@@ -1,0 +1,168 @@
+{
+  "id": "cc-flexiblesearch",
+  "title": "FlexibleSearch — Query Language Deep Dive",
+  "description": "SAP Commerce Cloud's type-aware query language for retrieving Models from the database safely and efficiently.",
+  "icon": "🔍",
+  "category": "sap-commerce-cloud",
+  "tags": ["flexiblesearch", "querying", "dao", "performance", "database"],
+  "sections": [
+    {
+      "title": "What is FlexibleSearch?",
+      "content": "<p><strong>FlexibleSearch</strong> is SAP Commerce Cloud's built-in query language. It looks like SQL but operates on <em>types and attributes</em> from the TypeSystem rather than raw database tables and columns. The platform translates FlexibleSearch queries into native SQL at runtime, handling table joins, typecode filtering, and localization automatically.</p><p>You never write raw SQL in Commerce Cloud. All data retrieval goes through <code>FlexibleSearchService</code>, which is the Spring bean that executes FlexibleSearch queries and returns typed results.</p><p>The key benefits of FlexibleSearch over raw SQL are:</p><ul><li><strong>Type-awareness</strong> — queries reference type codes and attribute qualifiers, not table names and column names</li><li><strong>Subtype inclusion</strong> — querying <code>{Product}</code> automatically includes all subtypes like <code>VariantProduct</code></li><li><strong>Localization</strong> — localized attributes are resolved for the current session language transparently</li><li><strong>Portability</strong> — queries work regardless of the underlying database (MySQL, MSSQL, Oracle, SAP HANA)</li></ul><blockquote><strong>Key mental model:</strong> Think of FlexibleSearch as a type-safe view over the database. You write queries in terms of your domain model, and the platform handles the SQL translation. This is why changing a type's deployment table does not break any FlexibleSearch queries that reference it.</blockquote>"
+    },
+    {
+      "title": "Basic Query Syntax",
+      "content": "<p>The structure of a FlexibleSearch query mirrors SQL but uses curly braces <code>{}</code> to reference types and attributes.</p><h3>Basic SELECT</h3><pre><code>SELECT {p:pk} FROM {Product AS p} WHERE {p:code} = ?code</code></pre><p>Breaking this down:</p><ul><li><code>{Product AS p}</code> — the type to query, aliased as <code>p</code></li><li><code>{p:pk}</code> — the <code>pk</code> attribute on the alias <code>p</code></li><li><code>{p:code}</code> — the <code>code</code> attribute on <code>p</code></li><li><code>?code</code> — a named query parameter (never concatenate values inline)</li></ul><h3>Selecting Multiple Attributes</h3><pre><code>SELECT {p:pk}, {p:code}, {p:name} FROM {Product AS p}\nWHERE {p:catalogVersion} = ?catalogVersion</code></pre><h3>Using Generated Constants</h3><p>Instead of hardcoding attribute qualifier strings, use the generated constants from Model classes — this makes queries refactor-safe:</p><pre><code>// Hardcoded — fragile\n\"SELECT {pk} FROM {Product} WHERE {code} = ?code\"\n\n// Using constants — preferred\n\"SELECT {\" + ItemModel.PK + \"} \"\n+ \"FROM {\" + ProductModel._TYPECODE + \"} \"\n+ \"WHERE {\" + ProductModel.CODE + \"} = ?code\"</code></pre><blockquote><strong>Exam tip:</strong> The <code>_TYPECODE</code> constant is a special static field generated on every Model class that returns the type's code as a string. Using it prevents typos and keeps queries valid after refactoring. Many exam scenario questions present queries with subtle string errors — knowing the constant pattern helps you spot them.</blockquote>"
+    },
+    {
+      "title": "Subtype Filtering — The ! Operator",
+      "content": "<p>One of the most frequently tested FlexibleSearch concepts is how subtype inclusion works and how to control it.</p><h3>Default Behavior — Subtypes Included</h3><p>When you query a type without any modifier, <strong>all subtypes are included</strong> in the result:</p><pre><code>SELECT {pk} FROM {Product}\n-- Returns: Product, ElectronicProduct, VariantProduct,\n--          and all other subtypes</code></pre><h3>The ! Operator — Exclude Subtypes</h3><p>Appending <code>!</code> to a type name restricts results to <em>only</em> instances of that exact type, excluding all subtypes:</p><pre><code>SELECT {pk} FROM {Product!}\n-- Returns: only exact Product instances,\n--          NOT ElectronicProduct or VariantProduct</code></pre><h3>When to Use Each</h3><ul><li>Use <strong>without !</strong> when you want all products regardless of subtype — the common case for storefront listing pages</li><li>Use <strong>with !</strong> when you specifically need only the base type — for example, when migrating data and you want to avoid processing subtype records twice</li></ul><h3>Querying a Specific Subtype</h3><p>To query only a specific subtype (and its own subtypes), simply use the subtype's code directly:</p><pre><code>SELECT {pk} FROM {ElectronicProduct}\n-- Returns ElectronicProduct and any types that extend it</code></pre><blockquote><strong>Common exam scenario:</strong> A query returns more results than expected — products appear duplicated or unrelated subtypes appear. The answer is almost always the <code>!</code> operator: the query should be targeting <code>{Product!}</code> to exclude subtypes that share the same deployment table.</blockquote>"
+    },
+    {
+      "title": "JOINs, ORDER BY, and Pagination",
+      "content": "<p>FlexibleSearch supports JOIN operations, sorting, and pagination — all essential for real DAO implementations.</p><h3>JOINs</h3><p>Joins follow SQL syntax but use type codes in the FROM clause:</p><pre><code>SELECT {p:pk}\nFROM {Product AS p\n      JOIN CatalogVersion AS cv\n      ON {p:catalogVersion} = {cv:pk}}\nWHERE {cv:version} = ?version\nAND {cv:catalog} = ?catalog</code></pre><p>Note that the JOIN is declared <em>inside</em> the FROM clause curly braces. This is a FlexibleSearch-specific syntax difference from standard SQL.</p><h3>LEFT JOIN</h3><pre><code>SELECT {p:pk}, {pr:price}\nFROM {Product AS p\n      LEFT JOIN PriceRow AS pr\n      ON {pr:product} = {p:pk}}\nWHERE {p:code} = ?code</code></pre><h3>ORDER BY</h3><pre><code>SELECT {p:pk} FROM {Product AS p}\nWHERE {p:catalogVersion} = ?cv\nORDER BY {p:name} ASC</code></pre><h3>Pagination via FlexibleSearchQuery</h3><p>For large result sets, always use pagination through the query object rather than loading everything into memory:</p><pre><code>FlexibleSearchQuery query = new FlexibleSearchQuery(\n    \"SELECT {pk} FROM {Product} WHERE {catalogVersion} = ?cv\");\nquery.addQueryParameter(\"cv\", catalogVersion);\nquery.setStart(0);      // offset\nquery.setCount(20);     // page size\n\nSearchResult&lt;ProductModel&gt; result =\n    flexibleSearchService.search(query);\n\nList&lt;ProductModel&gt; page = result.getResult();\nint total = result.getTotalCount();</code></pre><blockquote><strong>Performance rule:</strong> Never use <code>SELECT *</code> or load all attributes when you only need PKs. Selecting only <code>{pk}</code> and then loading models via <code>modelService.get(pk)</code> leverages the ModelService cache. Loading full objects in bulk defeats the cache and increases memory pressure.</blockquote>"
+    },
+    {
+      "title": "Localization and Relation Queries",
+      "content": "<p>Two areas where FlexibleSearch behaves differently from standard SQL: <strong>localized attributes</strong> and <strong>relation navigation</strong>.</p><h3>Localized Attributes</h3><p>When you reference a localized attribute in a WHERE clause, Commerce Cloud filters using the <em>current session language</em> by default:</p><pre><code>SELECT {pk} FROM {Product}\nWHERE {name} LIKE ?searchTerm\n-- Searches the 'name' attribute in the session's current language</code></pre><p>To query a specific language explicitly, use the language qualifier syntax:</p><pre><code>SELECT {pk} FROM {Product}\nWHERE {name[en]} LIKE ?searchTerm\n-- Always searches the English name regardless of session language</code></pre><h3>Querying Through Relations</h3><p>For many-to-many relations, you can query through the relation's link type:</p><pre><code>SELECT {p:pk}\nFROM {Product AS p\n      JOIN CategoryProductRelation AS rel\n      ON {rel:target} = {p:pk}\n      JOIN Category AS c\n      ON {rel:source} = {c:pk}}\nWHERE {c:code} = ?categoryCode</code></pre><p>The relation type code (e.g. <code>CategoryProductRelation</code>) is generated from the relation name in <code>items.xml</code>. You join through the link type just like any other type.</p><blockquote><strong>Gotcha:</strong> When querying localized attributes without specifying a language, results depend on the session locale. In background processes like CronJobs where no session language is set, localized attribute queries can return unexpected results or null. Always set a session language explicitly in non-interactive contexts.</blockquote>"
+    },
+    {
+      "title": "FlexibleSearchService — search() vs searchUnique() vs searchRaw()",
+      "content": "<p>The <code>FlexibleSearchService</code> exposes several query execution methods, each suited to different scenarios. Knowing which to use is a regular exam topic.</p><h3>search()</h3><p>The standard method for queries that return zero to many results:</p><pre><code>SearchResult&lt;ProductModel&gt; result =\n    flexibleSearchService.search(query);\n\nList&lt;ProductModel&gt; models = result.getResult();\nint totalCount = result.getTotalCount(); // total matching rows\nint requestedCount = result.getRequestedCount(); // page size</code></pre><h3>searchUnique()</h3><p>For queries that must return exactly one result. Throws if zero or more than one row matches:</p><pre><code>// Throws AmbiguousIdentifierException if multiple match\n// Throws UnknownIdentifierException if none match\nProductModel product =\n    flexibleSearchService.searchUnique(query);</code></pre><h3>searchRaw()</h3><p>Returns raw values (not Model objects) for queries that select non-PK fields. Useful for aggregate queries or when you only need scalar values:</p><pre><code>FlexibleSearchQuery query = new FlexibleSearchQuery(\n    \"SELECT {code}, {name} FROM {Product} WHERE {catalogVersion} = ?cv\");\nquery.setResultClassList(Arrays.asList(String.class, String.class));\n\nList&lt;List&lt;Object&gt;&gt; rows =\n    flexibleSearchService.search(query).getResult();</code></pre><h3>Executing FlexibleSearch in HAC</h3><p>The HAC (Hybris Administration Console) has a FlexibleSearch console under <strong>Console → FlexibleSearch</strong>. This is invaluable for testing queries during development and is referenced in exam scenarios about debugging data issues.</p><blockquote><strong>Summary of when to use each:</strong> Use <code>search()</code> for lists, <code>searchUnique()</code> for lookups by unique key (and handle the exceptions), and raw result classes when you need scalar aggregates like counts or sums rather than full Model objects.</blockquote>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-flexiblesearch-q1",
+      "type": "multiple-choice",
+      "text": "What does the '!' operator do when appended to a type name in a FlexibleSearch query, e.g. FROM {Product!}?",
+      "options": [
+        "It forces a full table scan and disables index usage for that type",
+        "It excludes all subtypes from the result, returning only exact instances of that type",
+        "It marks the query as read-only, preventing accidental data modification",
+        "It is a syntax error — the '!' operator is not valid in FlexibleSearch"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The <code>!</code> operator restricts results to exact instances of the named type, excluding all subtypes. Without it, querying <code>{Product}</code> returns Products, VariantProducts, ElectronicProducts, and every other subtype. Use <code>!</code> when you specifically need only the base type's instances.</p>"
+    },
+    {
+      "id": "cc-flexiblesearch-q2",
+      "type": "true-false",
+      "text": "In FlexibleSearch, query parameters should be concatenated directly into the query string using Java string operations for simplicity.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Parameters must use the <code>?paramName</code> placeholder syntax and be passed via <code>query.addQueryParameter()</code>. String concatenation is a security risk (equivalent to SQL injection), breaks with special characters, and prevents query plan caching by the platform.</p>"
+    },
+    {
+      "id": "cc-flexiblesearch-q3",
+      "type": "multiple-choice",
+      "text": "A query runs 'SELECT {pk} FROM {Product}'. Which of the following will be included in the results?",
+      "options": [
+        "Only exact Product instances — subtypes are excluded by default",
+        "Product instances and all subtypes such as VariantProduct and ElectronicProduct",
+        "Only Products from the current catalog version",
+        "Only Products whose PK is non-null — nulls are filtered automatically"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Without the <code>!</code> operator, FlexibleSearch includes all subtypes of the queried type. <code>{Product}</code> returns every instance of Product and any type that extends it. To restrict to exact Product instances only, use <code>{Product!}</code>.</p>"
+    },
+    {
+      "id": "cc-flexiblesearch-q4",
+      "type": "multiple-choice",
+      "text": "What happens when 'flexibleSearchService.searchUnique()' is called and the query matches two rows?",
+      "options": [
+        "It returns the first matching result and silently discards the second",
+        "It returns both results wrapped in a List",
+        "It throws an AmbiguousIdentifierException",
+        "It throws a FlexibleSearchException with a generic error message"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> <code>searchUnique()</code> enforces that exactly one result is returned. If multiple rows match, it throws <code>AmbiguousIdentifierException</code>. If no rows match, it throws <code>UnknownIdentifierException</code>. Use <code>search()</code> when zero or multiple results are acceptable.</p>"
+    },
+    {
+      "id": "cc-flexiblesearch-q5",
+      "type": "true-false",
+      "text": "In a FlexibleSearch JOIN, the join condition is declared inside the FROM clause curly braces, not in a separate ON clause after the FROM block.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> FlexibleSearch JOIN syntax places the entire join definition — including the ON condition — inside the <code>FROM {}</code> block. This differs from standard SQL where JOIN and ON appear after the FROM clause. The pattern is: <code>FROM {TypeA AS a JOIN TypeB AS b ON {a:attr} = {b:pk}}</code>.</p>"
+    },
+    {
+      "id": "cc-flexiblesearch-q6",
+      "type": "multiple-choice",
+      "text": "A developer needs to search products by their English name regardless of the current session language. Which query syntax is correct?",
+      "options": [
+        "WHERE {name} LIKE ?term AND {language} = 'en'",
+        "WHERE {name[en]} LIKE ?term",
+        "WHERE LANG({name}, 'en') LIKE ?term",
+        "WHERE {name:en} LIKE ?term"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The language qualifier syntax for localized attributes in FlexibleSearch is <code>{attribute[languageCode]}</code>. Without specifying a language, the query uses the current session locale, which is unpredictable in background processes.</p>"
+    },
+    {
+      "id": "cc-flexiblesearch-q7",
+      "type": "multiple-choice",
+      "text": "Which FlexibleSearchService method should be used when a query selects scalar values like counts or strings rather than full Model objects?",
+      "options": [
+        "searchUnique(), with the result cast to the expected scalar type",
+        "search(), with setResultClassList() defining the expected Java types for each selected column",
+        "searchRaw(), which is a separate service method dedicated to non-Model queries",
+        "searchScalar(), the platform method specifically designed for aggregate queries"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> For scalar results, use <code>search()</code> with <code>query.setResultClassList()</code> to define the expected Java type for each selected column. The result comes back as <code>List&lt;List&lt;Object&gt;&gt;</code>. There is no separate <code>searchRaw()</code> or <code>searchScalar()</code> method on the service.</p>"
+    },
+    {
+      "id": "cc-flexiblesearch-q8",
+      "type": "true-false",
+      "text": "FlexibleSearch queries are portable across different database vendors (MySQL, MSSQL, SAP HANA) because the platform translates them to native SQL at runtime.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> This is one of the primary reasons FlexibleSearch exists. Because queries reference types and attributes rather than database tables and columns, the platform can generate database-specific SQL at runtime. This portability is a deliberate design goal of the Commerce Cloud platform.</p>"
+    },
+    {
+      "id": "cc-flexiblesearch-q9",
+      "type": "multiple-choice",
+      "text": "How should pagination be implemented in a FlexibleSearch DAO to avoid loading all records into memory?",
+      "options": [
+        "Load all results with search() and use Java's List.subList() to extract the needed page",
+        "Use query.setStart() and query.setCount() on the FlexibleSearchQuery object before executing",
+        "Append 'LIMIT ?count OFFSET ?start' to the query string as in standard SQL",
+        "Pagination is not supported in FlexibleSearch — use ABAP reports for large datasets"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> <code>FlexibleSearchQuery</code> exposes <code>setStart()</code> (offset) and <code>setCount()</code> (page size) for server-side pagination. The database applies the limit before returning results, avoiding memory overhead. Never load all rows and slice in Java — this is a common performance bug in Commerce Cloud projects.</p>"
+    },
+    {
+      "id": "cc-flexiblesearch-q10",
+      "type": "true-false",
+      "text": "The _TYPECODE constant on a generated Model class (e.g. ProductModel._TYPECODE) returns the numeric typecode integer used in the database.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> <code>_TYPECODE</code> returns the type's <em>code string</em> (e.g. <code>\"Product\"</code>), not the numeric typecode integer. It is used in FlexibleSearch query strings inside <code>{}</code> brackets. The numeric typecode is a database-level identifier; the code string is what FlexibleSearch and the TypeSystem use at the API level.</p>"
+    },
+    {
+      "id": "cc-flexiblesearch-q11",
+      "type": "multiple-choice",
+      "text": "A CronJob executes a FlexibleSearch query on a localized attribute without specifying a language. What is the likely result?",
+      "options": [
+        "The query always defaults to English regardless of context",
+        "The query fails with a LocalizationException because no language is set",
+        "The query uses the session language, which may be unset in background processes, causing unpredictable or null results",
+        "FlexibleSearch automatically queries all languages and merges the results"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> Without an explicit language qualifier, FlexibleSearch resolves localized attributes using the current session language. In CronJobs and background processes, no session language is set by default, which can produce null values or unexpected behavior. Always set the session language explicitly in non-interactive contexts.</p>"
+    },
+    {
+      "id": "cc-flexiblesearch-q12",
+      "type": "multiple-choice",
+      "text": "What does 'result.getTotalCount()' return on a paginated FlexibleSearchService.search() result?",
+      "options": [
+        "The number of results in the current page only",
+        "The total number of rows matching the query across all pages",
+        "The total number of types in the TypeSystem matching the FROM clause",
+        "The number of results requested via query.setCount()"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> <code>getTotalCount()</code> returns the full count of matching rows in the database, regardless of the page size set via <code>setCount()</code>. <code>getRequestedCount()</code> returns the page size. This distinction matters for building pagination UIs that show total pages.</p>"
+    }
+  ]
+}

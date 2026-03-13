@@ -1,0 +1,168 @@
+{
+  "id": "cc-caching",
+  "title": "Caching — Regions, Invalidation & Configuration",
+  "description": "How SAP Commerce Cloud caches data across multiple layers to maximize performance and how to configure, extend, and invalidate caches.",
+  "icon": "⚡",
+  "category": "sap-commerce-cloud",
+  "tags": ["caching", "performance", "regions", "invalidation", "ehcache"],
+  "sections": [
+    {
+      "title": "Why Caching Matters and the Cache Layers",
+      "content": "<p>SAP Commerce Cloud serves high-traffic e-commerce workloads where database queries for the same data (product listings, categories, prices) would repeat thousands of times per minute. Caching is the primary mechanism to avoid this and is built into multiple layers of the platform.</p><p>Commerce Cloud has <strong>three distinct cache layers</strong>, each at a different architectural level:</p><ol><li><strong>ModelService / Entity Cache (L1)</strong> — a per-session, in-memory cache of loaded Model instances. Every Model loaded in a session is cached here and reused on subsequent PKlookups within the same session. This is the closest cache to the application code.</li><li><strong>Region Cache (L2)</strong> — a cross-session, JVM-level cache managed by the platform's <strong>RegionCache</strong> infrastructure. This is the primary configurable cache. All FlexibleSearch query results and model data are cached here.</li><li><strong>HTTP / CDN Cache</strong> — the outermost cache, typically a CDN (Akamai, Cloudflare) or a reverse proxy (Varnish) caching full HTTP responses. Configured at the infrastructure level, not within Commerce Cloud itself.</li></ol><p>Understanding which layer a cache operates at is important because the invalidation strategy differs for each. Flushing the L2 Region Cache does not affect a CDN cache, and vice versa.</p><blockquote><strong>Cache hit vs miss:</strong> A cache hit means the data was found in cache and no database query was needed. A cache miss means the data was not in cache and a database query was executed, with the result then stored in cache. Maximizing hit rates while keeping cache data fresh is the core caching challenge.</blockquote>"
+    },
+    {
+      "title": "The Region Cache — Configuration and Regions",
+      "content": "<p>The <strong>Region Cache</strong> is Commerce Cloud's main application-level cache. It is partitioned into named <strong>regions</strong>, each independently configurable for size, expiry, and eviction strategy. The underlying implementation uses <strong>EhCache</strong> (or the platform's own cache abstraction on top of it).</p><h3>Key Cache Regions</h3><p>Several important regions are predefined by the platform:</p><ul><li><code>entityCache</code> — caches individual Model instances by PK</li><li><code>queryCache</code> — caches FlexibleSearch query results (lists of PKs)</li><li><code>typesystemCache</code> — caches TypeSystem metadata (type definitions, attribute descriptors)</li><li><code>cmsCache</code> — caches CMS page and component data</li></ul><h3>Configuring a Cache Region</h3><p>Region configuration is done in <code>project.properties</code> or <code>local.properties</code> using a consistent property naming pattern:</p><pre><code># Maximum number of entries in the entity cache\nregionCache.entityCache.size=100000\n\n# Time to live in seconds (0 = never expire)\nregionCache.entityCache.TTL=3600\n\n# Eviction policy: LRU, LFU, FIFO\nregionCache.entityCache.evictionPolicy=LRU\n\n# Enable/disable the region entirely\nregionCache.entityCache.enabled=true\n\n# Stats — enables cache hit/miss monitoring\nregionCache.entityCache.stats=true</code></pre><h3>Custom Cache Regions</h3><p>You can define your own named cache regions for custom data that you want to cache independently of the platform regions:</p><pre><code>regionCache.myCustomCache.size=5000\nregionCache.myCustomCache.TTL=1800\nregionCache.myCustomCache.evictionPolicy=LRU</code></pre><blockquote><strong>TTL=0 means never expire:</strong> Setting TTL to 0 means items remain in the cache until evicted by size constraints. This is appropriate for rarely-changing reference data (currencies, languages, tax categories) but dangerous for frequently-changing data. A misconfigured TTL is a common cause of stale data bugs in production.</blockquote>"
+    },
+    {
+      "title": "Cache Invalidation — Strategies and the InvalidationTopic",
+      "content": "<p>Cache invalidation is one of the hardest problems in distributed systems, and Commerce Cloud provides several mechanisms to handle it correctly.</p><h3>Automatic Invalidation</h3><p>When a Model is saved or removed via <code>ModelService</code>, Commerce Cloud <strong>automatically invalidates</strong> the corresponding cache entries in the Region Cache. You do not need to manually invalidate the cache for standard CRUD operations through the ServiceLayer.</p><h3>Manual Invalidation via RegionCacheService</h3><p>For cases where you need programmatic cache control, inject the <code>RegionCacheService</code>:</p><pre><code>@Autowired\nprivate RegionCacheService regionCacheService;\n\n// Invalidate a specific key in a specific region\nregionCacheService.invalidate(\n    new CacheKey(\"myRegion\", myObject), false);\n\n// Clear an entire region\nregionCacheService.clearCache(\"myCustomCache\");\n\n// Clear all caches\nregionCacheService.clearCaches();</code></pre><h3>The InvalidationTopic System</h3><p>In a <strong>clustered environment</strong>, invalidating the cache on one node does not automatically propagate to other nodes. Commerce Cloud uses an <strong>InvalidationTopic</strong> publish/subscribe system to broadcast invalidation messages across the cluster:</p><ul><li>When a Model is saved on Node A, the platform publishes an invalidation message to the topic</li><li>All other nodes subscribe and receive the message, invalidating their local caches accordingly</li><li>This ensures cache consistency across the cluster without requiring each node to query the database</li></ul><blockquote><strong>Cluster cache consistency:</strong> In development with a single node, cache invalidation issues are rare. In a production cluster, stale data on one node while another has fresh data is a real risk if custom caching bypasses the InvalidationTopic system. Always use the platform's cache infrastructure rather than a custom in-memory map for cross-session data.</blockquote>"
+    },
+    {
+      "title": "The Query Cache and FlexibleSearch",
+      "content": "<p>The <strong>query cache</strong> is one of the most impactful caches in Commerce Cloud because FlexibleSearch queries are executed frequently. Understanding how it works and its limitations prevents a common class of bugs.</p><h3>How the Query Cache Works</h3><p>When a FlexibleSearch query executes, Commerce Cloud generates a cache key from the query string and its parameters. If the same query with the same parameters has been executed before, the result (a list of PKs) is returned from the query cache without hitting the database. The full Models are then loaded from the entity cache or database as needed.</p><p>This two-level approach (query cache stores PKs, entity cache stores Models) means:</p><ul><li>A query cache hit still requires loading Models — but entity cache hits make this fast</li><li>Query cache invalidation is coarser than entity cache — saving <em>any</em> Product can invalidate cached Product query results</li></ul><h3>Disabling the Query Cache for a Specific Query</h3><p>Sometimes you explicitly want fresh data and need to bypass the query cache:</p><pre><code>FlexibleSearchQuery query = new FlexibleSearchQuery(\n    \"SELECT {pk} FROM {Order} WHERE {status} = ?status\");\nquery.addQueryParameter(\"status\", OrderStatus.PROCESSING);\n\n// Disable caching for this specific query\nquery.setDisableCaching(true);\n\nList&lt;OrderModel&gt; orders =\n    flexibleSearchService.search(query).getResult();</code></pre><h3>When to Disable Query Caching</h3><ul><li>Queries that must always return real-time data (e.g. live inventory checks)</li><li>Queries in data migration scripts where you need to read back freshly written data</li><li>Debugging stale data issues to confirm whether caching is the cause</li></ul><blockquote><strong>Avoid disabling caching globally:</strong> Setting <code>regionCache.queryCache.enabled=false</code> in properties disables the query cache for the entire platform. This is occasionally done in development for debugging but causes severe performance degradation in production. Always use <code>query.setDisableCaching(true)</code> for targeted bypasses.</blockquote>"
+    },
+    {
+      "title": "CMS and Storefront Caching",
+      "content": "<p>The storefront has its own caching concerns that differ from the entity/query cache. CMS pages, components, and navigation data are heavily cached to serve page requests without re-querying the database on every hit.</p><h3>CMS Cache</h3><p>The <code>cmsCache</code> region caches CMS page structures and component data. When a content editor publishes changes in SmartEdit, this cache must be invalidated for the changes to appear on the storefront. This happens automatically through the platform's synchronization and invalidation mechanisms.</p><h3>Spartacus / Composable Storefront Caching</h3><p>In headless setups with Spartacus, caching operates differently:</p><ul><li><strong>OCC API responses</strong> are cached at the CDN/reverse proxy layer using HTTP cache headers (<code>Cache-Control</code>, <code>ETag</code>)</li><li><strong>Spartacus state management</strong> (NgRx) acts as a client-side cache — API responses are stored in the Redux store and reused across navigation</li><li><strong>SSR (Server-Side Rendering)</strong> cache stores rendered HTML pages for fast delivery of the first paint</li></ul><h3>Setting HTTP Cache Headers from OCC</h3><p>Commerce Cloud's OCC layer can emit cache control headers that instruct CDNs how long to cache responses:</p><pre><code># In project.properties — cache product pages for 5 minutes at CDN\ncommerce.caching.maxAge.product=300\ncommerce.caching.maxAge.category=600</code></pre><blockquote><strong>Storefront cache invalidation:</strong> When a product price changes in the backend, the entity cache is invalidated automatically. But if the OCC response was cached at the CDN, end users may see stale prices until the CDN TTL expires or a manual purge is triggered. Always align your CDN TTL with acceptable data staleness for the business.</blockquote>"
+    },
+    {
+      "title": "Monitoring, Tuning and Common Cache Pitfalls",
+      "content": "<p>Cache performance monitoring and correct configuration are as important as the caching implementation itself. The HAC provides built-in tools for both.</p><h3>Cache Monitoring in HAC</h3><p>Navigate to <strong>Monitoring → Cache</strong> in the HAC to see:</p><ul><li>All active cache regions and their current sizes</li><li>Hit rate, miss rate, and eviction counts per region</li><li>Options to manually clear individual regions or all caches</li></ul><p>A low hit rate (below ~80%) on the entity or query cache usually indicates the cache size is too small (items are evicted before they can be reused) or the TTL is too short.</p><h3>Common Cache Pitfalls</h3><ul><li><strong>Bypassing the ServiceLayer</strong> — direct JDBC updates or raw SQL changes bypass ModelService's automatic cache invalidation, leaving stale data in the cache. Never modify the database directly.</li><li><strong>Caching mutable objects</strong> — if you cache a Model reference directly in a custom static map and then modify it, the cached reference also changes. Always cache by PK and reload via ModelService.</li><li><strong>Over-invalidation</strong> — calling <code>clearCaches()</code> (clears everything) as a quick fix causes a cache cold-start, hammering the database with requests. Prefer targeted region or key invalidation.</li><li><strong>Under-sizing cache regions</strong> — a product catalog with 500,000 SKUs in a cache region sized to 10,000 entries will have constant eviction and near-zero hit rates. Size regions based on catalog scale.</li></ul><pre><code># Recommended sizing for a large catalog\nregionCache.entityCache.size=500000\nregionCache.queryCache.size=50000\nregionCache.typesystemCache.size=10000</code></pre><blockquote><strong>Cache stats in production:</strong> Enable <code>regionCache.{region}.stats=true</code> for key regions during performance testing, but consider disabling or sampling it in production — maintaining stats counters adds a small overhead per cache operation that compounds under high throughput.</blockquote>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-caching-q1",
+      "type": "multiple-choice",
+      "text": "Which of the following correctly describes the three cache layers in SAP Commerce Cloud from closest to application code to furthest?",
+      "options": [
+        "CDN → Region Cache → ModelService Session Cache",
+        "ModelService Session Cache → Region Cache → CDN/HTTP Cache",
+        "Region Cache → ModelService Session Cache → CDN",
+        "Database → Region Cache → CDN"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The layers from closest (L1) to furthest (L3) are: ModelService session cache (per-session, in-JVM) → Region Cache (cross-session, JVM-level) → CDN/HTTP cache (infrastructure-level). Each layer has different invalidation strategies and configuration mechanisms.</p>"
+    },
+    {
+      "id": "cc-caching-q2",
+      "type": "true-false",
+      "text": "Setting 'regionCache.entityCache.TTL=0' means cache entries expire immediately and are never stored.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> A TTL of <code>0</code> means entries <em>never expire</em> based on time — they remain in the cache until evicted by the size limit or explicitly invalidated. This is appropriate for rarely-changing reference data. To disable the cache entirely, use <code>regionCache.entityCache.enabled=false</code>.</p>"
+    },
+    {
+      "id": "cc-caching-q3",
+      "type": "multiple-choice",
+      "text": "When a ProductModel is saved via ModelService, what happens to its corresponding entry in the Region Cache?",
+      "options": [
+        "Nothing — cache invalidation must be triggered manually after every save",
+        "The entire Region Cache is cleared to ensure consistency",
+        "The corresponding cache entry is automatically invalidated by the platform",
+        "The cache entry is updated in-place with the new Model values"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> ModelService automatically invalidates the corresponding Region Cache entries when a Model is saved or removed. This is one of the key benefits of using the ServiceLayer for all persistence — cache consistency is maintained without any manual intervention.</p>"
+    },
+    {
+      "id": "cc-caching-q4",
+      "type": "multiple-choice",
+      "text": "A developer needs a specific FlexibleSearch query to always return real-time data, bypassing the query cache. How should this be done?",
+      "options": [
+        "Set 'regionCache.queryCache.enabled=false' in project.properties",
+        "Append 'NOCACHE' to the end of the FlexibleSearch query string",
+        "Call 'query.setDisableCaching(true)' on the FlexibleSearchQuery object",
+        "Wrap the query in a try/finally block that calls regionCacheService.clearCache()"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> <code>query.setDisableCaching(true)</code> disables caching for that specific query execution only. Disabling the entire query cache via properties (Option A) is a global change that severely impacts performance across the whole platform and should never be used in production for this purpose.</p>"
+    },
+    {
+      "id": "cc-caching-q5",
+      "type": "true-false",
+      "text": "In a clustered Commerce Cloud environment, saving a Model on one node automatically propagates cache invalidation to all other nodes via the InvalidationTopic system.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> Commerce Cloud's InvalidationTopic publish/subscribe system broadcasts cache invalidation messages across all nodes in the cluster. When Node A saves a Model, it publishes an invalidation message, and all other nodes receive and process it, clearing the corresponding entries from their local caches.</p>"
+    },
+    {
+      "id": "cc-caching-q6",
+      "type": "multiple-choice",
+      "text": "What is the recommended eviction policy property value for a cache region that should prioritize keeping the most recently accessed items?",
+      "options": [
+        "FIFO",
+        "LFU",
+        "LRU",
+        "TTL"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> LRU (Least Recently Used) evicts items that have not been accessed for the longest time, keeping recently accessed items in cache. LFU (Least Frequently Used) evicts items with the fewest accesses. FIFO (First In First Out) evicts the oldest items regardless of access patterns. TTL is not an eviction policy — it is a time-to-live expiry setting.</p>"
+    },
+    {
+      "id": "cc-caching-q7",
+      "type": "multiple-choice",
+      "text": "A direct JDBC UPDATE statement is executed against the database, bypassing the ServiceLayer. What is the cache impact?",
+      "options": [
+        "The platform detects the direct change and automatically invalidates affected cache entries",
+        "No cache invalidation occurs — the cache will serve stale data until TTL expiry or manual invalidation",
+        "The Region Cache is automatically cleared on the next request to that type",
+        "Direct JDBC operations are blocked by the platform to prevent exactly this scenario"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The automatic invalidation only works when changes go through ModelService. A direct JDBC update bypasses the ServiceLayer entirely, so no invalidation event is published. The cache continues serving the old values until TTL expiry, manual cache clearing, or the next save through the ServiceLayer. This is a major reason to never use raw SQL for data modification in Commerce Cloud.</p>"
+    },
+    {
+      "id": "cc-caching-q8",
+      "type": "true-false",
+      "text": "The query cache in Commerce Cloud stores full Model objects for each matching query result.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> The query cache stores only <strong>lists of PKs</strong>, not full Model objects. The actual Models are loaded separately from the entity cache or database. This two-level design keeps the query cache compact and allows cache entries to be shared — the same Product PK in multiple query results points to one entity cache entry.</p>"
+    },
+    {
+      "id": "cc-caching-q9",
+      "type": "multiple-choice",
+      "text": "A product price is updated in the backend. The entity cache is correctly invalidated. However, end users still see the old price for several minutes. What is the most likely cause?",
+      "options": [
+        "The TTL on the entity cache is set too high",
+        "The OCC API response is cached at the CDN layer with a TTL that has not yet expired",
+        "The query cache still contains the old PK list and is serving stale results",
+        "The ModelService session cache has not been refreshed on the user's session"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> If the entity and query caches are properly invalidated but users still see stale data, the most likely culprit is the CDN/HTTP cache serving a cached OCC API response. CDN TTLs are independent of the platform's internal cache invalidation. Resolution requires either a CDN purge or waiting for the TTL to expire.</p>"
+    },
+    {
+      "id": "cc-caching-q10",
+      "type": "multiple-choice",
+      "text": "Where in the HAC can you monitor cache hit rates and manually clear cache regions?",
+      "options": [
+        "Platform → Configuration",
+        "Console → FlexibleSearch",
+        "Monitoring → Cache",
+        "Background Processes → CronJobs"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> The HAC's <strong>Monitoring → Cache</strong> section shows all active cache regions with their current sizes, hit rates, miss rates, and eviction counts. It also provides buttons to clear individual regions or all caches, making it the primary operational tool for cache management.</p>"
+    },
+    {
+      "id": "cc-caching-q11",
+      "type": "true-false",
+      "text": "Calling 'regionCacheService.clearCaches()' is the recommended approach for resolving stale data issues in production because it ensures all caches are fully refreshed.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> <code>clearCaches()</code> clears <em>all</em> cache regions simultaneously, causing a cache cold-start where every subsequent request misses the cache and hits the database. Under production load this can cause severe performance degradation. Always prefer targeted invalidation — clear only the specific region or key that contains stale data.</p>"
+    },
+    {
+      "id": "cc-caching-q12",
+      "type": "multiple-choice",
+      "text": "Which property correctly configures the maximum number of entries in the entityCache region?",
+      "options": [
+        "cache.entityCache.maxEntries=100000",
+        "regionCache.entityCache.size=100000",
+        "ehcache.entityCache.maxElements=100000",
+        "platform.cache.entity.limit=100000"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Commerce Cloud's Region Cache uses the <code>regionCache.{regionName}.size</code> property pattern for configuring the maximum number of entries per region. The other options use incorrect prefixes or property names that are not recognized by the platform's cache configuration system.</p>"
+    }
+  ]
+}

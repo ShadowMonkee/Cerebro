@@ -5,6 +5,13 @@
   "topics": [
     "cc-typesystem",
     "cc-spring-basics",
-    "cc-servicelayer"
+    "cc-servicelayer",
+    "cc-flexiblesearch",
+    "cc-interceptors",
+    "cc-extensions",
+    "cc-impex",
+    "cc-cronjobs",
+    "cc-caching",
+    "cc-search-solr"
   ]
 }

@@ -1,0 +1,168 @@
+{
+  "id": "cc-cronjobs",
+  "title": "CronJobs & Maintenance Tasks",
+  "description": "How SAP Commerce Cloud schedules and executes background tasks using the CronJob framework, triggers, and job performers.",
+  "icon": "⏰",
+  "category": "sap-commerce-cloud",
+  "tags": ["cronjobs", "scheduling", "background-tasks", "triggers", "maintenance"],
+  "sections": [
+    {
+      "title": "The CronJob Framework — Core Concepts",
+      "content": "<p>The <strong>CronJob framework</strong> is SAP Commerce Cloud's built-in mechanism for scheduling and executing background tasks. It is used for everything from Solr indexing and order processing to data cleanup and report generation.</p><p>The framework has three distinct concepts that are often confused:</p><ul><li><strong>Job (ServicelayerJob)</strong> — the Spring bean that contains the actual business logic to execute. Defined once, reusable across multiple CronJob instances.</li><li><strong>CronJob</strong> — a persisted item in the database that references a Job and holds configuration (parameters, logging settings, node group). Think of it as a scheduled run configuration.</li><li><strong>Trigger</strong> — a persisted item that defines <em>when</em> a CronJob should run, using either a cron expression or a time interval.</li></ul><p>This separation is intentional. You write one Job implementation, then create multiple CronJob instances that point to it — each with different parameters or schedules. For example, one SolrIndexerJob can power both a full index CronJob (nightly) and a partial update CronJob (every 15 minutes).</p><blockquote><strong>Key mental model:</strong> Job = what to do. CronJob = the configuration of a run. Trigger = when to run it. All three are required for a scheduled background task. The exam regularly tests whether candidates understand this three-part structure.</blockquote>"
+    },
+    {
+      "title": "Implementing a Job — ServicelayerJob",
+      "content": "<p>All modern CronJob implementations extend <code>AbstractJobPerformable</code>, which is the ServiceLayer-compatible base class. The older <code>JobPerformable</code> interface is still valid but <code>AbstractJobPerformable</code> provides useful utilities and is the recommended approach.</p><pre><code>public class SendNewsletterJob\n        extends AbstractJobPerformable&lt;CronJobModel&gt; {\n\n    private NewsletterService newsletterService;\n    private UserService userService;\n\n    @Override\n    public PerformResult perform(CronJobModel cronJob) {\n\n        // Set admin user context — required for most service calls\n        userService.setCurrentUser(\n            userService.getAdminUser());\n\n        try {\n            newsletterService.sendPendingNewsletters();\n            return new PerformResult(\n                CronJobResult.SUCCESS,\n                CronJobStatus.FINISHED);\n        } catch (Exception e) {\n            LOG.error(\"Newsletter job failed\", e);\n            return new PerformResult(\n                CronJobResult.ERROR,\n                CronJobStatus.FINISHED);\n        }\n    }\n\n    @Override\n    public boolean isAbortable() {\n        return true; // Allow manual abort from HAC\n    }\n\n    // Setters for Spring injection\n    public void setNewsletterService(\n            NewsletterService newsletterService) {\n        this.newsletterService = newsletterService;\n    }\n}</code></pre><h3>PerformResult</h3><p>The <code>perform()</code> method must return a <code>PerformResult</code> combining a <strong>result</strong> and a <strong>status</strong>:</p><ul><li><strong>CronJobResult</strong>: <code>SUCCESS</code>, <code>FAILURE</code>, <code>ERROR</code>, <code>UNKNOWN</code></li><li><strong>CronJobStatus</strong>: <code>FINISHED</code>, <code>ABORTED</code>, <code>RUNNING</code>, <code>UNKNOWN</code></li></ul><p>The typical success return is <code>new PerformResult(CronJobResult.SUCCESS, CronJobStatus.FINISHED)</code>.</p><blockquote><strong>Always set the user context.</strong> CronJobs run as the <code>anonymous</code> user by default. Most ServiceLayer calls require an authenticated user. Set the current user to admin (or a dedicated service account) at the start of <code>perform()</code> and restore it in a <code>finally</code> block to avoid permission errors.</blockquote>"
+    },
+    {
+      "title": "Registering a Job and Creating a CronJob via ImpEx",
+      "content": "<p>Once the Job class is written and wired as a Spring bean, you need to persist a <strong>ServicelayerJobModel</strong> pointing to it, and then create a <strong>CronJobModel</strong> referencing that job.</p><h3>Spring Bean Declaration</h3><pre><code>&lt;bean id=\"sendNewsletterJob\"\n      class=\"com.mycompany.SendNewsletterJob\"&gt;\n  &lt;property name=\"newsletterService\"\n            ref=\"newsletterService\"/&gt;\n  &lt;property name=\"userService\"\n            ref=\"userService\"/&gt;\n&lt;/bean&gt;</code></pre><h3>ImpEx to Create the Job and CronJob</h3><pre><code>-- Create the ServicelayerJob item pointing to the Spring bean\nINSERT_UPDATE ServicelayerJob; springId[unique=true]    ; code[unique=true]\n                              ; sendNewsletterJob       ; sendNewsletterJob\n\n-- Create the CronJob referencing the job\nINSERT_UPDATE CronJob; code[unique=true]      ; job(code)         ; active\n                     ; sendNewsletterCronJob  ; sendNewsletterJob ; true\n\n-- Create a Trigger with a cron expression (every day at 2am)\nINSERT_UPDATE Trigger; cronJob(code)[unique=true] ; cronExpression\n                     ; sendNewsletterCronJob      ; 0 0 2 * * ?</code></pre><p>The <strong>springId</strong> on <code>ServicelayerJob</code> must exactly match the Spring bean ID. This is how the platform finds and instantiates the correct job implementation at runtime.</p><blockquote><strong>springId must match exactly:</strong> A mismatch between the <code>springId</code> in the database and the actual Spring bean ID causes the CronJob to fail at runtime with a bean-not-found error. This is one of the most common CronJob setup mistakes and appears regularly in exam scenarios.</blockquote>"
+    },
+    {
+      "title": "Triggers and Cron Expressions",
+      "content": "<p>A <strong>Trigger</strong> defines when a CronJob runs. Commerce Cloud supports two trigger types:</p><ul><li><strong>Cron expression triggers</strong> — schedule based on a standard cron syntax</li><li><strong>Relative triggers</strong> — run a fixed interval after the previous execution completes</li></ul><h3>Cron Expression Format</h3><p>Commerce Cloud uses the <strong>Quartz cron expression</strong> format, which has <strong>6 fields</strong> (not 5 like Unix cron):</p><pre><code>┌─────────── second (0-59)\n│ ┌───────── minute (0-59)\n│ │ ┌─────── hour (0-23)\n│ │ │ ┌───── day of month (1-31)\n│ │ │ │ ┌─── month (1-12 or JAN-DEC)\n│ │ │ │ │ ┌─ day of week (1-7 or SUN-SAT)\n│ │ │ │ │ │\n0 0 2 * * ?   ← Every day at 02:00:00\n0 0/15 * * * ? ← Every 15 minutes\n0 0 0 ? * MON ← Every Monday at midnight</code></pre><p>The <code>?</code> character means \"no specific value\" and is used in either the day-of-month or day-of-week field (not both).</p><h3>Multiple Triggers per CronJob</h3><p>A single CronJob can have multiple Triggers. This is useful when you need a task to run on different schedules — for example, a full run on Sundays and a lighter run every night.</p><h3>Activating and Deactivating</h3><p>Triggers have an <code>active</code> flag. Setting <code>active=false</code> on a Trigger disables it without deleting it. The CronJob itself also has an <code>active</code> flag — if the CronJob is inactive, none of its triggers fire.</p><blockquote><strong>Quartz vs Unix cron:</strong> The 6-field Quartz format is a common exam trap. Unix cron has 5 fields; Quartz has 6 (leading seconds field). An expression like <code>0 0 2 * * ?</code> is valid Quartz. Writing <code>0 2 * * *</code> (5 fields) is Unix cron syntax and will not work in Commerce Cloud.</blockquote>"
+    },
+    {
+      "title": "Abortable Jobs and the CronJob Lifecycle",
+      "content": "<p>Understanding the full lifecycle of a CronJob execution — and how to handle long-running tasks safely — is important for both the exam and production systems.</p><h3>Making a Job Abortable</h3><p>Override <code>isAbortable()</code> to return <code>true</code>, then check <code>clearAbortRequestedIfNeeded(cronJob)</code> periodically inside your <code>perform()</code> loop to respect abort requests from the HAC:</p><pre><code>@Override\npublic PerformResult perform(CronJobModel cronJob) {\n    List&lt;OrderModel&gt; orders = getOrdersToProcess();\n\n    for (OrderModel order : orders) {\n\n        // Check if an abort has been requested\n        if (clearAbortRequestedIfNeeded(cronJob)) {\n            return new PerformResult(\n                CronJobResult.UNKNOWN,\n                CronJobStatus.ABORTED);\n        }\n\n        processOrder(order);\n    }\n\n    return new PerformResult(\n        CronJobResult.SUCCESS,\n        CronJobStatus.FINISHED);\n}</code></pre><h3>CronJob Logging</h3><p>Commerce Cloud persists CronJob logs in the database. Each CronJob run creates a log entry accessible from the HAC under <strong>Background Processes → CronJobs</strong>. You can write to this log from within your job:</p><pre><code>// Within perform() - logs are persisted to the DB\nLOG.info(\"Processing order: \" + order.getCode());</code></pre><h3>Node Groups and Cluster Execution</h3><p>In a clustered environment, CronJobs can be restricted to run on specific nodes using <strong>node groups</strong>. The <code>nodeGroup</code> attribute on a CronJob specifies which cluster nodes are eligible to execute it. This prevents the same CronJob from running simultaneously on multiple nodes.</p><blockquote><strong>SingletonJobPerformable:</strong> For CronJobs that must never run concurrently (even across restarts), use the <code>singletonJobPerformable</code> pattern. It uses a database lock to ensure only one instance runs at a time, regardless of cluster configuration.</blockquote>"
+    },
+    {
+      "title": "Managing CronJobs in HAC and Best Practices",
+      "content": "<p>The HAC provides a full management interface for CronJobs under <strong>Background Processes → CronJobs</strong>. Understanding what you can do from HAC is tested in the exam.</p><h3>HAC CronJob Management</h3><ul><li><strong>View all CronJobs</strong> and their last execution result (SUCCESS, FAILURE, ERROR)</li><li><strong>Trigger a CronJob manually</strong> — runs it immediately regardless of its trigger schedule</li><li><strong>Abort a running CronJob</strong> — sends an abort signal (only effective if the job checks for it)</li><li><strong>View logs</strong> — see the persisted log output of each run</li><li><strong>Enable/disable</strong> CronJobs and Triggers</li></ul><h3>Best Practices</h3><ul><li><strong>Always set user context</strong> — use admin or a dedicated service user at the start of <code>perform()</code></li><li><strong>Make long-running jobs abortable</strong> — check abort signals in loops</li><li><strong>Use session language</strong> — set a language if the job uses localized data via FlexibleSearch</li><li><strong>Avoid long transactions</strong> — commit in batches to avoid transaction timeouts and memory issues</li><li><strong>Handle exceptions explicitly</strong> — return <code>CronJobResult.ERROR</code> rather than letting uncaught exceptions propagate; uncaught exceptions leave the CronJob in RUNNING status</li></ul><pre><code>// Pattern for batched processing\n@Override\npublic PerformResult perform(CronJobModel cronJob) {\n    userService.setCurrentUser(userService.getAdminUser());\n    sessionService.setAttribute(\n        CommonI18NService.LANGUAGE_SESSION_ATTR_KEY,\n        commonI18NService.getLanguage(\"en\"));\n\n    int offset = 0;\n    final int batchSize = 100;\n    List&lt;ProductModel&gt; batch;\n\n    do {\n        if (clearAbortRequestedIfNeeded(cronJob)) {\n            return new PerformResult(\n                CronJobResult.UNKNOWN, CronJobStatus.ABORTED);\n        }\n        batch = productDao.findProductsBatch(offset, batchSize);\n        processBatch(batch);\n        modelService.saveAll(batch);\n        modelService.clearTransactionalCache();\n        offset += batchSize;\n    } while (batch.size() == batchSize);\n\n    return new PerformResult(\n        CronJobResult.SUCCESS, CronJobStatus.FINISHED);\n}</code></pre><blockquote><strong>clearTransactionalCache():</strong> In batch-processing CronJobs, call <code>modelService.clearTransactionalCache()</code> after each batch to release memory. Without this, every loaded Model accumulates in the session cache and large jobs will eventually run out of heap space.</blockquote>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-cronjobs-q1",
+      "type": "multiple-choice",
+      "text": "In the CronJob framework, what is the correct relationship between a Job, a CronJob, and a Trigger?",
+      "options": [
+        "Job contains the schedule; CronJob contains the logic; Trigger connects them",
+        "Job contains the business logic; CronJob is the persisted run configuration referencing the Job; Trigger defines when to run the CronJob",
+        "CronJob contains the business logic; Job is the persisted item; Trigger is the Spring bean",
+        "Job and CronJob are interchangeable terms; Trigger defines both the logic and the schedule"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The three-part structure is: <strong>Job</strong> (Spring bean with logic) → <strong>CronJob</strong> (persisted config that references the Job) → <strong>Trigger</strong> (persisted schedule). This separation allows one Job to be reused across many CronJob configurations with different parameters and schedules.</p>"
+    },
+    {
+      "id": "cc-cronjobs-q2",
+      "type": "true-false",
+      "text": "The 'springId' attribute on a ServicelayerJob item must exactly match the Spring bean ID of the job implementation.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> The platform uses the <code>springId</code> to look up the job's Spring bean at runtime. A mismatch between the database value and the actual bean ID causes a bean-not-found error when the CronJob is triggered. This is one of the most common CronJob configuration mistakes.</p>"
+    },
+    {
+      "id": "cc-cronjobs-q3",
+      "type": "multiple-choice",
+      "text": "A CronJob fails with an AccessDeniedException when calling a ProductService method. What is the most likely cause?",
+      "options": [
+        "The CronJob's Spring bean is missing the @Transactional annotation",
+        "The CronJob runs as the anonymous user by default, which lacks the required permissions",
+        "The ServicelayerJob item has the wrong springId value",
+        "The Trigger's cron expression is invalid, causing the job to run in degraded mode"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> CronJobs execute under the <code>anonymous</code> user context by default. Most service calls require an authenticated user with appropriate permissions. The fix is to call <code>userService.setCurrentUser(userService.getAdminUser())</code> at the start of <code>perform()</code>.</p>"
+    },
+    {
+      "id": "cc-cronjobs-q4",
+      "type": "multiple-choice",
+      "text": "What does the Quartz cron expression '0 0 2 * * ?' mean?",
+      "options": [
+        "Every 2 minutes",
+        "Every day at 02:00:00",
+        "Every 2 hours",
+        "At second 0, minute 0, on day 2 of every month"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> In Quartz 6-field format: <code>0</code> (second) <code>0</code> (minute) <code>2</code> (hour) <code>*</code> (every day of month) <code>*</code> (every month) <code>?</code> (no specific day of week) = every day at 02:00:00. The leading seconds field distinguishes Quartz from 5-field Unix cron.</p>"
+    },
+    {
+      "id": "cc-cronjobs-q5",
+      "type": "true-false",
+      "text": "A CronJob can have multiple Triggers, allowing it to run on different schedules simultaneously.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> Multiple Triggers can reference the same CronJob. This is useful for scenarios like running a full operation weekly and a lighter operation nightly, both pointing to the same CronJob configuration. Each Trigger independently fires the CronJob when its schedule matches.</p>"
+    },
+    {
+      "id": "cc-cronjobs-q6",
+      "type": "multiple-choice",
+      "text": "How does a Job implementation signal to the framework that it supports manual abort from the HAC?",
+      "options": [
+        "By annotating the perform() method with @Abortable",
+        "By overriding isAbortable() to return true and periodically checking clearAbortRequestedIfNeeded()",
+        "By setting the 'abortable' property on the ServicelayerJob item in ImpEx",
+        "All jobs support abort automatically — no implementation change is needed"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Two things are required: override <code>isAbortable()</code> to return <code>true</code> (signals HAC to show the Abort button), and call <code>clearAbortRequestedIfNeeded(cronJob)</code> periodically inside the <code>perform()</code> loop (checks the database flag and returns <code>true</code> if an abort was requested). Without the periodic check, the abort signal is never acted on.</p>"
+    },
+    {
+      "id": "cc-cronjobs-q7",
+      "type": "multiple-choice",
+      "text": "What should be returned from perform() if a CronJob is successfully aborted mid-execution?",
+      "options": [
+        "new PerformResult(CronJobResult.SUCCESS, CronJobStatus.FINISHED)",
+        "new PerformResult(CronJobResult.FAILURE, CronJobStatus.FINISHED)",
+        "new PerformResult(CronJobResult.UNKNOWN, CronJobStatus.ABORTED)",
+        "null — returning null signals an abort to the framework"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> When a job detects an abort signal and exits early, the correct return is <code>CronJobResult.UNKNOWN</code> (since the work is incomplete) with <code>CronJobStatus.ABORTED</code>. Returning SUCCESS when work is incomplete is misleading. Never return null — this causes a NullPointerException in the framework.</p>"
+    },
+    {
+      "id": "cc-cronjobs-q8",
+      "type": "true-false",
+      "text": "Quartz cron expressions in Commerce Cloud use 6 fields, with the first field representing seconds.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> Commerce Cloud uses Quartz cron syntax which has 6 fields: second, minute, hour, day-of-month, month, day-of-week. This differs from Unix cron's 5 fields (which starts at minutes). A common mistake is writing 5-field expressions which are not valid in Commerce Cloud.</p>"
+    },
+    {
+      "id": "cc-cronjobs-q9",
+      "type": "multiple-choice",
+      "text": "Why should 'modelService.clearTransactionalCache()' be called periodically in a batch-processing CronJob?",
+      "options": [
+        "It commits the current transaction to the database, ensuring data is persisted",
+        "It releases accumulated Models from the session cache, preventing OutOfMemoryErrors during large batch operations",
+        "It refreshes all loaded Models from the database to pick up changes made by other processes",
+        "It is required before calling modelService.saveAll() to avoid constraint violations"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Every Model loaded via ModelService is kept in the session cache for the duration of the session. In a CronJob processing thousands of items, this cache grows without bound. Calling <code>clearTransactionalCache()</code> after each batch releases those cached instances, keeping heap usage stable throughout the job.</p>"
+    },
+    {
+      "id": "cc-cronjobs-q10",
+      "type": "multiple-choice",
+      "text": "What happens if an uncaught exception propagates out of a CronJob's perform() method?",
+      "options": [
+        "The CronJob is automatically retried according to the Trigger's retry policy",
+        "The CronJob status is set to FINISHED with result ERROR",
+        "The CronJob may be left in RUNNING status, making it appear still active in HAC",
+        "The platform catches all exceptions and always returns SUCCESS to prevent alerting"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> An uncaught exception can leave the CronJob in <code>RUNNING</code> status, which prevents it from being triggered again (the platform thinks it is still executing). Always wrap your <code>perform()</code> in a try/catch and explicitly return <code>CronJobResult.ERROR</code> with <code>CronJobStatus.FINISHED</code> on failure.</p>"
+    },
+    {
+      "id": "cc-cronjobs-q11",
+      "type": "true-false",
+      "text": "In a clustered Commerce Cloud environment, a CronJob without a nodeGroup assignment will run simultaneously on all cluster nodes when its Trigger fires.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> The CronJob framework includes cluster awareness — without a <code>nodeGroup</code>, the platform uses a locking mechanism to ensure a CronJob runs on only one node at a time. However, configuring <code>nodeGroup</code> gives explicit control over which nodes are eligible, which is the recommended approach for production clusters.</p>"
+    },
+    {
+      "id": "cc-cronjobs-q12",
+      "type": "multiple-choice",
+      "text": "Where in the HAC can you manually trigger a CronJob to run immediately, regardless of its scheduled Trigger?",
+      "options": [
+        "Console → Scripting Languages",
+        "Background Processes → CronJobs",
+        "Monitoring → Performance",
+        "Platform → Configuration"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The HAC's <strong>Background Processes → CronJobs</strong> section lists all CronJobs and provides controls to trigger them manually, abort running jobs, view logs, and enable or disable them. This is the primary operational interface for CronJob management.</p>"
+    }
+  ]
+}

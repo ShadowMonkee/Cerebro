@@ -1,0 +1,168 @@
+{
+  "id": "cc-search-solr",
+  "title": "Search with Solr — Indexing, Facets & Synonyms",
+  "description": "How SAP Commerce Cloud integrates with Apache Solr to power product search, faceted navigation, and search relevance tuning.",
+  "icon": "🔎",
+  "category": "sap-commerce-cloud",
+  "tags": ["solr", "search", "indexing", "facets", "synonyms"],
+  "sections": [
+    {
+      "title": "Solr in Commerce Cloud — Architecture Overview",
+      "content": "<p>SAP Commerce Cloud uses <strong>Apache Solr</strong> as its search engine. Rather than querying the database for every search request — which would be too slow for full-text search, faceting, and relevance ranking — Commerce Cloud maintains a Solr index that mirrors the product catalog data in a search-optimized format.</p><p>The integration consists of several key components:</p><ul><li><strong>SolrFacetSearchConfig</strong> — the persisted configuration item that defines a search index: which types to index, which fields to include, and how queries are structured</li><li><strong>IndexedType</strong> — defines which Commerce Cloud type (usually <code>Product</code>) is indexed and how its attributes map to Solr fields</li><li><strong>IndexedProperty</strong> — maps a specific attribute (e.g. <code>name</code>, <code>price</code>, <code>brand</code>) to a Solr field with configuration for faceting, boosting, and localization</li><li><strong>SolrIndexerCronJob</strong> — the background job that reads product data from the database and pushes it to Solr</li><li><strong>FacetSearchService</strong> — the Spring bean used to execute Solr searches from code</li></ul><p>Commerce Cloud maintains <strong>two Solr cores</strong> per index configuration: an <em>active</em> core serving live search traffic and a <em>staging</em> core being populated by the indexer. When indexing completes, the cores are swapped atomically, ensuring zero search downtime during re-indexing.</p><blockquote><strong>Solr is not a database replacement:</strong> Solr holds a snapshot of product data optimized for search. It does not replace FlexibleSearch for transactional queries. Data in Solr is only as fresh as the last index run — real-time inventory or pricing changes are not instantly reflected unless a partial update indexer runs frequently.</blockquote>"
+    },
+    {
+      "title": "Indexing — Full Index vs Partial Update",
+      "content": "<p>There are two types of indexing operations in Commerce Cloud, each suited to different scenarios:</p><h3>Full Index</h3><p>A full index re-indexes every item of the configured type from scratch. The indexer reads all products from the database, transforms them, and writes them to the staging Solr core. When complete, the staging core becomes the active core.</p><ul><li>Typically scheduled nightly via a CronJob</li><li>Ensures complete data consistency between the database and Solr</li><li>Can take minutes to hours depending on catalog size</li></ul><h3>Partial Update (Hot Update)</h3><p>A partial update re-indexes only items that have changed since the last index run. Commerce Cloud tracks modified items using a <strong>modified time</strong> strategy — the indexer queries for items whose <code>modifiedtime</code> is newer than the last run.</p><ul><li>Typically scheduled every 15–30 minutes</li><li>Much faster than a full index — only changed items are processed</li><li>Does not swap cores — updates are applied directly to the active core</li></ul><h3>The Indexer CronJob</h3><p>Both index types are executed by the <code>SolrIndexerCronJob</code>. The type of operation is configured by the <code>indexerOperation</code> parameter on the CronJob:</p><pre><code>INSERT_UPDATE SolrIndexerCronJob\n  ; code[unique=true]           ; job(code)        ; indexerOperation\n  ; fullProductIndexCronJob     ; solrIndexerJob   ; FULL\n  ; partialProductIndexCronJob  ; solrIndexerJob   ; UPDATE</code></pre><blockquote><strong>Index freshness vs cost:</strong> A full index guarantees correctness but is expensive. Partial updates are cheap but can miss deletions (deleted products are not re-indexed, so they only disappear after the next full index). A common production strategy is partial updates every 15 minutes with a nightly full index.</blockquote>"
+    },
+    {
+      "title": "IndexedProperties — Mapping Attributes to Solr Fields",
+      "content": "<p>An <strong>IndexedProperty</strong> defines how a single attribute from a Commerce Cloud type maps to a Solr field. The configuration controls whether the field is searchable, facetable, sortable, and how it handles localization.</p><h3>Key IndexedProperty Configuration</h3><ul><li><code>name</code> — the Solr field name (must be unique within the index)</li><li><code>type</code> — the field data type: <code>string</code>, <code>text</code>, <code>double</code>, <code>boolean</code>, <code>date</code>, etc.</li><li><code>localized</code> — if <code>true</code>, separate Solr fields are created per language (e.g. <code>name_en</code>, <code>name_de</code>)</li><li><code>facet</code> — if <code>true</code>, the field can be used as a facet for filtering</li><li><code>sortable</code> — if <code>true</code>, search results can be sorted by this field</li><li><code>fieldValueProvider</code> — the Spring bean that extracts the value from the Model. The platform provides many providers; you can write custom ones.</li></ul><h3>Common Field Value Providers</h3><ul><li><code>springELValueProvider</code> — evaluates a Spring Expression Language expression against the model (e.g. <code>#{model.code}</code>)</li><li><code>priceValueProvider</code> — resolves the correct price for the current currency and user group</li><li><code>promotionPriceValueProvider</code> — resolves promotional prices</li><li><code>categoryCodeValueProvider</code> — extracts all category codes from the product's category hierarchy</li></ul><pre><code>INSERT_UPDATE SolrIndexedProperty\n  ; solrIndexedType(identifier)[unique=true]\n  ; name[unique=true]\n  ; type\n  ; localized\n  ; facet\n  ; sortable\n  ; fieldValueProvider\n  ; productType ; name         ; text   ; true  ; false ; true  ; springELValueProvider\n  ; productType ; brand        ; string ; false ; true  ; false ; springELValueProvider\n  ; productType ; price        ; double ; false ; false ; true  ; priceValueProvider</code></pre><blockquote><strong>text vs string type:</strong> Use <code>text</code> for full-text searchable fields (names, descriptions) — Solr applies tokenization and stemming. Use <code>string</code> for exact-match fields used in facets or filters (brand, color, category code). Mixing these up is a common configuration mistake that causes facet values to be tokenized and split.</blockquote>"
+    },
+    {
+      "title": "Faceted Search and Navigation",
+      "content": "<p><strong>Facets</strong> are the clickable filter options on a search results page (\"Brand: Samsung | Apple | LG\", \"Price: €0–€100 | €100–€500\"). Commerce Cloud generates facets automatically from IndexedProperties marked with <code>facet=true</code>.</p><h3>Facet Types</h3><ul><li><strong>MultiSelectOr</strong> — selecting multiple values shows products matching any of them (OR logic). Default for most category facets.</li><li><strong>MultiSelectAnd</strong> — selecting multiple values shows only products matching all of them (AND logic). Used for attributes like \"features\".</li><li><strong>Range facets</strong> — groups numeric or date values into ranges (price ranges, rating ranges).</li></ul><h3>Configuring a Range Facet</h3><pre><code>INSERT_UPDATE SolrValueRangeSet\n  ; name[unique=true] ; type\n  ; priceRangeSet     ; double\n\nINSERT_UPDATE SolrValueRange\n  ; name[unique=true] ; valueRangeSet(name)[unique=true] ; from  ; to\n  ; range1            ; priceRangeSet                   ; 0     ; 99.99\n  ; range2            ; priceRangeSet                   ; 100   ; 499.99\n  ; range3            ; priceRangeSet                   ; 500   ; 9999</code></pre><h3>Facet Sorting</h3><p>Facet values can be sorted by count (most products first) or alphabetically. This is configured on the <code>SolrIndexedProperty</code> via the <code>facetSort</code> attribute:</p><ul><li><code>Count</code> — sort by number of matching products (default, most useful)</li><li><code>Alpha</code> — sort alphabetically by facet value</li></ul><blockquote><strong>Facets require string type:</strong> Only fields with type <code>string</code> (not <code>text</code>) produce meaningful facet values. A <code>text</code> field is tokenized by Solr, so a brand name like \"Samsung Galaxy\" would appear as two separate facet values: \"samsung\" and \"galaxy\". Always use <code>string</code> type for facetable fields.</blockquote>"
+    },
+    {
+      "title": "Search Queries, Boosting and Relevance",
+      "content": "<p>Out of the box, Commerce Cloud's Solr integration handles keyword matching. Tuning <em>how</em> results are ranked — relevance — is a significant part of search optimization.</p><h3>Query Fields and Boosting</h3><p>When a user searches for \"laptop\", Solr searches across multiple fields. You can configure which fields are searched and how much each field contributes to the relevance score using <strong>boost values</strong>:</p><pre><code>INSERT_UPDATE SolrSearchQueryProperty\n  ; indexedProperty(name, solrIndexedType(identifier))[unique=true]\n  ; searchQueryTemplate(name, ...) [unique=true]\n  ; boost\n  ; name_en ; defaultTemplate ; 10.0\n  ; description_en ; defaultTemplate ; 2.0\n  ; brand   ; defaultTemplate ; 5.0</code></pre><p>A <code>boost</code> of 10 on <code>name</code> means a keyword match in the product name contributes 10x more to the score than a field with boost 1. This ensures \"laptop\" in the product name ranks higher than \"laptop\" mentioned in the description.</p><h3>Promoted Results (Merchandising)</h3><p>Commerce Cloud supports <strong>promoted results</strong> — specific products pinned to the top of search results for given keywords, regardless of relevance score. This is configured via the Backoffice or SmartEdit and stored as <code>SearchRestriction</code> items.</p><h3>Spell Checking and Did-You-Mean</h3><p>Solr's spell-check component can suggest corrections for misspelled queries. This is enabled in the Solr schema configuration and surfaced to the storefront via the <code>SearchResultData.spellingSuggestion</code> field on the search response.</p><blockquote><strong>Relevance tuning is iterative:</strong> Default boost values rarely produce ideal results for a specific catalog. Plan for several rounds of relevance tuning based on search analytics — which queries return zero results, which queries have low click-through rates, and which products should rank higher for key terms.</blockquote>"
+    },
+    {
+      "title": "Synonyms, Stop Words and Custom Solr Configuration",
+      "content": "<p>Solr's text analysis pipeline can be customized to improve search quality for domain-specific catalogs. Commerce Cloud exposes several of these capabilities through its configuration layer.</p><h3>Synonyms</h3><p>Synonyms allow different search terms to match the same products. For example, \"TV\" should return the same results as \"television\":</p><pre><code>INSERT_UPDATE SolrSynonymConfig\n  ; baseSite(uid)[unique=true]\n  ; language(isocode)[unique=true]\n  ; synonyms\n  ; electronics ; en ; tv,television,telly\n  ; electronics ; en ; laptop,notebook,portable computer</code></pre><p>Synonyms are stored in the database and pushed to Solr's synonym file during index configuration. There are two types:</p><ul><li><strong>Equivalent synonyms</strong> — all terms are interchangeable: <code>tv,television,telly</code></li><li><strong>Explicit synonyms</strong> — one term expands to others: <code>tv => television</code> (searching \"tv\" finds \"television\" but not vice versa)</li></ul><h3>Stop Words</h3><p>Stop words are common words filtered out of queries because they add no search value (\"the\", \"a\", \"and\"). The stop word list is configured in the Solr schema. Commerce Cloud allows custom stop words to be added per language.</p><h3>Solr Schema and Custom Field Types</h3><p>The Solr schema (<code>schema.xml</code>) defines field types, analyzers, tokenizers, and filters. In CCV2, the schema is managed through the Cloud Portal and Commerce Cloud's Solr configuration — you do not edit <code>schema.xml</code> directly. Custom field types must be declared via the platform's Solr configuration API.</p><blockquote><strong>Synonym management in production:</strong> Synonym files are pushed to Solr during index configuration updates. Adding a new synonym requires either a full re-index or a Solr core reload. Plan synonym management as an operational task with appropriate CronJob support, not a real-time configuration change.</blockquote>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-search-solr-q1",
+      "type": "multiple-choice",
+      "text": "Why does Commerce Cloud maintain two Solr cores per index configuration?",
+      "options": [
+        "One core handles keyword search and the other handles faceted filtering",
+        "One core serves live search traffic while the other is populated by the indexer; they swap atomically when indexing completes",
+        "One core stores the full index and the other stores only the partial update delta",
+        "The two cores provide automatic failover — if one goes down, the other serves traffic"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The dual-core pattern (active + staging) enables zero-downtime re-indexing. The indexer writes to the staging core while the active core continues serving search traffic. When indexing completes, the cores are swapped atomically. This is called the <em>hot swap</em> pattern.</p>"
+    },
+    {
+      "id": "cc-search-solr-q2",
+      "type": "true-false",
+      "text": "A partial update (UPDATE) indexer operation re-indexes all products from scratch and swaps the Solr cores when complete.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> A partial update only re-indexes items whose <code>modifiedtime</code> is newer than the last run. It updates the <em>active</em> core directly without a core swap. Core swapping only happens after a <strong>full</strong> index operation.</p>"
+    },
+    {
+      "id": "cc-search-solr-q3",
+      "type": "multiple-choice",
+      "text": "An IndexedProperty for 'brand' should support faceted filtering. Which field type should be used?",
+      "options": [
+        "text — to enable full-text search across brand names",
+        "string — for exact-match values that produce correct facet entries",
+        "keyword — the dedicated Solr type for facetable fields",
+        "double — for numeric precision in facet ranges"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Facetable fields must use type <code>string</code>, not <code>text</code>. The <code>text</code> type applies tokenization and stemming, splitting \"Samsung Galaxy\" into \"samsung\" and \"galaxy\" as separate facet values. The <code>string</code> type stores the value as-is, producing the correct facet entry \"Samsung Galaxy\".</p>"
+    },
+    {
+      "id": "cc-search-solr-q4",
+      "type": "multiple-choice",
+      "text": "What is the purpose of setting a high 'boost' value on the 'name' field in a SolrSearchQueryProperty?",
+      "options": [
+        "It increases the indexing speed for that field",
+        "It makes the field appear first in the Solr schema definition",
+        "It increases the relevance score contribution when a search keyword matches in that field, ranking those products higher",
+        "It enables spell-check suggestions to be generated from that field"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> Boost values multiply the relevance score contribution of a field match. A boost of 10 on <code>name</code> means a keyword match in the product name contributes 10 times more to the final score than a field with boost 1. This ensures products where the keyword appears in the name rank above products where it only appears in the description.</p>"
+    },
+    {
+      "id": "cc-search-solr-q5",
+      "type": "true-false",
+      "text": "A product deleted from Commerce Cloud will immediately disappear from Solr search results after the deletion is saved via ModelService.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Solr is not updated in real-time on deletion. Deleted products are removed from Solr only when a full index runs (partial updates do not detect deletions). Until the next full index, deleted products may still appear in search results. This is a known limitation of the partial update strategy.</p>"
+    },
+    {
+      "id": "cc-search-solr-q6",
+      "type": "multiple-choice",
+      "text": "Which indexerOperation value should be set on a SolrIndexerCronJob to perform a full re-index with core swap?",
+      "options": [
+        "FULL",
+        "UPDATE",
+        "REBUILD",
+        "REINDEX"
+      ],
+      "correctIndex": 0,
+      "explanation": "<p><strong>Option A is correct.</strong> The <code>FULL</code> operation re-indexes all items and performs a core swap on completion. <code>UPDATE</code> performs a partial update of modified items only, without a core swap. <code>REBUILD</code> and <code>REINDEX</code> are not valid indexerOperation values.</p>"
+    },
+    {
+      "id": "cc-search-solr-q7",
+      "type": "multiple-choice",
+      "text": "A developer wants to map the product's name attribute to Solr using a Spring EL expression. Which fieldValueProvider should be used?",
+      "options": [
+        "priceValueProvider",
+        "springELValueProvider",
+        "categoryCodeValueProvider",
+        "modelAttributeValueProvider"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The <code>springELValueProvider</code> evaluates a Spring Expression Language expression (e.g. <code>#{model.name}</code>) against the indexed Model to extract field values. <code>priceValueProvider</code> is specifically for price resolution, and <code>categoryCodeValueProvider</code> extracts category hierarchy codes.</p>"
+    },
+    {
+      "id": "cc-search-solr-q8",
+      "type": "true-false",
+      "text": "Setting 'localized=true' on an IndexedProperty creates a single Solr field that stores values for all languages.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Setting <code>localized=true</code> creates <em>separate</em> Solr fields per language — for example, <code>name_en</code>, <code>name_de</code>, <code>name_fr</code>. Each language gets its own field, allowing language-specific search and faceting. A single combined field would mix languages and produce incorrect results.</p>"
+    },
+    {
+      "id": "cc-search-solr-q9",
+      "type": "multiple-choice",
+      "text": "Which type of facet uses OR logic — showing products that match any of the selected facet values?",
+      "options": [
+        "MultiSelectAnd",
+        "RangeFacet",
+        "MultiSelectOr",
+        "ExclusiveFacet"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> <code>MultiSelectOr</code> applies OR logic — selecting \"Samsung\" and \"Apple\" under the Brand facet returns products from either brand. <code>MultiSelectAnd</code> requires products to match all selected values simultaneously, which is useful for feature attributes but rarely for brand or category facets.</p>"
+    },
+    {
+      "id": "cc-search-solr-q10",
+      "type": "multiple-choice",
+      "text": "A synonym configuration contains 'tv,television,telly'. A user searches for 'telly'. Which products will be returned?",
+      "options": [
+        "Only products containing the exact word 'telly'",
+        "Products matching 'telly' or 'television' but not 'tv'",
+        "Products matching any of 'tv', 'television', or 'telly' — they are equivalent synonyms",
+        "No products — synonym expansion only works in one direction (tv → television)"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> Comma-separated synonyms define <em>equivalent</em> synonyms — all terms are interchangeable. Searching for any one of them expands to all the others. Directional synonyms use the <code>=&gt;</code> syntax (e.g. <code>tv =&gt; television</code>) for one-way expansion.</p>"
+    },
+    {
+      "id": "cc-search-solr-q11",
+      "type": "true-false",
+      "text": "The FacetSearchService Spring bean is used to execute Solr search queries from Commerce Cloud application code.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> <code>FacetSearchService</code> is the entry point for programmatic Solr searches in the ServiceLayer. It accepts a <code>SearchQuery</code> object and returns a <code>SearchResult</code> containing matched products, facet data, and pagination info. It abstracts the underlying Solr communication from the application code.</p>"
+    },
+    {
+      "id": "cc-search-solr-q12",
+      "type": "multiple-choice",
+      "text": "After adding new synonyms to SolrSynonymConfig, what must happen for the changes to take effect in search results?",
+      "options": [
+        "Changes take effect immediately — synonym config is read on every search request",
+        "A server restart is required to reload the Solr client configuration",
+        "The synonyms must be pushed to Solr via an index configuration update and a Solr core reload or re-index",
+        "Synonyms only take effect after the next Update System in HAC"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> Synonym files are pushed to Solr during index configuration updates and require a Solr core reload (or a full re-index) to take effect. They are not read dynamically on each search request. Planning synonym rollouts as an operational task with the appropriate indexer CronJob is essential.</p>"
+    }
+  ]
+}

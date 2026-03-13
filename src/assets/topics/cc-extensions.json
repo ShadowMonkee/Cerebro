@@ -1,0 +1,168 @@
+{
+  "id": "cc-extensions",
+  "title": "Extensions — Structure, Dependencies & the Build System",
+  "description": "How SAP Commerce Cloud organizes code into extensions, manages dependencies, and compiles the platform with the Ant build system.",
+  "icon": "🧩",
+  "category": "sap-commerce-cloud",
+  "tags": ["extensions", "build-system", "ant", "dependencies", "platform-structure"],
+  "sections": [
+    {
+      "title": "What is an Extension?",
+      "content": "<p>An <strong>extension</strong> is the fundamental unit of modularity in SAP Commerce Cloud. Every piece of functionality — whether it is a platform module, a SAP-provided addon, or your own custom code — lives inside an extension. The platform itself is composed of dozens of extensions (like <code>core</code>, <code>commerceservices</code>, <code>acceleratorstorefrontcommons</code>), and your project adds its own on top.</p><p>An extension is simply a <strong>directory with a defined structure</strong>. The platform recognizes it as an extension by the presence of an <code>extensioninfo.xml</code> file at its root. Everything else — Java source, Spring XML, resources, web components — follows predictable conventions that the build system understands automatically.</p><h3>Typical Extension Directory Layout</h3><pre><code>myextension/\n├── extensioninfo.xml        ← declares the extension & dependencies\n├── project.properties       ← extension-level properties\n├── src/                     ← Java source code\n│   └── com/mycompany/...\n├── gensrc/                  ← generated sources (do not edit)\n├── resources/\n│   ├── myextension-items.xml       ← TypeSystem declarations\n│   ├── myextension-spring.xml      ← Spring beans\n│   └── myextension-backoffice-spring.xml\n├── web/\n│   ├── webroot/             ← web resources\n│   └── src/                 ← web-tier Java source\n└── testsrc/                 ← unit and integration tests</code></pre><blockquote><strong>Convention over configuration:</strong> Files named <code>{extensionname}-items.xml</code>, <code>{extensionname}-spring.xml</code>, and <code>{extensionname}-backoffice-spring.xml</code> in the <code>resources/</code> folder are picked up automatically by the platform — no explicit registration needed for these standard files.</blockquote>"
+    },
+    {
+      "title": "extensioninfo.xml — The Extension Manifest",
+      "content": "<p>The <code>extensioninfo.xml</code> file is the manifest of an extension. It declares the extension's name, what it requires, and what modules it provides.</p><pre><code>&lt;?xml version=\"1.0\" encoding=\"UTF-8\"?&gt;\n&lt;extensioninfo xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n    xsi:noNamespaceSchemaLocation=\"extensioninfo.xsd\"&gt;\n\n  &lt;extension name=\"myextension\"\n             classprefix=\"Myextension\"\n             abstractclassprefix=\"Generated\"\n             managername=\"MyextensionManager\"\n             managersuperclass=\"de.hybris.platform.jalo.extension.Extension\"\n             version=\"0.0.1-SNAPSHOT\"&gt;\n\n    &lt;!-- Dependencies on other extensions --&gt;\n    &lt;requires-extension name=\"core\"/&gt;\n    &lt;requires-extension name=\"commerceservices\"/&gt;\n    &lt;requires-extension name=\"catalogue\"/&gt;\n\n    &lt;!-- Declares this extension has a core Java module --&gt;\n    &lt;coremodule generated=\"true\"\n      manager=\"de.hybris.platform.jalo.extension.ExtensionManager\"/&gt;\n\n    &lt;!-- Declares this extension has a web module --&gt;\n    &lt;webmodule jspcompile=\"false\" webroot=\"/myextension\"/&gt;\n\n  &lt;/extension&gt;\n&lt;/extensioninfo&gt;</code></pre><h3>Key Attributes and Elements</h3><ul><li><code>name</code> — must be unique across all extensions in the platform. Used as the prefix for generated files.</li><li><code>requires-extension</code> — declares a compile-time and runtime dependency. The dependency graph determines build order and Spring context loading order.</li><li><code>coremodule</code> — indicates the extension contributes Java classes and Spring beans to the main application context.</li><li><code>webmodule</code> — indicates the extension exposes a web application (servlet context) at the given <code>webroot</code> path.</li></ul><blockquote><strong>Circular dependencies are forbidden.</strong> If Extension A requires Extension B, and Extension B requires Extension A, the build fails. The dependency graph must be a directed acyclic graph (DAG). This constraint enforces clean architectural layering.</blockquote>"
+    },
+    {
+      "title": "localextensions.xml — Activating Extensions",
+      "content": "<p>Having an extension on disk is not enough for it to be included in the build. Each extension must be <strong>explicitly activated</strong> in the <code>localextensions.xml</code> file, located at <code>config/localextensions.xml</code> in your platform installation.</p><pre><code>&lt;?xml version=\"1.0\" encoding=\"UTF-8\"?&gt;\n&lt;hybrisconfig xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n    xsi:noNamespaceSchemaLocation=\"..\"&gt;\n  &lt;extensions&gt;\n\n    &lt;!-- Load all extensions in a directory (common for SAP-provided addons) --&gt;\n    &lt;path dir=\"${HYBRIS_BIN_DIR}\"/&gt;\n\n    &lt;!-- Explicitly activate a custom extension --&gt;\n    &lt;extension name=\"myextension\"/&gt;\n    &lt;extension name=\"mywebextension\"/&gt;\n    &lt;extension name=\"mybackofficeextension\"/&gt;\n\n  &lt;/extensions&gt;\n&lt;/hybrisconfig&gt;</code></pre><p>The <code>&lt;path dir=\"...\"&gt;</code> element scans a directory and activates all extensions found within it. This is how the SAP-provided platform extensions (in <code>HYBRIS_BIN_DIR</code>) are activated. Custom extensions are typically listed explicitly by name.</p><h3>Dependency Resolution</h3><p>When you activate an extension in <code>localextensions.xml</code>, the platform automatically resolves and activates all its declared <code>requires-extension</code> dependencies transitively. You do not need to manually list every transitive dependency.</p><blockquote><strong>Common mistake:</strong> Adding a new custom extension to <code>extensioninfo.xml</code> of another extension but forgetting to add it to <code>localextensions.xml</code>. The build will fail with a missing extension error. Both steps are always required for a new extension.</blockquote>"
+    },
+    {
+      "title": "The Ant Build System",
+      "content": "<p>SAP Commerce Cloud uses <strong>Apache Ant</strong> as its build system. All build operations are performed via Ant targets from the <code>platform/</code> directory. Understanding the key targets and their effects is a regular exam topic.</p><h3>Essential Ant Targets</h3><ul><li><code>ant clean</code> — deletes all compiled classes and generated sources from all active extensions</li><li><code>ant build</code> — compiles all Java sources (without regenerating model classes from items.xml)</li><li><code>ant all</code> — generates model classes from items.xml, then compiles everything. Equivalent to <code>ant clean generate build</code></li><li><code>ant clean all</code> — the full clean rebuild: delete everything, regenerate, compile. The safe option after any items.xml change.</li><li><code>ant initialize</code> — starts the server and runs a full system initialization (drops and recreates the DB schema)</li><li><code>ant server</code> — starts the Commerce Cloud server</li><li><code>ant modulegen</code> — scaffolds a new extension from a template</li></ul><h3>When to Run What</h3><pre><code>// Changed items.xml?\nant clean all   → then Update System in HAC\n\n// Changed only Java/Spring files?\nant build       → restart server\n\n// New extension added to localextensions.xml?\nant clean all   → required to include new extension in build\n\n// Fresh developer setup?\nant clean all   → then Initialize System in HAC</code></pre><blockquote><strong>Exam rule:</strong> <code>ant all</code> does NOT clean first. If you have stale generated sources causing mysterious compilation errors, always use <code>ant clean all</code>. This is the most common resolution to confusing build failures and is explicitly tested in scenario questions.</blockquote>"
+    },
+    {
+      "title": "Extension Templates and Types",
+      "content": "<p>Not all extensions have the same purpose. Commerce Cloud ships with several <strong>extension templates</strong> that scaffold the right structure for different use cases. You create a new extension from a template using <code>ant modulegen</code>.</p><h3>Common Extension Templates</h3><ul><li><strong>yempty</strong> — a minimal extension with no web or backoffice module. Used for pure service/domain logic extensions.</li><li><strong>yacceleratorstorefront</strong> — a storefront web extension with Spring MVC controllers, JSPs, and tag libraries. The base for custom Accelerator storefronts.</li><li><strong>ybackoffice</strong> — a Backoffice extension template providing the correct structure for Backoffice widgets and configuration.</li><li><strong>yaddon</strong> — an AddOn extension that patches an existing storefront extension without modifying it directly (decorator pattern for extensions).</li><li><strong>ycommercewebservices</strong> — the OCC API extension template for RESTful web services.</li></ul><h3>AddOns — A Special Extension Type</h3><p>An <strong>AddOn</strong> is a special extension type that can inject content (JSPs, Spring beans, static resources) into a <em>target</em> extension without modifying the target's source code. AddOns are installed onto a target storefront extension using:</p><pre><code>ant addoninstall -Daddonnames=\"myaddon\" \\\n    -DaddonStorefront.yacceleratorstorefront=\"mystorefront\"</code></pre><p>This is how SAP ships features like the <code>acceleratorWebServicesAddon</code> — they can be layered onto any storefront extension without code changes to the base.</p><blockquote><strong>AddOn vs regular extension:</strong> A regular extension is a standalone module. An AddOn is a <em>patch</em> for another extension. AddOns cannot run standalone — they must be installed onto a target. The exam may present scenarios where you must choose between creating a new extension vs an AddOn.</blockquote>"
+    },
+    {
+      "title": "Properties and Configuration",
+      "content": "<p>Commerce Cloud's configuration system uses a layered set of <strong>properties files</strong> that are merged at startup. Understanding the load order and override mechanism is essential for both the exam and real deployments.</p><h3>Properties File Load Order (lowest to highest priority)</h3><ol><li><code>project.properties</code> inside each extension — default values shipped with the extension</li><li><code>local.properties</code> in the <code>config/</code> directory — developer/environment-specific overrides</li><li>System properties set via JVM arguments (<code>-Dproperty=value</code>) — highest priority</li></ol><p>Higher-priority files override lower-priority ones. A property set in <code>local.properties</code> always wins over one in an extension's <code>project.properties</code>.</p><h3>Accessing Properties in Code</h3><pre><code>// Via ConfigurationService (Spring injection)\n@Autowired\nprivate ConfigurationService configurationService;\n\nString value = configurationService\n    .getConfiguration()\n    .getString(\"my.custom.property\", \"defaultValue\");</code></pre><h3>CCV2 and Cloud-Specific Properties</h3><p>In the Cloud (CCV2), properties are managed through the Cloud Portal rather than <code>local.properties</code>. The Cloud Portal injects properties at deployment time. This means <code>local.properties</code> does not exist in CCV2 environments — always use the Cloud Portal for environment-specific configuration.</p><blockquote><strong>Security note:</strong> Never store secrets (passwords, API keys) in <code>project.properties</code> — these are committed to source control. In CCV2, use the Cloud Portal's secret management. In local environments, use <code>local.properties</code> which should be in <code>.gitignore</code>.</blockquote>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-extensions-q1",
+      "type": "multiple-choice",
+      "text": "Which file in an extension serves as its manifest, declaring its name, dependencies, and modules?",
+      "options": [
+        "project.properties",
+        "extensioninfo.xml",
+        "localextensions.xml",
+        "extension-spring.xml"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> <code>extensioninfo.xml</code> is the extension manifest. It declares the extension name, <code>requires-extension</code> dependencies, and which modules (core, web, backoffice) the extension provides. <code>localextensions.xml</code> is a platform-level file that activates extensions — it is not inside an extension itself.</p>"
+    },
+    {
+      "id": "cc-extensions-q2",
+      "type": "true-false",
+      "text": "Adding a new extension to extensioninfo.xml of another extension is sufficient for it to be included in the build — no further configuration is needed.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Two steps are always required: declare the dependency in <code>extensioninfo.xml</code> (so the platform knows about the relationship), AND add the extension to <code>localextensions.xml</code> (so it is activated and included in the build). Missing either step causes a build failure.</p>"
+    },
+    {
+      "id": "cc-extensions-q3",
+      "type": "multiple-choice",
+      "text": "A developer changes items.xml in a custom extension. What is the correct sequence of actions to apply the changes?",
+      "options": [
+        "Restart the server — items.xml changes are picked up automatically on startup",
+        "Run 'ant build', then restart the server",
+        "Run 'ant clean all', then perform an Update System in HAC",
+        "Run 'ant initialize' to apply the schema changes directly"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> <code>ant clean all</code> regenerates Java model classes from the updated <code>items.xml</code> and recompiles everything. Update System in HAC then applies the schema changes to the running database incrementally, preserving existing data. <code>ant initialize</code> would drop all data — only appropriate for fresh dev setups.</p>"
+    },
+    {
+      "id": "cc-extensions-q4",
+      "type": "multiple-choice",
+      "text": "What is the purpose of the 'yaddon' extension template compared to a regular extension?",
+      "options": [
+        "An AddOn provides better performance than a regular extension for storefront operations",
+        "An AddOn can inject JSPs, Spring beans, and resources into a target extension without modifying its source code",
+        "An AddOn replaces the target extension entirely with an upgraded version",
+        "An AddOn is only used for Backoffice customizations, not storefront changes"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> An AddOn is a decorator pattern for extensions — it patches a target extension (like a storefront) by contributing content to it, without touching the target's source. This allows features to be layered on cleanly. AddOns cannot run standalone; they must be installed onto a target using <code>ant addoninstall</code>.</p>"
+    },
+    {
+      "id": "cc-extensions-q5",
+      "type": "true-false",
+      "text": "Circular dependencies between extensions (A requires B, B requires A) are resolved automatically by the platform's build system.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Circular dependencies are forbidden and cause the build to fail. The extension dependency graph must be a directed acyclic graph (DAG). This constraint enforces clean architectural layering and ensures a deterministic build order for type system merging and Spring context loading.</p>"
+    },
+    {
+      "id": "cc-extensions-q6",
+      "type": "multiple-choice",
+      "text": "What does 'ant clean all' do that 'ant build' alone does not?",
+      "options": [
+        "ant clean all also deploys the built artifacts to the running server",
+        "ant clean all deletes compiled output and regenerates model classes from items.xml before compiling; ant build only recompiles Java sources",
+        "ant clean all runs unit tests as part of the build; ant build skips tests",
+        "There is no difference — both targets produce an identical result"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> <code>ant build</code> only recompiles Java sources — it does not regenerate model classes from <code>items.xml</code>. <code>ant clean all</code> first deletes all compiled output and generated sources, then regenerates models from <code>items.xml</code>, then compiles everything. Always use <code>ant clean all</code> after any <code>items.xml</code> change.</p>"
+    },
+    {
+      "id": "cc-extensions-q7",
+      "type": "multiple-choice",
+      "text": "In Commerce Cloud's properties system, which file has the highest priority and overrides all others?",
+      "options": [
+        "project.properties inside each extension",
+        "local.properties in the config/ directory",
+        "System properties set via JVM -D arguments",
+        "The platform's core project.properties file"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> The priority order from lowest to highest is: extension <code>project.properties</code> → <code>local.properties</code> → JVM system properties. System properties passed via <code>-Dproperty=value</code> always override file-based configuration. This is useful for CI/CD environments where properties are injected at runtime.</p>"
+    },
+    {
+      "id": "cc-extensions-q8",
+      "type": "true-false",
+      "text": "In CCV2 (the cloud environment), local.properties is used to configure environment-specific properties just as in a local development setup.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> In CCV2, <code>local.properties</code> does not exist. Environment-specific properties are configured through the <strong>Cloud Portal</strong>, which injects them at deployment time. Any reliance on <code>local.properties</code> in cloud deployments will result in missing configuration.</p>"
+    },
+    {
+      "id": "cc-extensions-q9",
+      "type": "multiple-choice",
+      "text": "Which Ant target should be used to scaffold a new extension from a template?",
+      "options": [
+        "ant newextension",
+        "ant create -Dtemplate=yempty",
+        "ant modulegen",
+        "ant scaffold -Dtype=extension"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> <code>ant modulegen</code> is the Ant target that launches the interactive extension scaffolding wizard. It prompts for the template type (e.g. <code>yempty</code>, <code>yaddon</code>, <code>ybackoffice</code>), extension name, and package prefix, then generates the full directory structure.</p>"
+    },
+    {
+      "id": "cc-extensions-q10",
+      "type": "true-false",
+      "text": "When you activate an extension in localextensions.xml, the platform automatically resolves and activates all its transitive requires-extension dependencies.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> Transitive dependency resolution is automatic. If <code>myextension</code> requires <code>commerceservices</code>, and <code>commerceservices</code> requires <code>core</code>, activating <code>myextension</code> in <code>localextensions.xml</code> ensures all transitive dependencies are included in the build without manual listing.</p>"
+    },
+    {
+      "id": "cc-extensions-q11",
+      "type": "multiple-choice",
+      "text": "A developer uses 'ant all' after modifying items.xml but still sees old model class behavior. What is the most likely cause?",
+      "options": [
+        "ant all does not regenerate model classes — a separate 'ant generate' target is needed",
+        "ant all does not clean previously compiled output first — stale generated sources may still exist; use 'ant clean all' instead",
+        "The items.xml file was saved in the wrong encoding format, causing the parser to skip it",
+        "Model regeneration only runs during 'ant initialize', not during a regular build"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> <code>ant all</code> generates and compiles but does <em>not</em> clean first. Stale generated sources from a previous build can shadow the newly generated ones. <code>ant clean all</code> is the safe sequence because it deletes all generated and compiled output before regenerating, ensuring a fully fresh build.</p>"
+    },
+    {
+      "id": "cc-extensions-q12",
+      "type": "multiple-choice",
+      "text": "Which extension template is appropriate for creating a new extension that only adds services and DAOs with no web interface or Backoffice module?",
+      "options": [
+        "yaddon — it provides a minimal footprint for pure logic extensions",
+        "ybackoffice — its structure is cleanest for non-web extensions",
+        "yempty — a minimal template with no web or backoffice module",
+        "ycommercewebservices — the standard template for all new custom extensions"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> The <code>yempty</code> template generates the minimal extension structure — just the core module with no web or backoffice scaffolding. It is the right choice for extensions that only contribute services, DAOs, types, and Spring beans. The other templates include web or Backoffice infrastructure that would be unused and add unnecessary complexity.</p>"
+    }
+  ]
+}

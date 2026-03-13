@@ -1,0 +1,168 @@
+{
+  "id": "cc-impex",
+  "title": "ImpEx — Import, Export & Data Migration",
+  "description": "SAP Commerce Cloud's declarative CSV-based format for importing, exporting, and migrating platform data at any scale.",
+  "icon": "📦",
+  "category": "sap-commerce-cloud",
+  "tags": ["impex", "data-migration", "import", "export", "scripting"],
+  "sections": [
+    {
+      "title": "What is ImpEx?",
+      "content": "<p><strong>ImpEx</strong> (Import/Export) is SAP Commerce Cloud's built-in mechanism for creating, updating, removing, and exporting data using a declarative CSV-like syntax. It is one of the most frequently used tools in day-to-day Commerce Cloud development and is heavily tested in the certification exam.</p><p>ImpEx scripts are plain text files with a <code>.impex</code> extension. They are used for:</p><ul><li><strong>Essential data</strong> — mandatory data required for the extension to function (loaded during Initialize and Update System)</li><li><strong>Project data</strong> — sample or demo data loaded during initialization</li><li><strong>Data migrations</strong> — one-off scripts run during upgrades to transform existing data</li><li><strong>Test data setup</strong> — creating fixtures for automated tests</li></ul><p>ImpEx scripts can be executed from three places: the HAC ImpEx console (Console → ImpEx Import), programmatically via the <code>ImportService</code> Spring bean, or automatically during system initialization from an extension's <code>resources/impex/</code> folder.</p><blockquote><strong>Where ImpEx fits:</strong> Think of ImpEx as the data layer equivalent of SQL scripts, but type-aware and integrated with the TypeSystem. It respects interceptors, validates types, and operates through the ServiceLayer — it is not a raw database operation.</blockquote>"
+    },
+    {
+      "title": "Basic ImpEx Syntax — INSERT, UPDATE, INSERT_UPDATE, REMOVE",
+      "content": "<p>Every ImpEx script consists of one or more <strong>header lines</strong> followed by <strong>data lines</strong>. The header defines the operation, the type, and the attribute columns. Data lines provide the values.</p><h3>The Four Operations</h3><ul><li><code>INSERT</code> — creates new items. Fails if an item with the same unique key already exists.</li><li><code>UPDATE</code> — updates existing items. Fails if the item does not exist.</li><li><code>INSERT_UPDATE</code> — creates the item if it does not exist, updates it if it does. The safest and most commonly used operation.</li><li><code>REMOVE</code> — deletes items matching the given unique key.</li></ul><h3>Basic Example</h3><pre><code>INSERT_UPDATE Product; code[unique=true]; name[lang=en]; catalogVersion(catalog(id), version)\n                     ; LAPTOP-001       ; Gaming Laptop ; electronicsProductCatalog:Staged\n                     ; LAPTOP-002       ; Office Laptop ; electronicsProductCatalog:Staged</code></pre><p>Breaking down the header:</p><ul><li><code>INSERT_UPDATE Product</code> — operation and type</li><li><code>code[unique=true]</code> — the <code>code</code> attribute is the unique identifier used to look up existing items</li><li><code>name[lang=en]</code> — sets the localized <code>name</code> attribute for English</li><li><code>catalogVersion(catalog(id), version)</code> — a <strong>reference expression</strong> resolving a CatalogVersion by its catalog's id and version string</li></ul><blockquote><strong>Column separator:</strong> ImpEx uses semicolons (<code>;</code>) as column separators by default, not commas. The first <code>;</code> on a data line is the separator before the first value column. Leading and trailing whitespace around values is trimmed automatically.</blockquote>"
+    },
+    {
+      "title": "References, Modifiers and Special Syntax",
+      "content": "<p>ImpEx's power comes from its ability to resolve <strong>references</strong> between types and apply <strong>modifiers</strong> that control import behavior.</p><h3>Reference Resolution</h3><p>To set a relation attribute, ImpEx resolves references using parenthetical expressions that navigate the type graph:</p><pre><code>; productCode ; category(code)      ; unit(code)\n; LAPTOP-001  ; electronics         ; pieces</code></pre><p>The expression <code>category(code)</code> means: find a Category whose <code>code</code> attribute matches the given value. You can chain multiple levels deep:</p><pre><code>; catalogVersion(catalog(id), version)\n; myProductCatalog:Online</code></pre><p>This resolves a CatalogVersion by first finding a Catalog with the given id, then finding the version within it.</p><h3>Key Modifiers</h3><ul><li><code>[unique=true]</code> — marks the attribute as part of the unique key used to look up existing items for UPDATE/INSERT_UPDATE</li><li><code>[lang=en]</code> — sets the value for a specific language on a localized attribute</li><li><code>[default=someValue]</code> — uses this value if the data line's cell is empty</li><li><code>[virtual=true]</code> — the column is not mapped to a type attribute; used with translators or scripts</li><li><code>[allownull=true]</code> — allows writing a null value, overriding the platform's null-check</li><li><code>[forceWrite=true]</code> — forces writing even to read-only attributes</li></ul><pre><code>INSERT_UPDATE Product; code[unique=true]; name[lang=en][default=Unnamed]; price[allownull=true]\n                     ; PROD-001         ;                               ;</code></pre><blockquote><strong>Multiple unique keys:</strong> You can mark multiple columns as <code>[unique=true]</code>. The combination of all unique columns forms the composite key used for lookup. This is how you uniquely identify items that have no single natural key.</blockquote>"
+    },
+    {
+      "title": "Macros, Collections and Multi-value Attributes",
+      "content": "<p>ImpEx provides several features that make large scripts more maintainable and expressive.</p><h3>Macros</h3><p>Macros are reusable substitutions defined at the top of an ImpEx file. They reduce repetition for frequently used values like catalog versions:</p><pre><code>$catalog=electronicsProductCatalog\n$catalogVersion=$catalog:Online\n$contentCatalog=electronicsContentCatalog\n\nINSERT_UPDATE Product; code[unique=true]; catalogVersion(catalog(id),version)\n                     ; LAPTOP-001       ; $catalogVersion\n                     ; LAPTOP-002       ; $catalogVersion</code></pre><p>Macros are simple text substitutions — the <code>$macro</code> token is replaced literally before parsing. They are not typed variables.</p><h3>Collections and Multi-value Attributes</h3><p>For attributes that accept multiple values (collections or many-to-many relations), separate values with a comma inside the cell:</p><pre><code>INSERT_UPDATE Product; code[unique=true]; supercategories(code)\n                     ; LAPTOP-001       ; electronics,computers,laptops</code></pre><p>The default collection delimiter is a comma. You can change it with the <code>[collection-delimiter=|]</code> modifier if values contain commas.</p><h3>Scripting with BeanShell</h3><p>ImpEx supports embedded <strong>BeanShell scripts</strong> for dynamic value computation at import time. Scripts are prefixed with <code>#%</code>:</p><pre><code>#% impex.setTargetFile( \"my-export.csv\" );\n\nINSERT_UPDATE Product; code[unique=true]; name[lang=en]\n                     ; #% java.util.UUID.randomUUID().toString() ; Dynamic Product</code></pre><blockquote><strong>BeanShell scope:</strong> BeanShell scripts in ImpEx run in the context of the import session and have access to the <code>impex</code> variable (the ImpEx session object). This is powerful but can make scripts hard to debug — use it sparingly and only when macros or modifiers cannot solve the problem.</blockquote>"
+    },
+    {
+      "title": "Essential Data, Project Data and Automatic Loading",
+      "content": "<p>ImpEx scripts inside an extension's <code>resources/impex/</code> folder are loaded automatically during system initialization and update, following a specific naming convention.</p><h3>File Naming Convention</h3><ul><li><code>essentialdata-*.impex</code> — loaded during both <strong>Initialize</strong> and <strong>Update System</strong>. Used for data the system cannot function without (e.g. user groups, base sites, currencies).</li><li><code>projectdata-*.impex</code> — loaded only during <strong>Initialize</strong> (full reset). Used for sample or demo data that should not be re-applied to production.</li></ul><pre><code>resources/\n└── impex/\n    ├── essentialdata-sites.impex\n    ├── essentialdata-currencies.impex\n    ├── projectdata-sampleproducts.impex\n    └── projectdata-samplecategories.impex</code></pre><h3>Loading Order</h3><p>ImpEx files are loaded in extension dependency order. An extension that depends on another will have its ImpEx files loaded after the dependency's files. Within a single extension, files are loaded alphabetically. This matters when one script references data created by another.</p><h3>Programmatic Import</h3><p>To run an ImpEx script programmatically from Java:</p><pre><code>@Autowired\nprivate ImportService importService;\n\npublic void runImport(String scriptContent) {\n    ImportConfig config = new ImportConfig();\n    config.setScript(new StreamBasedImpExResource(\n        new ByteArrayInputStream(\n            scriptContent.getBytes()), \"UTF-8\"));\n    config.setFailOnError(true);\n    ImportResult result = importService.importData(config);\n    if (result.hasUnresolvedLines()) {\n        // Handle errors\n    }\n}</code></pre><blockquote><strong>Unresolved lines:</strong> When an ImpEx import encounters a line it cannot process (e.g. a reference that does not resolve), it marks it as an <em>unresolved line</em> and continues by default. Always check <code>result.hasUnresolvedLines()</code> after programmatic imports and log or handle them — silent failures are a common source of missing data bugs.</blockquote>"
+    },
+    {
+      "title": "ImpEx Export and the HAC Console",
+      "content": "<p>ImpEx is not only for import — it can also <strong>export</strong> data from the platform into a script that can be re-imported elsewhere. This is useful for moving data between environments (e.g. from production to staging) or for creating data snapshots.</p><h3>Export Syntax</h3><pre><code>EXPORT Product WHERE {catalogVersion} = ?catalogVersion\nSELECT {code}, {name[lang=en]}, {catalogVersion}\nFROM {Product}\nWHERE {catalogVersion} IN\n    ({{ SELECT {pk} FROM {CatalogVersion}\n       WHERE {version} = 'Online' }})</code></pre><p>The double curly braces <code>{{ }}</code> denote an <strong>inline subquery</strong> — a FlexibleSearch query embedded inside an ImpEx expression. This is one of the most powerful (and most exam-tested) ImpEx features.</p><h3>The HAC ImpEx Console</h3><p>The HAC (Hybris Administration Console) provides an interactive ImpEx console at <strong>Console → ImpEx Import</strong> and <strong>Console → ImpEx Export</strong>. Key features:</p><ul><li>Paste and run ImpEx scripts interactively</li><li>View unresolved lines and error details</li><li>Upload <code>.impex</code> files for execution</li><li>Toggle <em>validation mode</em> to check the script without actually committing changes</li></ul><h3>Validation Mode</h3><p>Running an import in <strong>validation mode</strong> checks the script for syntax errors and unresolvable references without writing any data. This is invaluable before running a migration script on a production system.</p><blockquote><strong>Inline FlexibleSearch <code>{{ }}</code>:</strong> Double curly braces embed a FlexibleSearch query inside an ImpEx value cell. The query must return a single column of PKs. This allows you to resolve complex references that cannot be expressed with simple parenthetical navigation. It is one of the most frequently tested ImpEx advanced features.</blockquote>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-impex-q1",
+      "type": "multiple-choice",
+      "text": "Which ImpEx operation creates an item if it does not exist and updates it if it does?",
+      "options": [
+        "INSERT",
+        "UPDATE",
+        "INSERT_UPDATE",
+        "UPSERT"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> <code>INSERT_UPDATE</code> is the safest and most commonly used operation — it performs an upsert. <code>INSERT</code> fails if the item already exists, and <code>UPDATE</code> fails if it does not. There is no <code>UPSERT</code> keyword in ImpEx.</p>"
+    },
+    {
+      "id": "cc-impex-q2",
+      "type": "true-false",
+      "text": "ImpEx files named 'projectdata-*.impex' are loaded during both Initialize System and Update System operations.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> <code>projectdata-*.impex</code> files are loaded <em>only</em> during Initialize System (full reset). <code>essentialdata-*.impex</code> files are loaded during both Initialize and Update System. This distinction prevents sample data from being re-applied to production environments on every update.</p>"
+    },
+    {
+      "id": "cc-impex-q3",
+      "type": "multiple-choice",
+      "text": "In this ImpEx header: 'INSERT_UPDATE Product; code[unique=true]; catalogVersion(catalog(id),version)' — what does the expression 'catalogVersion(catalog(id),version)' do?",
+      "options": [
+        "It sets the catalogVersion attribute to the literal string 'catalog(id),version'",
+        "It resolves a CatalogVersion by navigating to a Catalog by its id and then finding the matching version within it",
+        "It creates a new CatalogVersion if one does not exist with the given id and version",
+        "It defines a virtual column that is not mapped to any type attribute"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Parenthetical reference expressions in ImpEx navigate the type graph to resolve related items. <code>catalogVersion(catalog(id),version)</code> means: find a CatalogVersion whose parent Catalog has the given id AND whose version string matches. The data cell value would be formatted as <code>myCatalog:Online</code>.</p>"
+    },
+    {
+      "id": "cc-impex-q4",
+      "type": "multiple-choice",
+      "text": "What is the purpose of the [unique=true] modifier on an ImpEx column?",
+      "options": [
+        "It enforces a database UNIQUE constraint on that column",
+        "It marks the attribute as the identifier used to look up existing items for UPDATE and INSERT_UPDATE operations",
+        "It prevents duplicate values from appearing in the same import file",
+        "It makes the column required — the import fails if the cell is empty"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> <code>[unique=true]</code> designates a column as part of the lookup key. For <code>UPDATE</code> and <code>INSERT_UPDATE</code>, the platform uses the unique column(s) to find the existing item before deciding whether to insert or update. Multiple columns can be marked unique, forming a composite key.</p>"
+    },
+    {
+      "id": "cc-impex-q5",
+      "type": "true-false",
+      "text": "ImpEx macros defined with '$macroName=value' are type-safe variables that the platform validates before executing the script.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> ImpEx macros are simple <em>text substitutions</em> — the token <code>$macroName</code> is replaced with its defined string before parsing. There is no type-checking or validation of macro values. An incorrect macro value only causes an error when the substituted line is processed.</p>"
+    },
+    {
+      "id": "cc-impex-q6",
+      "type": "multiple-choice",
+      "text": "What do double curly braces {{ }} denote inside an ImpEx script?",
+      "options": [
+        "A BeanShell script block for dynamic value computation",
+        "A macro definition block",
+        "An inline FlexibleSearch subquery used to resolve references",
+        "A comment block that is ignored during processing"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> Double curly braces embed a FlexibleSearch query inline within an ImpEx expression. The subquery must return a single column of PKs and is used to resolve complex references that cannot be expressed with simple parenthetical navigation. BeanShell scripts use the <code>#%</code> prefix instead.</p>"
+    },
+    {
+      "id": "cc-impex-q7",
+      "type": "multiple-choice",
+      "text": "After a programmatic ImpEx import via ImportService, the result object indicates there are unresolved lines. What does this mean?",
+      "options": [
+        "The import failed completely and no data was written to the database",
+        "Some lines could not be processed (e.g. unresolvable references) and were skipped; other lines may have been committed",
+        "The import is queued and will be retried automatically by the platform",
+        "Unresolved lines indicate a syntax error in the ImpEx header — no data lines were processed"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> By default, ImpEx skips lines it cannot resolve and continues processing. Unresolved lines indicate partial failures — some data may have been written while other lines were skipped. Always check and handle <code>result.hasUnresolvedLines()</code> after programmatic imports to avoid silent data gaps.</p>"
+    },
+    {
+      "id": "cc-impex-q8",
+      "type": "true-false",
+      "text": "ImpEx operations respect ValidateInterceptors — a ValidateInterceptor that blocks a save will also block the corresponding ImpEx line.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> ImpEx operates through the ServiceLayer and ModelService, not raw SQL. This means all interceptors — including <code>ValidateInterceptor</code> — fire during ImpEx imports. A validation rule that blocks a save in Java code will equally block the same data when imported via ImpEx.</p>"
+    },
+    {
+      "id": "cc-impex-q9",
+      "type": "multiple-choice",
+      "text": "In which order are ImpEx files loaded when multiple extensions are active?",
+      "options": [
+        "Alphabetically by filename across all extensions simultaneously",
+        "In extension dependency order — dependent extensions load their ImpEx after their dependencies; alphabetically within each extension",
+        "Randomly — ImpEx loading order is not guaranteed",
+        "In reverse dependency order — the most dependent extensions load first"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> ImpEx files load in extension dependency order, ensuring that data created by a dependency's scripts is available when the dependent extension's scripts run. Within a single extension, files load alphabetically. This ordering is critical when scripts reference data created by other scripts.</p>"
+    },
+    {
+      "id": "cc-impex-q10",
+      "type": "multiple-choice",
+      "text": "How do you set the English name of a product using a localized attribute in ImpEx?",
+      "options": [
+        "; PROD-001 ; name = 'English Name'",
+        "Use a separate header column: name[lang=en]",
+        "Use a BeanShell script to set the localization at runtime",
+        "Localized attributes cannot be set via ImpEx — use the Backoffice instead"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Localized attributes are set in ImpEx by appending the <code>[lang=languageCode]</code> modifier to the column header. For example: <code>name[lang=en]</code> sets the English name, and you can have multiple language columns in the same header: <code>name[lang=en]; name[lang=de]</code>.</p>"
+    },
+    {
+      "id": "cc-impex-q11",
+      "type": "true-false",
+      "text": "Running an ImpEx import in validation mode writes data to the database but rolls it back at the end, making it safe to test scripts on production.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Validation mode checks syntax and reference resolution <em>without writing any data to the database at all</em> — it is not a rollback mechanism. No data is written during validation mode, making it safe to use on any environment including production to verify a script before executing it for real.</p>"
+    },
+    {
+      "id": "cc-impex-q12",
+      "type": "multiple-choice",
+      "text": "A product has multiple categories. How do you assign all three categories in a single ImpEx data line?",
+      "options": [
+        "Use three separate data lines, one per category",
+        "Separate the category codes with a comma inside the cell: ; electronics,computers,laptops",
+        "Use the [multi=true] modifier and separate values with a pipe character",
+        "Multi-value attributes require a separate JOIN table ImpEx — they cannot be set on the main type header"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> ImpEx uses comma as the default collection delimiter for multi-value attributes. Multiple values are placed in a single cell separated by commas. If values themselves contain commas, use the <code>[collection-delimiter=|]</code> modifier to change the separator to a different character.</p>"
+    }
+  ]
+}

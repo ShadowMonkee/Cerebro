@@ -1,0 +1,168 @@
+{
+  "id": "cc-interceptors",
+  "title": "Interceptors — Validate, Prepare, Remove & Load",
+  "description": "How SAP Commerce Cloud's interceptor framework hooks into the Model lifecycle to enforce rules and automate data management.",
+  "icon": "🪝",
+  "category": "sap-commerce-cloud",
+  "tags": ["interceptors", "model-lifecycle", "validation", "persistence", "hooks"],
+  "sections": [
+    {
+      "title": "What Are Interceptors and Why Do They Exist?",
+      "content": "<p><strong>Interceptors</strong> are Spring beans that hook into the <strong>Model lifecycle</strong> — the sequence of events that occurs when a Model is created, loaded, saved, or removed. They are Commerce Cloud's primary mechanism for enforcing business rules, automating data population, and reacting to persistence events without polluting Service code.</p><p>The interceptor framework replaces the older Jalo-era <code>beforeSave</code> / <code>afterSave</code> methods and is the modern, recommended approach for all lifecycle hooks.</p><p>There are four interceptor types, each firing at a distinct point in the lifecycle:</p><ul><li><strong>PrepareInterceptor</strong> — fires before a Model is saved (INSERT or UPDATE). Used to set default values or compute derived fields.</li><li><strong>ValidateInterceptor</strong> — fires before a Model is saved, after Prepare. Used to enforce business rules. Can block the save by throwing an exception.</li><li><strong>RemoveInterceptor</strong> — fires before a Model is deleted. Used to enforce referential integrity or clean up related data.</li><li><strong>LoadInterceptor</strong> — fires after a Model is loaded from the database. Used to initialize transient fields or enrich data post-load.</li></ul><blockquote><strong>Execution order:</strong> When saving a Model, the order is always: <strong>Prepare → Validate → Save</strong>. Both Prepare and Validate run before the database write. If Validate throws, no data reaches the database and the transaction rolls back.</blockquote>"
+    },
+    {
+      "title": "PrepareInterceptor — Setting Defaults Before Save",
+      "content": "<p>A <code>PrepareInterceptor</code> fires before every save (both INSERT and UPDATE) and is the right place to set default values, compute derived attributes, or auto-populate fields the caller didn't set.</p><pre><code>public class ProductPrepareInterceptor\n        implements PrepareInterceptor&lt;ProductModel&gt; {\n\n    @Override\n    public void onPrepare(ProductModel model,\n                          InterceptorContext ctx)\n            throws InterceptorException {\n\n        // Auto-generate a code if not set\n        if (model.getCode() == null || model.getCode().isEmpty()) {\n            model.setCode(\"PROD-\" + UUID.randomUUID().toString());\n        }\n\n        // Set creation timestamp only on INSERT (not UPDATE)\n        if (ctx.isNew(model)) {\n            model.setCreatedBy(\"system\");\n        }\n    }\n}</code></pre><h3>The InterceptorContext</h3><p>The <code>InterceptorContext</code> parameter is available in all four interceptor types and provides crucial information about the operation in progress:</p><ul><li><code>ctx.isNew(model)</code> — returns <code>true</code> if this is an INSERT (model has never been saved)</li><li><code>ctx.isModified(model, ProductModel.CODE)</code> — returns <code>true</code> if the specific attribute was changed in this save operation</li><li><code>ctx.registerElement(otherModel)</code> — queues another Model for saving within the same transaction</li></ul><blockquote><strong>isNew() vs isModified():</strong> These two are heavily tested. Use <code>isNew()</code> to run logic only on first creation. Use <code>isModified(model, attributeName)</code> to react only when a specific field changed — for example, sending a notification only when an order status changes, not on every save.</blockquote>"
+    },
+    {
+      "title": "ValidateInterceptor — Enforcing Business Rules",
+      "content": "<p>A <code>ValidateInterceptor</code> enforces constraints on a Model before it is persisted. If the data is invalid, throw an <code>InterceptorException</code> to abort the save. The transaction rolls back completely — no partial data reaches the database.</p><pre><code>public class OrderValidateInterceptor\n        implements ValidateInterceptor&lt;OrderModel&gt; {\n\n    @Override\n    public void onValidate(OrderModel order,\n                           InterceptorContext ctx)\n            throws InterceptorException {\n\n        // Enforce that placed orders must have at least one entry\n        if (order.getEntries() == null ||\n                order.getEntries().isEmpty()) {\n            throw new InterceptorException(\n                \"Order must contain at least one entry\",\n                this);\n        }\n\n        // Enforce positive total\n        if (order.getTotalPrice() != null &&\n                order.getTotalPrice() < 0.0) {\n            throw new InterceptorException(\n                \"Order total cannot be negative\",\n                this);\n        }\n    }\n}</code></pre><h3>ValidateInterceptor vs. Spring Validation</h3><p>Spring's <code>@Valid</code> / <code>Validator</code> runs in the web layer on DTOs before they reach the Facade. <code>ValidateInterceptor</code> runs deep in the persistence layer on Models, regardless of where the save originates. For rules that must hold at the data level (not just the API level), interceptors are the correct choice.</p><blockquote><strong>Critical exam point:</strong> A <code>ValidateInterceptor</code> that throws does NOT save anything — the entire transaction rolls back. If you want to save some data and reject other data, you need to split them into separate transactions. The interceptor is an all-or-nothing gate.</blockquote>"
+    },
+    {
+      "title": "RemoveInterceptor — Controlling Deletion",
+      "content": "<p>A <code>RemoveInterceptor</code> fires before a Model is deleted from the database. It is used to enforce referential integrity, prevent deletion of protected records, or clean up related data that would otherwise be orphaned.</p><pre><code>public class CategoryRemoveInterceptor\n        implements RemoveInterceptor&lt;CategoryModel&gt; {\n\n    @Override\n    public void onRemove(CategoryModel category,\n                         InterceptorContext ctx)\n            throws InterceptorException {\n\n        // Prevent deletion if category has active products\n        if (category.getProducts() != null &&\n                !category.getProducts().isEmpty()) {\n            throw new InterceptorException(\n                \"Cannot delete category '\" + category.getCode()\n              + \"' — it still contains \" +\n                category.getProducts().size() + \" products.\",\n                this);\n        }\n    }\n}</code></pre><h3>Using registerElement to Cascade Operations</h3><p>If deletion should trigger removal of related models, use <code>ctx.registerElement()</code> to queue them for removal in the same transaction:</p><pre><code>@Override\npublic void onRemove(ParentModel parent,\n                     InterceptorContext ctx)\n        throws InterceptorException {\n    for (ChildModel child : parent.getChildren()) {\n        ctx.registerElement(child,\n            PersistenceOperation.DELETE);\n    }\n}</code></pre><blockquote><strong>Important distinction:</strong> A <code>RemoveInterceptor</code> fires <em>before</em> deletion. Throwing an <code>InterceptorException</code> here prevents the deletion entirely. There is no \"AfterRemoveInterceptor\" in Commerce Cloud — if you need post-deletion logic, use the Event system instead.</blockquote>"
+    },
+    {
+      "title": "LoadInterceptor — Post-Load Enrichment",
+      "content": "<p>A <code>LoadInterceptor</code> fires after a Model is loaded from the database. It is the least commonly used interceptor type but is useful for initializing transient (non-persisted) fields or applying post-load transformations.</p><pre><code>public class ProductLoadInterceptor\n        implements LoadInterceptor&lt;ProductModel&gt; {\n\n    private ExternalPricingService externalPricingService;\n\n    @Override\n    public void onLoad(ProductModel product,\n                       InterceptorContext ctx) {\n\n        // Populate a transient field from an external system\n        // (transient fields are not persisted in the DB)\n        Double livePrice =\n            externalPricingService.getLivePrice(\n                product.getCode());\n        product.setLivePrice(livePrice);\n    }\n}</code></pre><h3>When to Use LoadInterceptor — and When Not To</h3><p>LoadInterceptors run on <em>every</em> load of the affected type — including loads triggered internally by the platform during index runs, cache warm-ups, and background processes. This makes them a potential performance risk if the logic inside is slow (such as external API calls as shown above).</p><ul><li><strong>Appropriate use:</strong> Initializing lightweight computed transient fields that are cheap to calculate</li><li><strong>Avoid:</strong> External service calls, database queries, or any I/O-heavy operations in a LoadInterceptor</li></ul><blockquote><strong>Performance warning:</strong> A LoadInterceptor that makes an external HTTP call will fire that call every time any code loads a model of that type — including Solr indexing, which loads thousands of products at once. This is a common source of serious performance regressions in Commerce Cloud projects.</blockquote>"
+    },
+    {
+      "title": "Registering Interceptors in Spring",
+      "content": "<p>Declaring the interceptor class is only half the work. You must also <strong>register it</strong> with the platform's interceptor registry for it to fire. Registration is done via a dedicated Spring bean in your extension's <code>*-spring.xml</code>:</p><pre><code>&lt;!-- 1. Declare the interceptor bean --&gt;\n&lt;bean id=\"productPrepareInterceptor\"\n      class=\"com.mycompany.ProductPrepareInterceptor\"&gt;\n  &lt;property name=\"modelService\" ref=\"modelService\"/&gt;\n&lt;/bean&gt;\n\n&lt;!-- 2. Register it with the interceptor registry --&gt;\n&lt;bean class=\"de.hybris.platform.servicelayer.interceptor\n             .impl.DefaultInterceptorMapping\"&gt;\n  &lt;property name=\"interceptor\"\n            ref=\"productPrepareInterceptor\"/&gt;\n  &lt;property name=\"typeCode\" value=\"Product\"/&gt;\n&lt;/bean&gt;</code></pre><p>The <code>DefaultInterceptorMapping</code> bean wires an interceptor to a specific type code. Key properties:</p><ul><li><code>interceptor</code> — reference to your interceptor bean</li><li><code>typeCode</code> — the type this interceptor applies to. If omitted, it applies to <em>all</em> types — use with extreme caution</li></ul><h3>Interceptors and Subtype Inheritance</h3><p>An interceptor registered for a type also fires for all subtypes. An interceptor registered for <code>Product</code> fires when saving a <code>VariantProduct</code> or any other subtype. If you want to restrict firing to only the exact type, check the model's type inside the interceptor using the <code>typeService</code>.</p><blockquote><strong>Missing registration is a common mistake:</strong> Writing a perfect interceptor class but forgetting the <code>DefaultInterceptorMapping</code> bean means the interceptor never fires. Always verify registration by testing in a local environment before assuming an interceptor is active.</blockquote>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-interceptors-q1",
+      "type": "multiple-choice",
+      "text": "What is the correct execution order when a Model is saved in SAP Commerce Cloud?",
+      "options": [
+        "Validate → Prepare → Save to database",
+        "Prepare → Save to database → Validate",
+        "Prepare → Validate → Save to database",
+        "Load → Prepare → Validate → Save to database"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> The order is always <strong>Prepare → Validate → Save</strong>. Prepare runs first to set defaults and computed fields. Validate then checks the (possibly modified) state. Only if Validate passes does the platform write to the database. LoadInterceptor is not part of the save flow — it fires on reads.</p>"
+    },
+    {
+      "id": "cc-interceptors-q2",
+      "type": "true-false",
+      "text": "A ValidateInterceptor that throws an InterceptorException will prevent only the invalid Model from being saved, while other Models saved in the same transaction are committed successfully.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Throwing an <code>InterceptorException</code> in a <code>ValidateInterceptor</code> rolls back the <em>entire transaction</em>. All Models being saved in that transaction are rejected — not just the one that failed validation. The save is an all-or-nothing operation.</p>"
+    },
+    {
+      "id": "cc-interceptors-q3",
+      "type": "multiple-choice",
+      "text": "A developer wants logic to run only when a Product is saved for the first time (INSERT), not on subsequent updates. Which approach is correct?",
+      "options": [
+        "Use a ValidateInterceptor and check if all required fields are null",
+        "Use a PrepareInterceptor and check ctx.isNew(model) to guard the logic",
+        "Use a LoadInterceptor, which only fires on the first load after creation",
+        "Use a RemoveInterceptor with inverse logic to detect new records"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> <code>ctx.isNew(model)</code> returns <code>true</code> only when the Model has never been persisted before (INSERT operation). Wrapping your logic in this check inside a <code>PrepareInterceptor</code> ensures it only runs on creation, not on every subsequent update.</p>"
+    },
+    {
+      "id": "cc-interceptors-q4",
+      "type": "multiple-choice",
+      "text": "Which interceptor type fires after a Model is loaded from the database?",
+      "options": [
+        "PrepareInterceptor",
+        "ValidateInterceptor",
+        "RemoveInterceptor",
+        "LoadInterceptor"
+      ],
+      "correctIndex": 3,
+      "explanation": "<p><strong>Option D is correct.</strong> The <code>LoadInterceptor</code> is the only interceptor that fires post-load. The other three (Prepare, Validate, Remove) all fire during write operations (save or delete). This makes <code>LoadInterceptor</code> unique as the only read-side lifecycle hook.</p>"
+    },
+    {
+      "id": "cc-interceptors-q5",
+      "type": "true-false",
+      "text": "An interceptor registered for the 'Product' type will also fire when a 'VariantProduct' (which extends Product) is saved.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> Interceptors apply to the registered type and all its subtypes. Since <code>VariantProduct</code> extends <code>Product</code>, any interceptor mapped to <code>Product</code> will fire for <code>VariantProduct</code> saves as well. Use <code>typeService</code> inside the interceptor to restrict behavior to a specific type if needed.</p>"
+    },
+    {
+      "id": "cc-interceptors-q6",
+      "type": "multiple-choice",
+      "text": "How must an interceptor be registered for it to fire during Model lifecycle events?",
+      "options": [
+        "By annotating the interceptor class with @InterceptorFor(typeCode = \"Product\")",
+        "By declaring a DefaultInterceptorMapping bean in the extension's Spring XML, referencing the interceptor and typeCode",
+        "By adding the interceptor's bean ID to the interceptorRegistry list bean in platform-spring.xml",
+        "No registration is needed — the platform auto-detects beans that implement interceptor interfaces"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Registration requires a <code>DefaultInterceptorMapping</code> Spring bean that wires the interceptor bean to a type code. Without this mapping, the interceptor class exists as a Spring bean but never fires. There is no auto-detection or annotation-based registration in the standard platform.</p>"
+    },
+    {
+      "id": "cc-interceptors-q7",
+      "type": "multiple-choice",
+      "text": "A developer adds a LoadInterceptor for ProductModel that calls an external REST API to fetch live pricing. What is the primary risk?",
+      "options": [
+        "The LoadInterceptor will only fire on the first load and miss subsequent loads",
+        "The external call will fire on every product load — including Solr indexing — causing serious performance degradation",
+        "LoadInterceptors cannot inject Spring services like RestTemplate, so the call is not possible",
+        "The platform will cache the LoadInterceptor result, causing stale pricing data"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> <code>LoadInterceptor</code> fires on <em>every</em> load of that type, including bulk operations like Solr indexing which loads thousands of products. An external HTTP call in a LoadInterceptor multiplies that latency across every load, commonly causing timeouts and indexing failures. LoadInterceptors must contain only lightweight, fast logic.</p>"
+    },
+    {
+      "id": "cc-interceptors-q8",
+      "type": "true-false",
+      "text": "ctx.isModified(model, ProductModel.CODE) returns true only if the 'code' attribute was changed during the current save operation, not on every save.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> <code>ctx.isModified()</code> performs dirty-checking against the persisted state. It returns <code>true</code> only when the specific attribute value differs from what is currently in the database. This is essential for conditional logic like sending notifications only when a specific field actually changes.</p>"
+    },
+    {
+      "id": "cc-interceptors-q9",
+      "type": "multiple-choice",
+      "text": "What is the correct way to cascade a deletion to child Models from within a RemoveInterceptor?",
+      "options": [
+        "Call modelService.remove() directly on each child within the interceptor method",
+        "Throw an InterceptorException listing the child PKs to be removed",
+        "Use ctx.registerElement(childModel, PersistenceOperation.DELETE) to queue removals in the same transaction",
+        "Child removal cascades automatically — no action is needed in the interceptor"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> <code>ctx.registerElement(model, PersistenceOperation.DELETE)</code> queues additional models for deletion within the current transaction. Calling <code>modelService.remove()</code> directly inside an interceptor can cause recursive interceptor invocations and is not the recommended pattern.</p>"
+    },
+    {
+      "id": "cc-interceptors-q10",
+      "type": "multiple-choice",
+      "text": "Which statement best describes the difference between a ValidateInterceptor and Spring's @Valid web layer validation?",
+      "options": [
+        "They are functionally identical — use whichever is easier to configure",
+        "Spring @Valid runs on DTOs in the web layer before reaching the Facade; ValidateInterceptor runs on Models deep in the persistence layer regardless of call origin",
+        "ValidateInterceptor only runs in production mode; Spring @Valid runs in all environments",
+        "Spring @Valid is newer and replaces ValidateInterceptor in Commerce Cloud 2211"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Spring <code>@Valid</code> protects the API boundary — it validates DTOs before they enter the service layer. <code>ValidateInterceptor</code> protects the data boundary — it validates Models before they reach the database, regardless of whether the save originated from an API call, a CronJob, an ImpEx import, or any other source.</p>"
+    },
+    {
+      "id": "cc-interceptors-q11",
+      "type": "true-false",
+      "text": "A RemoveInterceptor can prevent deletion of a Model by throwing an InterceptorException.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> Like <code>ValidateInterceptor</code>, a <code>RemoveInterceptor</code> that throws <code>InterceptorException</code> aborts the operation. The deletion does not occur and the transaction rolls back. This is the standard mechanism for enforcing referential integrity rules at the data layer.</p>"
+    },
+    {
+      "id": "cc-interceptors-q12",
+      "type": "multiple-choice",
+      "text": "If a DefaultInterceptorMapping is declared without a 'typeCode' property, what happens?",
+      "options": [
+        "The Spring context fails to start — typeCode is a required property",
+        "The interceptor is registered but disabled until a typeCode is added at runtime",
+        "The interceptor fires for all types in the system — use with extreme caution",
+        "The interceptor only fires for types that explicitly opt in via their items.xml"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> Omitting <code>typeCode</code> from <code>DefaultInterceptorMapping</code> registers the interceptor globally — it fires for every Model of every type. This can have severe performance implications and cause unexpected behavior across the entire platform. Always specify a <code>typeCode</code> unless a global interceptor is explicitly required.</p>"
+    }
+  ]
+}
