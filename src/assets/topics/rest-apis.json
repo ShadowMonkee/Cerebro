@@ -1,0 +1,89 @@
+{
+  "id": "rest-apis",
+  "title": "REST APIs",
+  "description": "HTTP methods, status codes, resource design, and best practices for RESTful services.",
+  "icon": "🔗",
+  "sections": [
+    {
+      "title": "What is REST?",
+      "content": "<p><strong>REST</strong> (Representational State Transfer) is an architectural style for designing networked applications. A RESTful API uses HTTP requests to perform CRUD operations on <em>resources</em>.</p><h3>Core principles</h3><ul><li><strong>Stateless</strong> — Each request contains all the information needed to process it. The server does not store client state between requests.</li><li><strong>Resource-based</strong> — Everything is a resource identified by a URI (e.g., <code>/api/users/42</code>).</li><li><strong>Uniform interface</strong> — Use standard HTTP methods consistently across all resources.</li><li><strong>Client-server separation</strong> — The client and server evolve independently.</li></ul><p>Resources are typically represented as <strong>JSON</strong> in modern APIs, though XML and other formats are also possible.</p>"
+    },
+    {
+      "title": "HTTP Methods",
+      "content": "<p>RESTful APIs use standard HTTP methods to express the intended action on a resource:</p><pre><code>GET    /api/users       → List all users\nGET    /api/users/42    → Get user with ID 42\nPOST   /api/users       → Create a new user\nPUT    /api/users/42    → Replace user 42 entirely\nPATCH  /api/users/42    → Partially update user 42\nDELETE /api/users/42    → Delete user 42</code></pre><h3>Safe vs Unsafe</h3><p><strong>Safe methods</strong> do not modify resources: <code>GET</code>, <code>HEAD</code>, <code>OPTIONS</code>.</p><p><strong>Unsafe methods</strong> can modify resources: <code>POST</code>, <code>PUT</code>, <code>PATCH</code>, <code>DELETE</code>.</p><h3>Idempotent methods</h3><p>An idempotent method produces the same result regardless of how many times it is called. <code>GET</code>, <code>PUT</code>, and <code>DELETE</code> are idempotent. <code>POST</code> is <strong>not</strong> — calling it twice may create two resources.</p>"
+    },
+    {
+      "title": "Status Codes",
+      "content": "<p>HTTP status codes communicate the result of a request. They are grouped into five classes:</p><h3>2xx — Success</h3><ul><li><code>200 OK</code> — Request succeeded (used for GET, PUT, PATCH)</li><li><code>201 Created</code> — A new resource was created (used for POST)</li><li><code>204 No Content</code> — Success with no response body (used for DELETE)</li></ul><h3>3xx — Redirection</h3><ul><li><code>301 Moved Permanently</code> — Resource has a new URI</li><li><code>304 Not Modified</code> — Cached version is still valid</li></ul><h3>4xx — Client Error</h3><ul><li><code>400 Bad Request</code> — Malformed request syntax or invalid data</li><li><code>401 Unauthorized</code> — Authentication required</li><li><code>403 Forbidden</code> — Authenticated but not authorized</li><li><code>404 Not Found</code> — Resource does not exist</li><li><code>409 Conflict</code> — Request conflicts with current state</li><li><code>422 Unprocessable Entity</code> — Validation errors</li></ul><h3>5xx — Server Error</h3><ul><li><code>500 Internal Server Error</code> — Generic server failure</li><li><code>502 Bad Gateway</code> — Upstream server returned invalid response</li><li><code>503 Service Unavailable</code> — Server temporarily overloaded or down</li></ul>"
+    },
+    {
+      "title": "Best Practices",
+      "content": "<p>Follow these conventions to design clean, predictable APIs:</p><h3>URL design</h3><ul><li>Use <strong>nouns</strong>, not verbs: <code>/api/users</code> not <code>/api/getUsers</code></li><li>Use <strong>plural</strong> resource names: <code>/api/users</code> not <code>/api/user</code></li><li>Nest related resources: <code>/api/users/42/orders</code></li><li>Use query parameters for filtering: <code>/api/users?role=admin&active=true</code></li></ul><h3>Pagination</h3><pre><code>GET /api/users?page=2&limit=20\n\nResponse headers:\n  X-Total-Count: 145\n  Link: &lt;/api/users?page=3&limit=20&gt;; rel=\"next\"</code></pre><h3>Versioning</h3><p>Common approaches include URL path versioning (<code>/api/v1/users</code>) and header-based versioning (<code>Accept: application/vnd.api.v2+json</code>). URL path versioning is the most widely adopted.</p><h3>Error responses</h3><p>Return consistent error objects:</p><pre><code>{\n  \"error\": {\n    \"code\": \"VALIDATION_ERROR\",\n    \"message\": \"Email is required\",\n    \"details\": [\n      { \"field\": \"email\", \"issue\": \"must not be empty\" }\n    ]\n  }\n}</code></pre>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "rest-q1",
+      "type": "multiple-choice",
+      "text": "Which HTTP method is used to create a new resource?",
+      "options": ["GET", "POST", "PUT", "PATCH"],
+      "correctIndex": 1,
+      "explanation": "<p><code>POST</code> is used to create new resources. The server typically returns <code>201 Created</code> with the new resource in the response body and a <code>Location</code> header pointing to it.</p>"
+    },
+    {
+      "id": "rest-q2",
+      "type": "true-false",
+      "text": "The POST method is idempotent.",
+      "correctAnswer": false,
+      "explanation": "<p><code>POST</code> is <strong>not</strong> idempotent — sending the same POST request twice may create two separate resources. In contrast, <code>PUT</code> and <code>DELETE</code> are idempotent: repeating them produces the same end state.</p>"
+    },
+    {
+      "id": "rest-q3",
+      "type": "multiple-choice",
+      "text": "What status code should be returned when a resource is successfully deleted?",
+      "options": ["200 OK", "201 Created", "204 No Content", "404 Not Found"],
+      "correctIndex": 2,
+      "explanation": "<p><code>204 No Content</code> is the standard response for a successful DELETE — the resource was removed and there is no body to return. <code>200 OK</code> is also acceptable if you return a confirmation body.</p>"
+    },
+    {
+      "id": "rest-q4",
+      "type": "true-false",
+      "text": "A 401 Unauthorized response means the user is authenticated but lacks permission.",
+      "correctAnswer": false,
+      "explanation": "<p>Despite its name, <code>401 Unauthorized</code> actually means <strong>unauthenticated</strong> — the server doesn't know who you are. For authenticated users who lack permission, the correct code is <code>403 Forbidden</code>.</p>"
+    },
+    {
+      "id": "rest-q5",
+      "type": "multiple-choice",
+      "text": "Which URL design follows RESTful best practices?",
+      "options": [
+        "/api/getUsers",
+        "/api/user/list",
+        "/api/users",
+        "/api/fetchAllUsers"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>RESTful URLs use <strong>plural nouns</strong> to represent collections: <code>/api/users</code>. They avoid verbs like \"get\", \"list\", or \"fetch\" because the HTTP method already expresses the action.</p>"
+    },
+    {
+      "id": "rest-q6",
+      "type": "multiple-choice",
+      "text": "What is the difference between PUT and PATCH?",
+      "options": [
+        "PUT creates resources, PATCH deletes them",
+        "PUT replaces the entire resource, PATCH applies partial updates",
+        "PUT is for collections, PATCH is for single resources",
+        "There is no difference"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><code>PUT</code> replaces the <strong>entire</strong> resource — you must send all fields. <code>PATCH</code> applies a <strong>partial update</strong> — you only send the fields that changed. Using PATCH when you only need to change one field avoids sending unnecessary data.</p>"
+    },
+    {
+      "id": "rest-q7",
+      "type": "true-false",
+      "text": "REST requires that every request from the client contains all the information needed to process it.",
+      "correctAnswer": true,
+      "explanation": "<p>This is the <strong>statelessness</strong> principle — one of the core constraints of REST. The server does not store any client session state between requests. Authentication tokens, preferences, and context must be included in every request.</p>"
+    }
+  ]
+}

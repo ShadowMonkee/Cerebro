@@ -1,0 +1,77 @@
+{
+  "id": "css-fundamentals",
+  "title": "CSS Fundamentals",
+  "description": "Selectors, the box model, layout techniques, and responsive design principles.",
+  "icon": "🎨",
+  "sections": [
+    {
+      "title": "Selectors",
+      "content": "<p>CSS selectors are patterns used to select and style HTML elements. Mastering selectors is the foundation of writing efficient CSS.</p><h3>Basic selectors</h3><pre><code>/* Element selector */\np { color: blue; }\n\n/* Class selector */\n.highlight { background: yellow; }\n\n/* ID selector */\n#header { font-size: 2rem; }\n\n/* Universal selector */\n* { box-sizing: border-box; }</code></pre><h3>Combinators</h3><ul><li><code>A B</code> — Descendant (B anywhere inside A)</li><li><code>A > B</code> — Direct child only</li><li><code>A + B</code> — Adjacent sibling (B immediately after A)</li><li><code>A ~ B</code> — General sibling (any B after A at the same level)</li></ul><h3>Pseudo-classes</h3><pre><code>a:hover { color: red; }\nli:first-child { font-weight: bold; }\ninput:focus { outline: 2px solid blue; }\ntr:nth-child(even) { background: #f0f0f0; }</code></pre>"
+    },
+    {
+      "title": "The Box Model",
+      "content": "<p>Every HTML element is a rectangular box. The <strong>CSS box model</strong> describes how the size of that box is calculated.</p><p>From inside to outside, the box has four layers:</p><ol><li><strong>Content</strong> — The actual text, image, or child elements</li><li><strong>Padding</strong> — Space between content and border (transparent)</li><li><strong>Border</strong> — A line around the padding</li><li><strong>Margin</strong> — Space outside the border (transparent, collapses vertically)</li></ol><pre><code>.box {\n  width: 200px;\n  padding: 20px;\n  border: 2px solid black;\n  margin: 10px;\n}</code></pre><p>By default (<code>box-sizing: content-box</code>), width/height only apply to the content area. The total rendered width would be: 200 + 20×2 + 2×2 + 10×2 = <strong>264px</strong>.</p><blockquote>Use <code>box-sizing: border-box</code> to include padding and border in the width/height calculation. This is the modern standard and dramatically simplifies layout math.</blockquote>"
+    },
+    {
+      "title": "Flexbox",
+      "content": "<p><strong>Flexbox</strong> is a one-dimensional layout method for arranging items in rows or columns. It excels at distributing space and aligning items.</p><pre><code>.container {\n  display: flex;\n  justify-content: center;  /* main axis */\n  align-items: center;      /* cross axis */\n  gap: 1rem;\n}</code></pre><h3>Key container properties</h3><ul><li><code>flex-direction</code> — <code>row</code> (default), <code>column</code>, <code>row-reverse</code>, <code>column-reverse</code></li><li><code>flex-wrap</code> — <code>nowrap</code> (default), <code>wrap</code></li><li><code>justify-content</code> — Main axis alignment: <code>flex-start</code>, <code>center</code>, <code>space-between</code>, <code>space-around</code>, <code>space-evenly</code></li><li><code>align-items</code> — Cross axis alignment: <code>stretch</code> (default), <code>center</code>, <code>flex-start</code>, <code>flex-end</code></li></ul><h3>Key item properties</h3><pre><code>.item {\n  flex: 1;          /* shorthand: grow shrink basis */\n  flex-grow: 1;     /* how much to grow */\n  flex-shrink: 0;   /* don't shrink */\n  flex-basis: 200px; /* ideal starting size */\n  align-self: center; /* override container's align-items */\n}</code></pre>"
+    },
+    {
+      "title": "Responsive Design",
+      "content": "<p>Responsive design ensures your layout works across all screen sizes. The key tools are <strong>media queries</strong>, <strong>relative units</strong>, and <strong>fluid layouts</strong>.</p><h3>Media queries</h3><pre><code>/* Mobile-first approach */\n.grid {\n  display: grid;\n  grid-template-columns: 1fr;\n}\n\n@media (min-width: 768px) {\n  .grid {\n    grid-template-columns: 1fr 1fr;\n  }\n}\n\n@media (min-width: 1024px) {\n  .grid {\n    grid-template-columns: repeat(3, 1fr);\n  }\n}</code></pre><h3>Relative units</h3><ul><li><code>rem</code> — Relative to root font size (usually 16px)</li><li><code>em</code> — Relative to parent element's font size</li><li><code>vw / vh</code> — 1% of viewport width / height</li><li><code>%</code> — Relative to parent element's dimension</li></ul><blockquote>The viewport meta tag is essential: <code>&lt;meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"&gt;</code>. Without it, mobile browsers render at desktop width and scale down.</blockquote>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "css-q1",
+      "type": "multiple-choice",
+      "text": "Which selector has the highest specificity?",
+      "options": ["Element selector (p)", "Class selector (.box)", "ID selector (#header)", "Universal selector (*)"],
+      "correctIndex": 2,
+      "explanation": "<p>Specificity from lowest to highest: universal (<code>*</code>) → element (<code>p</code>) → class (<code>.box</code>) → ID (<code>#header</code>). ID selectors have a specificity weight of 1-0-0, class selectors 0-1-0, and element selectors 0-0-1.</p>"
+    },
+    {
+      "id": "css-q2",
+      "type": "true-false",
+      "text": "With box-sizing: border-box, padding and border are included in the element's width and height.",
+      "correctAnswer": true,
+      "explanation": "<p>That is exactly what <code>border-box</code> does. If you set <code>width: 200px</code> on an element with <code>border-box</code>, the total rendered width will be 200px regardless of padding and border values. The content area shrinks to accommodate them.</p>"
+    },
+    {
+      "id": "css-q3",
+      "type": "multiple-choice",
+      "text": "What does 'justify-content' control in a flex container?",
+      "options": [
+        "Alignment on the cross axis",
+        "Alignment on the main axis",
+        "Order of flex items",
+        "Wrapping behavior"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><code>justify-content</code> distributes space along the <strong>main axis</strong> (horizontal by default). For cross-axis alignment, you'd use <code>align-items</code> or <code>align-content</code>.</p>"
+    },
+    {
+      "id": "css-q4",
+      "type": "true-false",
+      "text": "The 'rem' unit is relative to the parent element's font size.",
+      "correctAnswer": false,
+      "explanation": "<p><code>rem</code> stands for <strong>root em</strong> and is relative to the <em>root element's</em> (<code>&lt;html&gt;</code>) font size — not the parent's. The <code>em</code> unit is the one relative to the parent element's font size.</p>"
+    },
+    {
+      "id": "css-q5",
+      "type": "multiple-choice",
+      "text": "Which combinator selects only direct children?",
+      "options": ["A B (space)", "A > B", "A + B", "A ~ B"],
+      "correctIndex": 1,
+      "explanation": "<p>The <code>></code> combinator selects only direct (immediate) children. The space combinator selects all descendants, <code>+</code> selects adjacent siblings, and <code>~</code> selects general siblings.</p>"
+    },
+    {
+      "id": "css-q6",
+      "type": "multiple-choice",
+      "text": "In the box model, which layer is between padding and margin?",
+      "options": ["Content", "Outline", "Border", "Shadow"],
+      "correctIndex": 2,
+      "explanation": "<p>The box model layers from inside out are: content → padding → <strong>border</strong> → margin. The outline sits outside the margin and does not affect layout.</p>"
+    }
+  ]
+}

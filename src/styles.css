@@ -1,0 +1,289 @@
+/* ============================================
+   CEREBRO — Global Design System
+   Dark & focused study helper
+   ============================================ */
+
+/* --- CSS Custom Properties --- */
+:root {
+  /* Backgrounds */
+  --bg-primary: #0d1117;
+  --bg-surface: #161b22;
+  --bg-raised: #1c2333;
+  --bg-border: #30363d;
+
+  /* Text */
+  --text-primary: #e6edf3;
+  --text-muted: #8b949e;
+
+  /* Accent */
+  --accent: #a78bfa;
+  --accent-hover: #c4b5fd;
+  --accent-dim: rgba(167, 139, 250, 0.08);
+
+  /* Red accent (branding + question numbers) */
+  --red: #f87171;
+  --red-dim: rgba(248, 113, 113, 0.12);
+
+  /* Semantic — pastel */
+  --success: #86efac;
+  --success-dim: rgba(134, 239, 172, 0.12);
+  --danger: #fca5a5;
+  --danger-dim: rgba(252, 165, 165, 0.12);
+  --warning: #fcd34d;
+  --warning-dim: rgba(252, 211, 77, 0.12);
+  --info: #93c5fd;
+  --info-dim: rgba(147, 197, 253, 0.12);
+
+  /* Typography */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Spacing & Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+}
+
+/* --- Reset & Base --- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+/* --- Scrollbar Styling --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* --- Utility Classes --- */
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* --- Card Base --- */
+.card {
+  background: var(--bg-surface);
+  border: 0.5px solid var(--bg-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  transition: border-color var(--transition-base);
+}
+
+.card:hover {
+  border-color: var(--accent);
+}
+
+/* --- Button Base --- */
+.btn {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-md);
+  border: 0.5px solid var(--bg-border);
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.btn:hover {
+  border-color: var(--text-muted);
+  background: var(--bg-border);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--bg-primary);
+  border-color: var(--accent);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover {
+  color: var(--text-primary);
+  background: var(--bg-raised);
+  border-color: var(--bg-border);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* --- Badge --- */
+.badge {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.badge-done {
+  background: var(--success-dim);
+  color: var(--success);
+}
+
+.badge-progress {
+  background: var(--warning-dim);
+  color: var(--warning);
+}
+
+.badge-new {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* --- Theory HTML Content Styling --- */
+.theory-content {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.theory-content p {
+  margin-bottom: 1rem;
+}
+
+.theory-content h1,
+.theory-content h2,
+.theory-content h3 {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  margin: 1.5rem 0 0.75rem;
+}
+
+.theory-content h1 { font-size: 1.25rem; }
+.theory-content h2 { font-size: 1.125rem; }
+.theory-content h3 { font-size: 1rem; }
+
+.theory-content code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  background: var(--bg-raised);
+  color: var(--accent);
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+}
+
+.theory-content pre {
+  background: var(--bg-primary);
+  border: 0.5px solid var(--bg-border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.theory-content pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.theory-content ul,
+.theory-content ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.theory-content li {
+  margin-bottom: 0.375rem;
+}
+
+.theory-content strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.theory-content em {
+  color: var(--accent);
+  font-style: italic;
+}
+
+.theory-content blockquote {
+  border-left: 3px solid var(--accent);
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  background: var(--accent-dim);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: var(--text-primary);
+}
+
+/* --- Selection --- */
+::selection {
+  background: rgba(167, 139, 250, 0.3);
+  color: var(--text-primary);
+}
