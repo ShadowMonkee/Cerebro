@@ -1,0 +1,169 @@
+{
+  "id": "cc-events",
+  "title": "Event System — Publishing & Listening",
+  "description": "Master the SAP Commerce Cloud event framework for decoupled, asynchronous communication between modules.",
+  "icon": "📡",
+  "category": "sap-commerce-cloud",
+  "tags": ["events", "listeners", "publishing", "asynchronous", "decoupling", "cluster-aware"],
+  "sections": [
+    {
+      "title": "Why Events Matter in Commerce Cloud",
+      "content": "<p>SAP Commerce Cloud uses an <strong>event-driven architecture</strong> to let extensions communicate without creating hard dependencies on each other. Instead of one service calling another directly, a service <em>publishes</em> an event, and any interested component <em>listens</em> for it.</p><p>This pattern delivers three key benefits. First, <strong>loose coupling</strong>: the publisher doesn't need to know who (or how many) listeners exist. Second, <strong>extensibility</strong>: custom extensions can hook into platform behaviour simply by registering a listener — no core code changes required. Third, <strong>scalability</strong>: events can be processed synchronously on the same thread or asynchronously on a different thread or even a different cluster node, depending on configuration.</p><p>The platform ships with dozens of built-in events — order placement, cart calculation, login, cache invalidation, and more. Understanding the event lifecycle is essential for writing clean, maintainable customisations that respect upgrade safety.</p>"
+    },
+    {
+      "title": "Core Concepts — Events, Sources & the EventService",
+      "content": "<p>Every event in Commerce Cloud is a Java object that extends <code>AbstractEvent</code>. This base class carries metadata such as a timestamp, the source object, and the cluster node ID. For events that must travel across cluster nodes, you extend <code>ClusterAwareEvent</code> instead.</p><p>The central API is <code>EventService</code>, which exposes two main methods: <code>publishEvent(AbstractEvent event)</code> to fire an event, and <code>registerEventListener(EventListener listener)</code> to subscribe. In practice you rarely call <code>registerEventListener</code> manually; Spring wiring handles it.</p><p>When <code>publishEvent</code> is called the <code>DefaultEventService</code> iterates over all registered listeners whose <code>getHandledEventTypes()</code> includes the published event class. Listeners are invoked in no guaranteed order. If the event is a <code>ClusterAwareEvent</code>, the service also serialises it and broadcasts it to other cluster nodes via the cluster broadcast mechanism, so remote listeners receive it too.</p><p>You can create your own event simply by subclassing <code>AbstractEvent</code> (or <code>ClusterAwareEvent</code>) and adding whatever payload fields you need — for example an order code, a customer UID, or a list of modified product codes.</p>"
+    },
+    {
+      "title": "Creating Custom Events",
+      "content": "<p>A custom event is a plain Java class. At minimum it extends <code>AbstractEvent</code> and adds fields for the data listeners will need.</p><pre><code>public class InventoryThresholdEvent extends AbstractEvent {\n    private final String productCode;\n    private final int availableStock;\n    private final int threshold;\n\n    public InventoryThresholdEvent(final String productCode,\n                                    final int availableStock,\n                                    final int threshold) {\n        super();\n        this.productCode = productCode;\n        this.availableStock = availableStock;\n        this.threshold = threshold;\n    }\n    // getters\n}</code></pre><p>If the event must be received by listeners on <strong>every cluster node</strong> — for example a cache-flush signal — extend <code>ClusterAwareEvent</code> instead and implement <code>publish(int sourceNodeId, int targetNodeId)</code>. The platform serialises cluster-aware events, so all payload fields must be <code>Serializable</code>.</p><p>Best practices: keep events <strong>immutable</strong> (use final fields, no setters), carry only the minimum data required (codes and IDs rather than full model objects), and name them with a clear <em>past-tense</em> or <em>threshold</em> convention (e.g. <code>OrderPlacedEvent</code>, <code>StockLevelLowEvent</code>).</p>"
+    },
+    {
+      "title": "Implementing Event Listeners",
+      "content": "<p>A listener implements <code>EventListener&lt;T extends AbstractEvent&gt;</code> or extends the convenience base class <code>AbstractEventListener&lt;T&gt;</code>. The generic parameter <code>T</code> tells the framework which event type this listener handles.</p><pre><code>public class InventoryThresholdListener\n        extends AbstractEventListener&lt;InventoryThresholdEvent&gt; {\n\n    @Override\n    protected void onEvent(final InventoryThresholdEvent event) {\n        // e.g. send alert email, create a restock task\n        LOG.warn(\"Stock low for {} : {} remaining\",\n                 event.getProductCode(),\n                 event.getAvailableStock());\n    }\n}</code></pre><p>Register the listener as a Spring bean in your <code>*-spring.xml</code>. The platform auto-detects beans that implement <code>EventListener</code> and registers them with the <code>EventService</code> at startup.</p><pre><code>&lt;bean id=\"inventoryThresholdListener\"\n      class=\"com.acme.listeners.InventoryThresholdListener\"\n      parent=\"abstractEventListener\" /&gt;</code></pre><p>Setting the <strong>parent</strong> to <code>abstractEventListener</code> is important — it wires tenant-awareness and ensures the listener is properly initialised. Forgetting this parent is a common source of bugs where listeners silently fail in multi-tenant setups.</p><p>A single listener class should handle <strong>one event type</strong>. If you need to react to multiple events, create separate listener beans rather than building a monolithic switch statement.</p>"
+    },
+    {
+      "title": "Synchronous vs Asynchronous Processing",
+      "content": "<p>By default, events are processed <strong>synchronously</strong> — the publishing thread blocks until every listener has finished. This is fine for fast, lightweight reactions (e.g. setting a flag), but problematic for heavy work like sending emails or calling external APIs.</p><p>To process an event <strong>asynchronously</strong>, override the listener method <code>isAsynchronous()</code> (from <code>AbstractEventListener</code>) to return <code>true</code>, or configure an asynchronous event processing strategy via Spring. The platform then hands off execution to a thread pool, freeing the publisher immediately.</p><p>Key considerations for asynchronous listeners: <strong>transaction context</strong> — the listener runs outside the publisher's transaction, so the database changes that triggered the event may not yet be committed. Use <code>TransactionAwareEvent</code> patterns or the <code>afterCommit</code> hook to avoid reading stale data. <strong>Error handling</strong> — exceptions in async listeners are logged but do not roll back the publisher's transaction. <strong>Ordering</strong> — execution order across multiple async listeners is non-deterministic.</p><p>A useful rule of thumb: if the listener's work must succeed for the business operation to be valid (e.g. stock reservation), keep it synchronous. If it is supplementary (e.g. analytics, notification), make it asynchronous.</p>"
+    },
+    {
+      "title": "Platform Events, Cluster Broadcasting & Testing",
+      "content": "<p>Commerce Cloud fires many events out of the box. Key examples include <code>AfterItemCreationEvent</code>, <code>AfterItemRemovalEvent</code>, <code>OrderPlacedEvent</code>, <code>LoginSuccessEvent</code>, <code>BeforeSessionCloseEvent</code>, and the <code>AfterInitializationEndEvent</code> that signals the system is fully started. Hooking into these lets you extend platform behaviour without modifying core source.</p><p><strong>Cluster broadcasting</strong> works through <code>ClusterAwareEvent</code>. When such an event is published, the platform's <code>ClusterBroadcastService</code> serialises the event and sends it to every node. Each node's <code>EventService</code> then dispatches it to local listeners. This is how cache invalidation is synchronised across a CCV2 cluster.</p><p><strong>Testing</strong> event-driven code in isolation is straightforward. In unit tests, instantiate your listener and call <code>onEvent()</code> directly. For integration tests, publish an event through the <code>EventService</code> retrieved from the Spring context and assert the expected side effects (database changes, log output, mock invocations). You can also write a test listener that captures events into a list to verify publishing logic.</p><p>Common pitfalls to avoid: circular event chains (Listener A publishes event B, whose listener publishes event A), performing heavy blocking I/O in synchronous listeners, and forgetting <code>Serializable</code> on <code>ClusterAwareEvent</code> payload fields — which causes silent broadcast failures.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-events-q1",
+      "type": "multiple-choice",
+      "text": "What base class must all custom events extend at minimum in SAP Commerce Cloud?",
+      "options": [
+        "AbstractEvent",
+        "ClusterAwareEvent",
+        "EventObject",
+        "GenericEvent"
+      ],
+      "correctIndex": 0,
+      "explanation": "<p>All events in Commerce Cloud extend <code>AbstractEvent</code>. <code>ClusterAwareEvent</code> is a subclass of <code>AbstractEvent</code> used only when the event must be broadcast across cluster nodes.</p>"
+    },
+    {
+      "id": "cc-events-q2",
+      "type": "multiple-choice",
+      "text": "Which service is responsible for publishing and dispatching events to listeners?",
+      "options": [
+        "ClusterBroadcastService",
+        "EventService",
+        "NotificationService",
+        "MessageBrokerService"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><code>EventService</code> is the central API. Its <code>publishEvent()</code> method fires the event and dispatches it to all matching registered listeners.</p>"
+    },
+    {
+      "id": "cc-events-q3",
+      "type": "true-false",
+      "text": "Event listeners registered with the EventService are guaranteed to execute in the order they were registered.",
+      "correctAnswer": false,
+      "explanation": "<p>The platform does <strong>not</strong> guarantee execution order of listeners. If ordering matters, you must implement coordination logic yourself or combine the work into a single listener.</p>"
+    },
+    {
+      "id": "cc-events-q4",
+      "type": "multiple-choice",
+      "text": "What is the recommended parent bean when declaring a custom event listener in your Spring XML configuration?",
+      "options": [
+        "abstractEventListener",
+        "defaultEventService",
+        "abstractCronJobPerformable",
+        "baseEventHandler"
+      ],
+      "correctIndex": 0,
+      "explanation": "<p>Setting <code>parent=\"abstractEventListener\"</code> ensures the listener is properly wired with tenant-awareness and initialisation hooks. Omitting this parent can cause silent failures in multi-tenant environments.</p>"
+    },
+    {
+      "id": "cc-events-q5",
+      "type": "true-false",
+      "text": "ClusterAwareEvent payloads must implement the Serializable interface so the platform can broadcast them to other nodes.",
+      "correctAnswer": true,
+      "explanation": "<p>Because <code>ClusterAwareEvent</code> instances are serialised and sent across the network to other cluster nodes, all payload fields must be <code>Serializable</code>. Non-serializable fields will cause silent broadcast failures.</p>"
+    },
+    {
+      "id": "cc-events-q6",
+      "type": "multiple-choice",
+      "text": "By default, how are events processed when published through the EventService?",
+      "options": [
+        "Asynchronously on a dedicated thread pool",
+        "Synchronously on the publishing thread",
+        "Queued in a JMS broker for later processing",
+        "Batched and processed at the end of the transaction"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>By default, event processing is <strong>synchronous</strong>: the publishing thread blocks until all listeners have completed. Asynchronous processing requires explicit opt-in via listener configuration.</p>"
+    },
+    {
+      "id": "cc-events-q7",
+      "type": "true-false",
+      "text": "An exception thrown by an asynchronous event listener will roll back the publishing service's database transaction.",
+      "correctAnswer": false,
+      "explanation": "<p>Asynchronous listeners execute outside the publisher's transaction context. Exceptions in async listeners are logged but have no effect on the original transaction.</p>"
+    },
+    {
+      "id": "cc-events-q8",
+      "type": "multiple-choice",
+      "text": "Which of the following is a built-in platform event fired after the system has fully started?",
+      "options": [
+        "SystemBootCompleteEvent",
+        "AfterInitializationEndEvent",
+        "PlatformReadyEvent",
+        "ApplicationStartedEvent"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><code>AfterInitializationEndEvent</code> is the platform event that signals the system has completed its initialisation sequence and is fully operational.</p>"
+    },
+    {
+      "id": "cc-events-q9",
+      "type": "true-false",
+      "text": "The recommended approach for handling multiple unrelated event types is to create one listener class with a switch statement that inspects the event type.",
+      "correctAnswer": false,
+      "explanation": "<p>Best practice is to create <strong>separate listener beans</strong>, each handling a single event type. Monolithic switch-based listeners violate the single-responsibility principle and are harder to maintain and test.</p>"
+    },
+    {
+      "id": "cc-events-q10",
+      "type": "multiple-choice",
+      "text": "When should you extend ClusterAwareEvent instead of AbstractEvent?",
+      "options": [
+        "When the event carries more than three payload fields",
+        "When the event must be received by listeners on every cluster node",
+        "When you need asynchronous processing",
+        "When the event is published inside a CronJob"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><code>ClusterAwareEvent</code> should be used when the event must be broadcast to <strong>all cluster nodes</strong>, such as cache invalidation signals. The number of fields, async processing, or CronJob context are not relevant factors.</p>"
+    },
+    {
+      "id": "cc-events-q11",
+      "type": "true-false",
+      "text": "You can unit-test an event listener by directly instantiating it and calling the onEvent() method with a test event object.",
+      "correctAnswer": true,
+      "explanation": "<p>Since listeners are plain Java objects, you can instantiate them in a test, mock any dependencies, and call <code>onEvent()</code> directly. This is the recommended approach for unit testing event-driven logic.</p>"
+    },
+    {
+      "id": "cc-events-q12",
+      "type": "multiple-choice",
+      "text": "What is a key risk when a synchronous listener performs a long-running external API call?",
+      "options": [
+        "The event is automatically converted to asynchronous",
+        "The publishing thread blocks, degrading response time for the original operation",
+        "The listener is deregistered by the platform after a timeout",
+        "The external API call is silently dropped"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>In synchronous mode, the publishing thread waits for all listeners to complete. A slow listener (e.g. calling an external API) blocks that thread, directly impacting the performance of the business operation that published the event.</p>"
+    },
+    {
+      "id": "cc-events-q13",
+      "type": "true-false",
+      "text": "Custom event classes should include setter methods so that listeners can modify event data after publication.",
+      "correctAnswer": false,
+      "explanation": "<p>Events should be <strong>immutable</strong>. Use final fields with only getters and no setters. Allowing listeners to mutate events can introduce subtle bugs, especially when multiple listeners process the same event instance.</p>"
+    }
+  ]
+}

@@ -12,6 +12,7 @@
     "cc-impex",
     "cc-cronjobs",
     "cc-caching",
+    "cc-events",
     "cc-search-solr"
   ]
 }
