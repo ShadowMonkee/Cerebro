@@ -1,0 +1,162 @@
+{
+  "id": "cc-spring-basics",
+  "title": "Spring in Commerce Cloud — Beans, Aliases & Overrides",
+  "description": "How SAP Commerce Cloud uses Spring for dependency injection, bean configuration, and safe customization without modifying platform code.",
+  "icon": "🌱",
+  "category": "sap-commerce-cloud",
+  "tags": ["spring", "dependency-injection", "beans", "customization", "converters"],
+  "sections": [
+    {
+      "title": "Spring as the Foundation of Commerce Cloud",
+      "content": "<p>SAP Commerce Cloud is built entirely on the <strong>Spring Framework</strong>. Every service, facade, DAO, converter, populator, and validator is a Spring bean. Understanding how Spring is configured and how Commerce Cloud extends its conventions is essential for both the certification exam and day-to-day development.</p><p>In standard Spring projects, you typically have one application context loaded from a few configuration files. Commerce Cloud is more complex: each <strong>extension</strong> contributes its own Spring configuration files, and the platform merges all of them into a single unified application context at startup. This means the order of extension loading — defined by extension dependencies — directly affects which bean definitions win in case of conflicts.</p><p>Spring XML configuration is the dominant style in Commerce Cloud. While annotation-based config (<code>@Component</code>, <code>@Service</code>) is supported, the platform's own beans and the recommended customization patterns all use XML. You will see these files named <code>*-spring.xml</code> inside the <code>resources/</code> folder of each extension.</p><blockquote><strong>Key principle:</strong> You should <em>never</em> modify SAP-provided Spring XML files directly. All customization is done by declaring new beans and overriding aliases in your own extension's Spring XML files. This ensures your changes survive platform upgrades.</blockquote>"
+    },
+    {
+      "title": "Bean Naming Conventions — The Default/Alias Pattern",
+      "content": "<p>Commerce Cloud follows a strict naming convention for all platform beans that you must understand deeply for the exam.</p><p>Every platform bean has two identifiers:</p><ul><li>A <strong>default name</strong> prefixed with <code>default</code> — e.g. <code>defaultProductService</code>, <code>defaultCartFacade</code>, <code>defaultOrderConverter</code></li><li>A <strong>short alias</strong> that other beans use for injection — e.g. <code>productService</code>, <code>cartFacade</code>, <code>orderConverter</code></li></ul><p>The alias is declared in the platform's Spring XML like this:</p><pre><code>&lt;alias name=\"defaultProductService\" alias=\"productService\"/&gt;\n&lt;bean id=\"defaultProductService\"\n      class=\"de.hybris.platform.product.impl.DefaultProductService\"&gt;\n  &lt;property name=\"productDao\" ref=\"productDao\"/&gt;\n&lt;/bean&gt;</code></pre><p>Beans in other extensions always inject via the <em>alias</em>, never the default name:</p><pre><code>&lt;bean id=\"myFacade\" class=\"com.mycompany.MyFacade\"&gt;\n  &lt;property name=\"productService\" ref=\"productService\"/&gt;\n&lt;/bean&gt;</code></pre><p>This design means that to replace a platform bean, you only need to <strong>reassign the alias</strong> to point at your custom implementation. Every other bean in the system that injects <code>productService</code> automatically gets your version — without any changes to their configuration.</p><blockquote><strong>Exam gotcha:</strong> Never redefine the original <code>defaultProductService</code> bean. This causes an ambiguous bean definition error. Instead, declare your new bean with a unique ID and reassign the alias. The <code>default*</code> bean should always remain intact.</blockquote>"
+    },
+    {
+      "title": "Overriding a Bean — The Correct Pattern",
+      "content": "<p>Overriding platform beans is one of the most tested topics in the certification. There is one correct pattern and several wrong ways that will cost you marks.</p><h3>The Correct Override Pattern</h3><pre><code>&lt;!-- In your extension's *-spring.xml --&gt;\n\n&lt;alias name=\"myCustomCartFacade\" alias=\"cartFacade\"/&gt;\n\n&lt;bean id=\"myCustomCartFacade\"\n      class=\"com.mycompany.MyCustomCartFacade\"\n      parent=\"defaultCartFacade\"&gt;\n  &lt;property name=\"myExtraService\" ref=\"myExtraService\"/&gt;\n&lt;/bean&gt;</code></pre><p>Three things happening here:</p><ol><li><strong>Alias reassignment</strong> — <code>cartFacade</code> now points to your implementation</li><li><strong>Unique bean ID</strong> — <code>myCustomCartFacade</code> avoids any naming collision</li><li><strong>parent attribute</strong> — inherits all property injections from <code>defaultCartFacade</code>, so you only need to declare the new or changed properties</li></ol><h3>The parent Attribute</h3><p>Using <code>parent</code> is important for maintainability. Without it, you must re-declare every property that <code>defaultCartFacade</code> had — and if SAP adds a new injected dependency in an upgrade, your override will be missing it and may fail. With <code>parent</code>, inherited properties are carried over automatically.</p><h3>Wrong Patterns to Avoid</h3><pre><code>&lt;!-- WRONG: Redefines the platform bean directly --&gt;\n&lt;bean id=\"defaultCartFacade\"\n      class=\"com.mycompany.MyCustomCartFacade\"/&gt;\n\n&lt;!-- WRONG: Uses the alias as the bean ID --&gt;\n&lt;bean id=\"cartFacade\"\n      class=\"com.mycompany.MyCustomCartFacade\"/&gt;</code></pre><blockquote><strong>Why the wrong patterns fail:</strong> Redefining <code>defaultCartFacade</code> means the original bean is gone — if anything injected it by its default name, that breaks. Using the alias as a bean ID creates an ambiguity because the alias declaration also exists, pointing at a different bean.</blockquote>"
+    },
+    {
+      "title": "Extension-Specific Spring Configuration Files",
+      "content": "<p>Each extension can contribute multiple Spring configuration files. Commerce Cloud loads them in a defined order based on the extension dependency graph. Understanding which files exist and when they are loaded is important for the exam.</p><h3>Standard Spring XML files in an extension</h3><ul><li><code>{extensionname}-spring.xml</code> — the main application context configuration</li><li><code>{extensionname}-web-spring.xml</code> — loaded only for web extensions, contributes to the web application context</li><li><code>{extensionname}-backoffice-spring.xml</code> — loaded only in the Backoffice application context</li></ul><p>The <strong>application context hierarchy</strong> matters: the global context is the parent, the web context is a child. Beans defined in the web context can reference beans from the global context, but not vice versa. This is a standard Spring parent-child context relationship.</p><h3>Registering Spring files in extensioninfo.xml</h3><p>For a Spring XML file to be picked up, it must be registered:</p><pre><code>&lt;extension name=\"myextension\"&gt;\n  &lt;requires-extension name=\"commerceservices\"/&gt;\n  &lt;coremodule generated=\"true\"\n    manager=\"de.hybris.platform.jalo.extension.ExtensionManager\"/&gt;\n&lt;/extension&gt;</code></pre><p>By convention, any file named <code>{extensionname}-spring.xml</code> placed in the <code>resources/</code> folder is loaded automatically. Non-standard file names must be explicitly declared.</p><blockquote><strong>Practical note:</strong> Large extensions often split their Spring configuration into multiple focused files (e.g. <code>myext-services-spring.xml</code>, <code>myext-converters-spring.xml</code>) and import them from the main file using <code>&lt;import resource=\"...\"&gt;</code>. This is a best practice for maintainability, not a platform requirement.</blockquote>"
+    },
+    {
+      "title": "Converters, Populators and the Data Object Pattern",
+      "content": "<p>One of Commerce Cloud's most important Spring patterns — heavily tested in the exam — is the <strong>Converter/Populator</strong> pattern used to transform Model objects into Data Transfer Objects (DTOs) for use in Facades and APIs.</p><h3>The Pattern</h3><ul><li>A <strong>Model</strong> is a persistence object (e.g. <code>ProductModel</code>) — rich, JPA-like, tied to the database</li><li>A <strong>Data object</strong> (DTO) is a plain Java object (e.g. <code>ProductData</code>) — lightweight, serializable, used in the web layer</li><li>A <strong>Populator</strong> copies specific fields from a Model to a Data object</li><li>A <strong>Converter</strong> creates the Data object instance and delegates to one or more Populators</li></ul><pre><code>&lt;!-- A populator --&gt;\n&lt;bean id=\"productBasicPopulator\"\n      class=\"com.mycompany.ProductBasicPopulator\"/&gt;\n\n&lt;!-- The converter references a list of populators --&gt;\n&lt;bean id=\"productConverter\"\n      parent=\"abstractPopulatingConverter\"&gt;\n  &lt;property name=\"targetClass\" value=\"de.hybris.platform.commercefacades.product.data.ProductData\"/&gt;\n  &lt;property name=\"populators\"&gt;\n    &lt;list&gt;\n      &lt;ref bean=\"productBasicPopulator\"/&gt;\n      &lt;ref bean=\"productPricePopulator\"/&gt;\n    &lt;/list&gt;\n  &lt;/property&gt;\n&lt;/bean&gt;</code></pre><h3>Adding a Custom Populator</h3><p>The correct way to add a custom populator to an existing converter is to use <strong>Spring list merging</strong>, not to redefine the entire converter:</p><pre><code>&lt;bean id=\"myProductPopulator\"\n      class=\"com.mycompany.MyProductPopulator\"/&gt;\n\n&lt;bean parent=\"modifyPopulatorList\"&gt;\n  &lt;property name=\"list\" ref=\"productConverter\"/&gt;\n  &lt;property name=\"add\" ref=\"myProductPopulator\"/&gt;\n&lt;/bean&gt;</code></pre><blockquote><strong>Exam tip:</strong> The <code>modifyPopulatorList</code> pattern is the correct, upgrade-safe way to extend a converter. Redefining the entire converter risks losing SAP-provided populators added in future releases. Know both the converter pattern itself and how to extend it safely.</blockquote>"
+    },
+    {
+      "title": "Scopes, Lazy Loading and Property Injection",
+      "content": "<p>A few additional Spring mechanics are regularly tested in the Commerce Cloud certification that don't fit neatly into other sections.</p><h3>Bean Scopes</h3><p>Most Commerce Cloud beans are <strong>singleton</strong> scoped (the Spring default). One instance exists per application context, shared across all requests. This means singleton beans must be <strong>stateless</strong> — storing request-specific data in an instance field on a singleton is a serious threading bug.</p><p>For request or session-scoped state, Commerce Cloud uses the <strong>SessionService</strong> or passes context objects as method parameters. You will rarely see <code>scope=\"prototype\"</code> or <code>scope=\"request\"</code> in platform code.</p><h3>Lazy Initialization</h3><p>By default Commerce Cloud beans are <strong>eagerly initialized</strong> — they are instantiated when the application context starts. This means misconfigured beans cause startup failures, which is useful for catching errors early. You can mark a bean as <code>lazy-init=\"true\"</code> to defer instantiation until first use, but this is unusual in platform code.</p><h3>Property Injection vs Constructor Injection</h3><p>Commerce Cloud almost exclusively uses <strong>setter/property injection</strong> via XML <code>&lt;property&gt;</code> elements, not constructor injection. This is a deliberate platform convention and what the exam expects to see in code examples:</p><pre><code>&lt;bean id=\"myService\" class=\"com.mycompany.MyServiceImpl\"&gt;\n  &lt;property name=\"productService\" ref=\"productService\"/&gt;\n  &lt;property name=\"modelService\" ref=\"modelService\"/&gt;\n&lt;/bean&gt;</code></pre><blockquote><strong>Threading warning:</strong> Because nearly all beans are singletons, never store user-specific or request-specific data as instance variables. Use <code>SessionService.getAttribute()</code> or pass data as method arguments. This is a common source of bugs in real projects and a topic the exam tests through scenario questions.</blockquote>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-spring-q1",
+      "type": "multiple-choice",
+      "text": "A developer wants to override the platform's 'productService' bean with a custom implementation. Which approach is correct?",
+      "options": [
+        "<bean id=\"defaultProductService\" class=\"com.mycompany.CustomProductService\"/>",
+        "<alias name=\"customProductService\" alias=\"productService\"/>\n<bean id=\"customProductService\" class=\"com.mycompany.CustomProductService\" parent=\"defaultProductService\"/>",
+        "<bean id=\"productService\" class=\"com.mycompany.CustomProductService\"/>",
+        "<bean id=\"customProductService\" class=\"com.mycompany.CustomProductService\"/>"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The safe override pattern is: declare a new bean with a unique ID, use <code>parent</code> to inherit injected dependencies, then reassign the alias. Option A overwrites the platform bean, breaking any beans that reference it by its default name. Option C uses the alias as a bean ID, creating ambiguity. Option D declares the bean but never reassigns the alias, so nothing actually uses it.</p>"
+    },
+    {
+      "id": "cc-spring-q2",
+      "type": "true-false",
+      "text": "In SAP Commerce Cloud, overriding a bean by redefining 'defaultProductService' with a custom class is the recommended and safe customization approach.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Redefining <code>defaultProductService</code> destroys the original bean. The correct approach is to declare a new bean (e.g. <code>myCustomProductService</code>) and reassign the short alias (<code>productService</code>) to point to it, leaving <code>defaultProductService</code> intact.</p>"
+    },
+    {
+      "id": "cc-spring-q3",
+      "type": "multiple-choice",
+      "text": "What is the purpose of the 'parent' attribute when declaring a custom bean that overrides a platform bean?",
+      "options": [
+        "It causes the custom bean to extend the platform bean's Java class via inheritance",
+        "It registers the custom bean as a child of the platform bean in the Spring context hierarchy",
+        "It inherits all property injections from the referenced bean, so only new or changed properties need to be declared",
+        "It is required for alias reassignment to work — without it, the alias is not recognized"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> The <code>parent</code> attribute is a Spring bean definition inheritance mechanism — it copies all property declarations from the referenced bean. This means if SAP adds a new injected dependency to <code>defaultCartFacade</code> in an upgrade, your override automatically inherits it without any changes on your side. It has no effect on Java class inheritance.</p>"
+    },
+    {
+      "id": "cc-spring-q4",
+      "type": "multiple-choice",
+      "text": "A team wants to add a custom populator to the existing 'productConverter' without redefining the entire converter. Which approach is correct?",
+      "options": [
+        "Redefine the productConverter bean with the full list of populators including the new one",
+        "Use the modifyPopulatorList bean with 'list' pointing to the converter and 'add' pointing to the new populator",
+        "Declare the new populator bean — it is automatically detected and added to all converters",
+        "Override the productConverter alias and declare a new converter bean that delegates to the original"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The <code>modifyPopulatorList</code> pattern safely appends a populator to an existing converter's list without redefining the entire bean. Redefining the full converter (Option A) risks losing SAP-provided populators added in future upgrades. There is no auto-detection of populators (Option C).</p>"
+    },
+    {
+      "id": "cc-spring-q5",
+      "type": "true-false",
+      "text": "A Spring singleton bean in Commerce Cloud can safely store the current user's cart ID as an instance variable because singletons are shared across the application.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Singleton beans are shared across all threads and requests. Storing user-specific data as an instance variable causes race conditions and data leaks between users. Request-specific state must use <code>SessionService</code> or be passed as method parameters.</p>"
+    },
+    {
+      "id": "cc-spring-q6",
+      "type": "multiple-choice",
+      "text": "Which Spring configuration file in an extension is loaded specifically for the Backoffice application context?",
+      "options": [
+        "{extensionname}-spring.xml",
+        "{extensionname}-web-spring.xml",
+        "{extensionname}-backoffice-spring.xml",
+        "{extensionname}-config.xml"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> Commerce Cloud loads <code>{extensionname}-backoffice-spring.xml</code> exclusively for the Backoffice application context. The main <code>-spring.xml</code> loads for the global context, and <code>-web-spring.xml</code> loads for the web (storefront) application context.</p>"
+    },
+    {
+      "id": "cc-spring-q7",
+      "type": "true-false",
+      "text": "Beans defined in the web application context can inject and reference beans defined in the global (parent) application context.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> In Spring's parent-child context hierarchy, child contexts (web) can access beans from the parent context (global). The reverse is not possible — the global context cannot reference beans defined in the web context.</p>"
+    },
+    {
+      "id": "cc-spring-q8",
+      "type": "multiple-choice",
+      "text": "What does the 'alias' element in Commerce Cloud Spring XML primarily enable?",
+      "options": [
+        "It creates a shortcut name for a bean that can be used in ImpEx scripts",
+        "It allows a bean to be overridden by a custom implementation without modifying any files that inject it by the alias name",
+        "It marks a bean as deprecated and provides a migration path to a replacement bean",
+        "It registers the bean under multiple names in the JMX management console"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The alias pattern is the foundation of Commerce Cloud's customization model. All injection uses the alias, so reassigning an alias to a new implementation instantly replaces the bean everywhere it is used — without touching any other configuration files.</p>"
+    },
+    {
+      "id": "cc-spring-q9",
+      "type": "multiple-choice",
+      "text": "A Populator in Commerce Cloud is responsible for which of the following?",
+      "options": [
+        "Creating a new instance of the target Data object and returning it",
+        "Copying specific fields from a source Model object into an already-created target Data object",
+        "Persisting a Data object back to the database via ModelService",
+        "Validating the completeness of a Data object before it is returned from a Facade"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> A <code>Populator</code> receives a source (Model) and a target (Data object already created by the Converter) and fills in specific fields. The Converter is responsible for instantiating the target object. Populators never create objects or persist data.</p>"
+    },
+    {
+      "id": "cc-spring-q10",
+      "type": "true-false",
+      "text": "In SAP Commerce Cloud, annotation-based Spring configuration using @Service and @Autowired is the recommended approach for declaring custom beans.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> While annotation-based config is technically supported, Commerce Cloud's conventions and the certification exam expect XML-based Spring configuration in <code>*-spring.xml</code> files. The platform itself is entirely XML-configured, and the override/alias pattern relies on XML declarations.</p>"
+    },
+    {
+      "id": "cc-spring-q11",
+      "type": "multiple-choice",
+      "text": "What is the default bean scope for Spring beans in SAP Commerce Cloud, and what constraint does this impose?",
+      "options": [
+        "Prototype — a new instance is created for each injection point, so state can be stored freely",
+        "Request — a new instance is created per HTTP request, so state is naturally isolated",
+        "Singleton — one shared instance per context, so beans must be completely stateless",
+        "Session — one instance per user session, allowing user-specific data to be stored safely"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> Nearly all Commerce Cloud beans are singletons. One instance is shared across all threads, so any mutable instance state creates threading bugs. This is why all context passing is done via method parameters or <code>SessionService</code>, never via instance variables.</p>"
+    },
+    {
+      "id": "cc-spring-q12",
+      "type": "true-false",
+      "text": "The 'targetClass' property on a Converter bean defines the Java class that the Converter will instantiate as the target Data object.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> The <code>targetClass</code> property on <code>abstractPopulatingConverter</code> tells the framework which DTO class to instantiate before handing the empty object to the populator chain. Without it, the converter does not know what type of object to create.</p>"
+    }
+  ]
+}

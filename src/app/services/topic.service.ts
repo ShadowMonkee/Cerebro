@@ -1,25 +1,38 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, map, tap, switchMap } from 'rxjs';
-import { Topic, TopicIndex } from '../models/topic.model';
+import { Topic, TopicIndex, Category } from '../models/topic.model';
 
 @Injectable({ providedIn: 'root' })
 export class TopicService {
   private cache = new Map<string, Topic>();
   private indexCache: string[] | null = null;
+  private categoriesCache: Category[] | null = null;
   private basePath = 'assets/topics';
 
   constructor(private http: HttpClient) {}
 
-  /** Get the list of all topic IDs */
-  getTopicIndex(): Observable<string[]> {
-    if (this.indexCache) {
-      return of(this.indexCache);
+  /** Fetch and cache the index file (topic IDs + categories) */
+  private fetchIndex(): Observable<TopicIndex> {
+    if (this.indexCache && this.categoriesCache) {
+      return of({ categories: this.categoriesCache, topics: this.indexCache });
     }
     return this.http.get<TopicIndex>(`${this.basePath}/topics-index.json`).pipe(
-      map(data => data.topics),
-      tap(topics => this.indexCache = topics)
+      tap(data => {
+        this.indexCache = data.topics;
+        this.categoriesCache = data.categories;
+      })
     );
+  }
+
+  /** Get the list of all topic IDs */
+  getTopicIndex(): Observable<string[]> {
+    return this.fetchIndex().pipe(map(data => data.topics));
+  }
+
+  /** Get all available categories */
+  getCategories(): Observable<Category[]> {
+    return this.fetchIndex().pipe(map(data => data.categories));
   }
 
   /** Get a single topic by ID */

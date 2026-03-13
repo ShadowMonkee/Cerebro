@@ -1,0 +1,162 @@
+{
+  "id": "cc-servicelayer",
+  "title": "ServiceLayer — Services, DAOs & ModelService",
+  "description": "The architecture and patterns behind Commerce Cloud's business logic layer, from DAOs to ModelService to the Facade pattern.",
+  "icon": "⚙️",
+  "category": "sap-commerce-cloud",
+  "tags": ["servicelayer", "modelservice", "dao", "facades", "business-logic"],
+  "sections": [
+    {
+      "title": "The ServiceLayer Architecture",
+      "content": "<p>The <strong>ServiceLayer</strong> is the recommended architecture for all business logic in SAP Commerce Cloud. It replaces the legacy Jalo layer (which still exists underneath but should never be used directly in modern development). Understanding the layered structure is essential for the exam.</p><p>The layers from top to bottom are:</p><ol><li><strong>Controller / Web Layer</strong> — handles HTTP requests, delegates immediately to Facades</li><li><strong>Facade Layer</strong> — orchestrates Services, converts Models to Data objects (DTOs) for the web layer</li><li><strong>Service Layer</strong> — contains business logic, operates on Models, delegates data access to DAOs</li><li><strong>DAO Layer</strong> — executes FlexibleSearch queries, returns Models</li><li><strong>ModelService / Persistence Layer</strong> — creates, saves, and removes Model objects</li></ol><p>Each layer has a strict contract about what it can and cannot do:</p><ul><li>Facades know about DTOs and Models but never write SQL</li><li>Services know about Models but never know about HTTP or DTOs</li><li>DAOs know about FlexibleSearch and Models but contain no business logic</li></ul><blockquote><strong>Exam rule:</strong> Business logic belongs in Services, not Facades. Facades are orchestrators and translators. If you find complex conditional logic in a Facade, it should be refactored into a Service. The exam tests this boundary regularly through scenario questions.</blockquote>"
+    },
+    {
+      "title": "ModelService — The Persistence Gateway",
+      "content": "<p><code>ModelService</code> is the central Spring bean for all persistence operations in the ServiceLayer. You never interact with the database directly — everything goes through ModelService.</p><h3>Core Methods</h3><ul><li><code>modelService.create(MyModel.class)</code> — creates a new, unsaved Model instance with defaults applied</li><li><code>modelService.save(model)</code> — persists a single Model (INSERT or UPDATE)</li><li><code>modelService.saveAll(collection)</code> — persists a collection of Models in one operation</li><li><code>modelService.remove(model)</code> — deletes a Model from the database</li><li><code>modelService.refresh(model)</code> — reloads the Model's attributes from the database, discarding unsaved changes</li><li><code>modelService.detach(model)</code> — removes the Model from the session cache without deleting it</li><li><code>modelService.initDefaults(model)</code> — applies default values defined in items.xml to an existing Model instance</li></ul><h3>The Session Cache</h3><p>ModelService maintains a <strong>session-scoped cache</strong> of loaded Models. When you call <code>modelService.get(pk)</code> twice with the same PK in the same session, you get the same Java object instance. This cache is automatically flushed on <code>save()</code>. Understanding this is important for reasoning about dirty-checking behavior.</p><pre><code>// Creating and saving a new product\nProductModel product = modelService.create(ProductModel.class);\nproduct.setCode(\"ELEC-001\");\nproduct.setName(\"Laptop\", Locale.ENGLISH);\nmodelService.save(product);\n\n// Removing a model\nProductModel toDelete = productService.getProductForCode(catalog, \"OLD-001\");\nmodelService.remove(toDelete);</code></pre><blockquote><strong>Common mistake:</strong> Calling <code>new ProductModel()</code> directly instead of <code>modelService.create(ProductModel.class)</code>. The <code>create()</code> method registers the instance with the session and applies attribute defaults from items.xml. A manually instantiated Model bypasses both, causing subtle bugs at save time.</blockquote>"
+    },
+    {
+      "title": "Writing a Service — Interface, Implementation and Spring Wiring",
+      "content": "<p>Every Service in Commerce Cloud should follow the <strong>interface + implementation</strong> pattern. This enables the alias-based override mechanism and makes unit testing straightforward.</p><pre><code>// 1. The interface\npublic interface WarrantyService {\n    int getWarrantyMonths(ProductModel product);\n    void extendWarranty(ProductModel product, int additionalMonths);\n}\n\n// 2. The implementation\npublic class DefaultWarrantyService implements WarrantyService {\n\n    private ModelService modelService;\n\n    @Override\n    public int getWarrantyMonths(ProductModel product) {\n        Integer months = product.getWarrantyMonths();\n        return months != null ? months : 12; // default\n    }\n\n    @Override\n    public void extendWarranty(ProductModel product, int additionalMonths) {\n        int current = getWarrantyMonths(product);\n        product.setWarrantyMonths(current + additionalMonths);\n        modelService.save(product);\n    }\n\n    public void setModelService(ModelService modelService) {\n        this.modelService = modelService;\n    }\n}</code></pre><pre><code>&lt;!-- 3. Spring wiring --&gt;\n&lt;alias name=\"defaultWarrantyService\" alias=\"warrantyService\"/&gt;\n&lt;bean id=\"defaultWarrantyService\"\n      class=\"com.mycompany.DefaultWarrantyService\"&gt;\n  &lt;property name=\"modelService\" ref=\"modelService\"/&gt;\n&lt;/bean&gt;</code></pre><p>Notice the pattern: <code>default*</code> bean ID, short alias, property injection of dependencies. This is identical to how SAP writes its own platform services, making your customizations consistent and overridable by downstream extensions.</p><blockquote><strong>Key principle:</strong> Services must be <em>stateless</em>. All state is carried in the Models they operate on or passed as method parameters. Never store a ProductModel (or any session-specific object) as a Service instance variable.</blockquote>"
+    },
+    {
+      "title": "DAOs — Data Access Objects and FlexibleSearch",
+      "content": "<p>A <strong>DAO</strong> (Data Access Object) is responsible for one thing: retrieving data from the database and returning Models. DAOs contain no business logic — they are thin wrappers around FlexibleSearch queries.</p><p>The standard base class is <code>AbstractItemDao</code>, which provides access to the <code>FlexibleSearchService</code>. Every DAO should extend this and expose specific, named query methods rather than exposing raw search capabilities to callers.</p><pre><code>public class DefaultWarrantyDao extends AbstractItemDao\n    implements WarrantyDao {\n\n    private static final String FIND_BY_MONTHS =\n        \"SELECT {\" + ProductModel.PK + \"} \"\n      + \"FROM {\" + ProductModel._TYPECODE + \"} \"\n      + \"WHERE {\" + ProductModel.WARRANTYMONTHS + \"} >= ?minMonths\";\n\n    @Override\n    public List&lt;ProductModel&gt; findProductsWithWarrantyAtLeast(int minMonths) {\n        final FlexibleSearchQuery query =\n            new FlexibleSearchQuery(FIND_BY_MONTHS);\n        query.addQueryParameter(\"minMonths\", minMonths);\n        return getFlexibleSearchService()\n            .&lt;ProductModel&gt;search(query)\n            .getResult();\n    }\n}</code></pre><p>A few important practices visible here:</p><ul><li>Query strings use <strong>generated constants</strong> (<code>ProductModel.PK</code>, <code>ProductModel._TYPECODE</code>) instead of hardcoded strings, making queries refactor-safe</li><li>Parameters use <code>?paramName</code> syntax — never string concatenation, which risks injection</li><li>The DAO returns <code>List&lt;ProductModel&gt;</code> — typed results, not raw objects</li></ul><blockquote><strong>Exam tip:</strong> The exam distinguishes between calling <code>FlexibleSearchService.search()</code> (returns a <code>SearchResult</code> with pagination info) and <code>FlexibleSearchService.searchUnique()</code> (returns a single result or throws if none or multiple found). Know when to use each.</blockquote>"
+    },
+    {
+      "title": "The Facade Layer — Orchestration and DTO Conversion",
+      "content": "<p>The <strong>Facade</strong> layer sits between the web/API layer and the Service layer. Its two responsibilities are <em>orchestration</em> (calling multiple services and assembling a result) and <em>translation</em> (converting Models to DTOs via Converters).</p><p>Facades should contain no business logic. If a Facade is doing conditional calculations or data transformations beyond simple delegation, that logic belongs in a Service.</p><pre><code>public class DefaultProductFacade implements ProductFacade {\n\n    private ProductService productService;\n    private Converter&lt;ProductModel, ProductData&gt; productConverter;\n\n    @Override\n    public ProductData getProductForCode(String code) {\n        // 1. Delegate to Service for business logic\n        ProductModel model = productService\n            .getProductForCode(baseSiteService.getCurrentBaseSite()\n                .getDefaultCatalog(), code);\n\n        // 2. Convert Model to DTO for the web layer\n        return productConverter.convert(model);\n    }\n}</code></pre><h3>Why the Facade Layer Exists</h3><p>The web layer (Controllers, OCC API) must not work with Models directly because:</p><ul><li>Models are tied to the Hibernate session — passing them to a serializer can trigger lazy-load exceptions</li><li>Models expose internal platform APIs that should not be part of a public contract</li><li>DTOs can be shaped specifically for the consumer (e.g. a mobile API response vs a backoffice form)</li></ul><blockquote><strong>Separation of concerns summary:</strong> Controller asks Facade for data → Facade asks Service for Model → Service asks DAO for Model → DAO queries database → Model flows back up → Facade converts Model to DTO → Controller returns DTO as JSON. Each layer only knows about the layer directly below it.</blockquote>"
+    },
+    {
+      "title": "Transactions and the UserContext",
+      "content": "<p>Two cross-cutting concerns in the ServiceLayer are important for the exam: <strong>transaction management</strong> and the <strong>user context</strong>.</p><h3>Transactions</h3><p>Commerce Cloud wraps all ServiceLayer operations in Spring-managed transactions. By default, methods in the ServiceLayer are transactional. You can annotate your own service methods explicitly:</p><pre><code>@Transactional\npublic void processOrder(OrderModel order) {\n    // All changes here are atomic\n    order.setStatus(OrderStatus.PROCESSING);\n    modelService.save(order);\n    inventoryService.reserveItems(order);\n    // If inventoryService throws, the entire transaction rolls back\n}</code></pre><p>The platform uses <code>@Transactional(propagation = Propagation.REQUIRED)</code> by default, meaning the method joins an existing transaction if one exists, or starts a new one.</p><h3>The UserContext and SessionService</h3><p>Many platform services behave differently depending on who the current user is. The <strong>UserService</strong> exposes <code>getCurrentUser()</code> which returns the active <code>UserModel</code> for the current thread/session.</p><p>To temporarily switch user context (e.g. in a CronJob running as admin), use the <code>UserService</code>:</p><pre><code>UserModel adminUser = userService.getAdminUser();\nuserService.setCurrentUser(adminUser);\ntry {\n    // Operations here run as admin\n    productService.doAdminOnlyOperation();\n} finally {\n    userService.setCurrentUser(originalUser); // Always restore\n}</code></pre><blockquote><strong>Exam scenario:</strong> A CronJob fails with an access denied error on a service call. The likely cause is that CronJobs run under the <code>anonymous</code> user by default. The fix is to set the current user to an appropriate user (usually admin) at the start of the CronJob's <code>perform()</code> method, and restore it in a finally block.</blockquote>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-servicelayer-q1",
+      "type": "multiple-choice",
+      "text": "In the ServiceLayer architecture, which layer is responsible for converting Models into DTOs before returning data to the web layer?",
+      "options": [
+        "Service layer — it returns DTOs directly to avoid exposing Models",
+        "DAO layer — it converts results before returning them from FlexibleSearch",
+        "Facade layer — it orchestrates Services and converts Models to DTOs via Converters",
+        "Controller layer — it calls ModelService directly to convert the data"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> The Facade layer is the translation boundary. It calls Services to get Models, then uses Converters/Populators to produce DTOs safe for the web layer. Services and DAOs always deal in Models, never DTOs. Controllers should never call ModelService directly.</p>"
+    },
+    {
+      "id": "cc-servicelayer-q2",
+      "type": "true-false",
+      "text": "Calling 'new ProductModel()' is equivalent to calling 'modelService.create(ProductModel.class)' and both approaches produce an identical result.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> <code>modelService.create()</code> registers the instance with the session cache and applies attribute defaults defined in <code>items.xml</code>. Using <code>new ProductModel()</code> bypasses both, which can cause missing defaults and errors at save time. Always use <code>modelService.create()</code>.</p>"
+    },
+    {
+      "id": "cc-servicelayer-q3",
+      "type": "multiple-choice",
+      "text": "What does 'modelService.refresh(model)' do?",
+      "options": [
+        "Saves any unsaved changes on the model to the database",
+        "Reloads the model's attributes from the database, discarding any unsaved in-memory changes",
+        "Clears the entire ModelService session cache for all loaded models",
+        "Re-applies default values from items.xml to all null attributes on the model"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> <code>refresh()</code> discards any in-memory changes and reloads the current database state for that model instance. It is useful when you suspect another thread or process has modified the record and you need a fresh view. It does not save changes — use <code>save()</code> for that.</p>"
+    },
+    {
+      "id": "cc-servicelayer-q4",
+      "type": "multiple-choice",
+      "text": "A DAO method should return which of the following?",
+      "options": [
+        "DTOs (Data Transfer Objects) shaped for the specific caller's needs",
+        "Raw JDBC ResultSet objects for maximum performance",
+        "Model objects (e.g. ProductModel, OrderModel) retrieved via FlexibleSearch",
+        "Jalo objects, since DAOs sit closest to the persistence layer"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> DAOs return typed Model objects from FlexibleSearch queries. They never return DTOs (that is the Facade's job), never expose raw JDBC (FlexibleSearch is the query API), and never use Jalo (the legacy layer that the ServiceLayer replaces).</p>"
+    },
+    {
+      "id": "cc-servicelayer-q5",
+      "type": "true-false",
+      "text": "FlexibleSearchService.searchUnique() throws an exception if zero results or more than one result are found for the query.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> <code>searchUnique()</code> expects exactly one result. It throws <code>AmbiguousIdentifierException</code> if multiple rows match and <code>UnknownIdentifierException</code> if none match. Use <code>search()</code> when zero or multiple results are valid outcomes.</p>"
+    },
+    {
+      "id": "cc-servicelayer-q6",
+      "type": "multiple-choice",
+      "text": "A CronJob's perform() method throws an AccessDeniedException when calling a platform service. What is the most likely cause and fix?",
+      "options": [
+        "The CronJob is missing a @Transactional annotation — adding it grants the necessary permissions",
+        "CronJobs run as the anonymous user by default — set the current user to admin at the start of perform() and restore it in a finally block",
+        "The service has been overridden incorrectly — the alias is not pointing to the correct bean",
+        "The CronJob's Spring bean is declared in the wrong context file and cannot access the service"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> CronJobs execute under the <code>anonymous</code> user context by default, which lacks permissions for many platform service calls. The standard fix is to call <code>userService.setCurrentUser(userService.getAdminUser())</code> at the start of <code>perform()</code> and restore the original user in a <code>finally</code> block.</p>"
+    },
+    {
+      "id": "cc-servicelayer-q7",
+      "type": "true-false",
+      "text": "A Service implementation in the ServiceLayer is allowed to contain complex business logic, including conditional calculations and multi-step workflows.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> The Service layer is explicitly where business logic lives. Complex conditions, multi-step workflows, and domain rules all belong in Services. What does NOT belong in Services is HTTP handling, DTO conversion (Facade's job), or raw database queries (DAO's job).</p>"
+    },
+    {
+      "id": "cc-servicelayer-q8",
+      "type": "multiple-choice",
+      "text": "Why should the web layer (Controllers, OCC) not work directly with Model objects?",
+      "options": [
+        "Models are not serializable and will cause JSON serialization to fail outright",
+        "Models are tied to the Hibernate session and expose internal platform APIs not appropriate for public contracts",
+        "Models cannot be passed as method arguments in Spring MVC controllers",
+        "Platform licensing restricts Model access to the Service layer only"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Models are session-bound objects — passing them to a serializer can trigger lazy-load exceptions. They also expose internal APIs that should not be part of a public web contract. DTOs are purpose-built for the consumer, serialization-safe, and decouple the API contract from internal data structures.</p>"
+    },
+    {
+      "id": "cc-servicelayer-q9",
+      "type": "multiple-choice",
+      "text": "What is the difference between modelService.save(model) and modelService.saveAll(collection)?",
+      "options": [
+        "save() uses optimistic locking while saveAll() uses pessimistic locking",
+        "save() persists a single Model; saveAll() persists a collection of Models, which can be more efficient for bulk operations",
+        "saveAll() validates all models before saving any of them; save() skips validation",
+        "There is no functional difference — saveAll() simply calls save() in a loop internally"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> <code>saveAll()</code> is optimized for persisting multiple Models together, reducing the number of database round-trips compared to calling <code>save()</code> in a loop. While Option D is partially true in implementation, the platform can batch the operations, making <code>saveAll()</code> the correct choice for collections.</p>"
+    },
+    {
+      "id": "cc-servicelayer-q10",
+      "type": "true-false",
+      "text": "In a FlexibleSearch query, parameters should be concatenated directly into the query string using Java string operations to improve readability.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Parameters must always use the <code>?paramName</code> placeholder syntax and be passed via <code>query.addQueryParameter()</code>. String concatenation is equivalent to SQL injection — it breaks with special characters and is a security risk. The platform's query parameterization also enables query plan caching.</p>"
+    },
+    {
+      "id": "cc-servicelayer-q11",
+      "type": "multiple-choice",
+      "text": "Which statement correctly describes the role of modelService.detach(model)?",
+      "options": [
+        "It permanently deletes the model from the database",
+        "It removes the model from the session cache without deleting it from the database",
+        "It marks the model as read-only, preventing any further changes from being saved",
+        "It detaches the model from its parent type, converting it to a GenericItem"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> <code>detach()</code> removes the Model instance from the ModelService session cache. The database record is untouched. This is useful when you want to prevent accidental saves of a model you are using for read-only purposes, or when managing memory in large batch operations.</p>"
+    },
+    {
+      "id": "cc-servicelayer-q12",
+      "type": "true-false",
+      "text": "A Facade is the correct place to add complex business rules such as price calculation logic and inventory validation.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Facades are orchestrators and translators — they delegate to Services and convert results to DTOs. Business rules belong in the Service layer. Placing logic in Facades makes it untestable in isolation and violates the layered architecture contract.</p>"
+    }
+  ]
+}

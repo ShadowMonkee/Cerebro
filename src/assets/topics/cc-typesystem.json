@@ -1,0 +1,162 @@
+{
+  "id": "cc-typesystem",
+  "title": "TypeSystem — Items, Types & Deployments",
+  "description": "How SAP Commerce Cloud defines, stores, and manages all data entities through its declarative TypeSystem.",
+  "icon": "🧱",
+  "category": "sap-commerce-cloud",
+  "tags": ["typesystem", "data-modeling", "persistence", "items-xml", "platform"],
+  "sections": [
+    {
+      "title": "What is the TypeSystem?",
+      "content": "<p>The <strong>TypeSystem</strong> is the metadata backbone of SAP Commerce Cloud. Every piece of data — products, orders, users, CMS components — is defined as a <em>type</em>. Unlike a traditional ORM where you write Java classes and annotate them, in Commerce Cloud you declare types in an XML file called <code>*-items.xml</code>, and the platform generates both the database schema and the Java model classes for you automatically.</p><p>This separation between declaration and implementation is fundamental. You never manually create database tables or write JPA annotations. The build system reads all <code>items.xml</code> files across all active extensions, computes the full type hierarchy, and generates everything during the <code>ant build</code> phase.</p><p>The TypeSystem is also <em>introspectable at runtime</em>. The <code>TypeService</code> Spring bean lets you query type metadata programmatically — you can ask which attributes a type has, what its supertype is, whether an attribute is localized, and more. This is how Backoffice renders dynamic forms for any type without needing compile-time knowledge of it.</p><blockquote><strong>Key insight:</strong> Think of the TypeSystem as a schema registry. It is the single source of truth for all data structures in the platform, bridging your XML declarations, the database, and the generated Java model layer.</blockquote>"
+    },
+    {
+      "title": "The Type Hierarchy — What to Extend and When",
+      "content": "<p>All types form a single inheritance hierarchy. Understanding which base type to extend is a frequent exam topic.</p><ul><li><strong>Item</strong> — the root of all persisted types. Every item has a <code>PK</code>, a <code>creationtime</code>, and a <code>modifiedtime</code>.</li><li><strong>GenericItem</strong> — extends Item, the standard base for most custom types.</li><li><strong>LocalizableItem</strong> — extends GenericItem, adds localization support. Attributes declared as <code>localized=\"true\"</code> are stored per-language.</li><li><strong>ExtensibleItem</strong> — allows dynamic attributes to be added at runtime without a schema change.</li><li><strong>Product</strong>, <strong>Order</strong>, <strong>User</strong>, <strong>AbstractOrder</strong> — concrete business types you will extend most often.</li></ul><p>To <strong>create a new type</strong>, use <code>autocreate=\"true\" generate=\"true\"</code>:</p><pre><code>&lt;itemtype code=\"ElectronicProduct\"\n          extends=\"Product\"\n          autocreate=\"true\"\n          generate=\"true\"&gt;\n  &lt;attributes&gt;\n    &lt;attribute qualifier=\"batteryLife\" type=\"java.lang.Integer\"&gt;\n      &lt;persistence type=\"property\"/&gt;\n    &lt;/attribute&gt;\n  &lt;/attributes&gt;\n&lt;/itemtype&gt;</code></pre><p>To <strong>modify an existing type</strong> (e.g. adding an attribute to <code>Product</code>), set both flags to <code>false</code> and omit the <code>extends</code> attribute entirely:</p><pre><code>&lt;itemtype code=\"Product\" autocreate=\"false\" generate=\"false\"&gt;\n  &lt;attributes&gt;\n    &lt;attribute qualifier=\"warrantyMonths\" type=\"java.lang.Integer\"&gt;\n      &lt;persistence type=\"property\"/&gt;\n    &lt;/attribute&gt;\n  &lt;/attributes&gt;\n&lt;/itemtype&gt;</code></pre><blockquote><strong>Exam gotcha:</strong> When modifying an existing type, do NOT redeclare <code>extends</code>. Writing <code>extends=\"GenericItem\"</code> on an existing type causes a conflict because the supertype is already defined in the core <code>items.xml</code>.</blockquote>"
+    },
+    {
+      "title": "Deployments — Tables and Typecodes",
+      "content": "<p>A <strong>deployment</strong> maps a type to a specific database table and assigns it a unique numeric <strong>typecode</strong>. Without a deployment, a type shares the database table of its nearest ancestor that has one.</p><pre><code>&lt;itemtype code=\"ElectronicProduct\" extends=\"Product\"\n          autocreate=\"true\" generate=\"true\"&gt;\n  &lt;deployment table=\"electronicproducts\" typecode=\"10500\"/&gt;\n  &lt;attributes&gt;\n    ...\n  &lt;/attributes&gt;\n&lt;/itemtype&gt;</code></pre><p><strong>When to declare a deployment:</strong></p><ul><li>When you expect large volumes and want query isolation from the parent table</li><li>When the type has many unique attributes that would create sparse columns in the parent table</li><li>When reporting or analytics tools need a clean, dedicated table</li></ul><p><strong>When NOT to declare a deployment:</strong></p><ul><li>For lightweight subtypes with only a few additional attributes</li><li>When the number of instances will be small</li></ul><p>The <strong>typecode</strong> is a globally unique number stored on every database row. SAP reserves typecodes below 10000 for platform use. Custom types should use numbers above 10000. Duplicate typecodes across extensions cause the build to fail.</p><blockquote><strong>Critical rule:</strong> Typecodes are permanent. Once data exists in the database, changing a typecode requires a full data migration. Choose your typecodes carefully, document them in a central registry, and never reuse a number even after a type is deleted.</blockquote>"
+    },
+    {
+      "title": "Relations — One-to-Many and Many-to-Many",
+      "content": "<p>The TypeSystem supports two types of relationships: <strong>one-to-many</strong> and <strong>many-to-many</strong>. Both are declared using the <code>&lt;relation&gt;</code> element.</p><h3>Many-to-Many Example</h3><pre><code>&lt;relation code=\"CategoryProductRelation\"\n          autocreate=\"true\" generate=\"true\" localized=\"false\"&gt;\n  &lt;sourceElement type=\"Category\" qualifier=\"supercategories\"\n                 cardinality=\"many\"&gt;\n    &lt;modifiers read=\"true\" write=\"true\" search=\"true\" optional=\"true\"/&gt;\n  &lt;/sourceElement&gt;\n  &lt;targetElement type=\"Product\" qualifier=\"products\"\n                 cardinality=\"many\"&gt;\n    &lt;modifiers read=\"true\" write=\"true\" search=\"true\" optional=\"true\"/&gt;\n  &lt;/targetElement&gt;\n&lt;/relation&gt;</code></pre><p>A many-to-many relation requires a <strong>link table</strong> in the database. Commerce Cloud creates this automatically. The relation itself gets its own typecode and is managed entirely by the platform.</p><p><strong>Ordered relations</strong> add a sequence number column to the link table, allowing retrieval in a defined order. Enable this with <code>ordered=\"true\"</code> on the target element.</p><h3>One-to-Many</h3><p>When one side has <code>cardinality=\"one\"</code> and the other <code>cardinality=\"many\"</code>, a foreign key column is added to the \"many\" side's table. No link table is created.</p><blockquote><strong>Exam tip:</strong> Know which side holds the foreign key. In a one-to-many, the \"many\" side (target) holds the FK. In a many-to-many, a separate join table is created. The exam tests whether you can reason about the performance implications of each approach.</blockquote>"
+    },
+    {
+      "title": "Persisted vs Dynamic Attributes",
+      "content": "<p>Attributes come in two fundamental flavors: <strong>persisted</strong> and <strong>dynamic</strong>. This distinction is a reliable exam topic.</p><h3>Persisted Attributes</h3><p>Declared with <code>&lt;persistence type=\"property\"/&gt;</code>. Stored as columns in the database. Searchable via FlexibleSearch. Participate in dirty-checking by ModelService — the platform knows when they change and marks the model for saving.</p><h3>Dynamic Attributes</h3><p>Declared with <code>&lt;persistence type=\"dynamic\" attributeHandler=\"myBeanName\"/&gt;</code>. These are <em>not stored in the database</em>. They are computed at runtime by a Spring bean implementing <code>DynamicAttributeHandler&lt;VALUE, MODEL&gt;</code>.</p><pre><code>// items.xml\n&lt;attribute qualifier=\"displayLabel\" type=\"java.lang.String\"&gt;\n  &lt;persistence type=\"dynamic\"\n               attributeHandler=\"productDisplayLabelHandler\"/&gt;\n&lt;/attribute&gt;\n\n// Spring bean\npublic class ProductDisplayLabelHandler\n    implements DynamicAttributeHandler&lt;String, ProductModel&gt; {\n\n  @Override\n  public String get(ProductModel model) {\n    return model.getName() + \" (\" + model.getCode() + \")\";\n  }\n\n  @Override\n  public void set(ProductModel model, String value) {\n    throw new UnsupportedOperationException(\"Read-only\");\n  }\n}</code></pre><p><strong>Key implications of dynamic attributes:</strong></p><ul><li>Cannot be used in FlexibleSearch WHERE clauses — no database column exists</li><li>Computed fresh on every access — no automatic caching</li><li>Do not trigger dirty-checking in ModelService</li><li>Ideal for computed or aggregated values that would be expensive to keep synchronized</li></ul><blockquote><strong>Common exam trap:</strong> Can you use a dynamic attribute in a FlexibleSearch WHERE clause? <strong>No.</strong> There is no corresponding database column to query against. This is one of the most tested distinctions in this topic area.</blockquote>"
+    },
+    {
+      "title": "Type Generation and the Build Lifecycle",
+      "content": "<p>Understanding how types move from XML declaration to running code is essential for the exam and for diagnosing real project issues.</p><h3>The Two-Phase Process</h3><ol><li><strong>ant clean all</strong> — reads all <code>*-items.xml</code> files in extension dependency order, resolves the full type hierarchy, and generates Java model classes into each extension's <code>gensrc/</code> folder.</li><li><strong>Initialize or Update System</strong> (via HAC or <code>ant initialize</code>) — applies the type definitions to the running database, creating or altering tables as needed.</li></ol><h3>Initialize vs Update</h3><p>This distinction is always on the exam:</p><ul><li><strong>Initialize</strong> — drops and recreates the entire database schema. <em>All data is lost.</em> Used only for fresh setups or CI test environments.</li><li><strong>Update</strong> — applies schema changes incrementally. Adds new tables and columns but never drops existing ones. Safe for production deployments.</li></ul><p>Both operations run <strong>essential data</strong> and <strong>project data</strong> ImpEx scripts from each extension, in dependency order.</p><h3>The items.xml Merge</h3><p>When multiple extensions modify the same type, Commerce Cloud merges all declarations at build time following the extension dependency graph. This is why circular dependencies between extensions are forbidden — they make merge order undefined and cause build failures.</p><blockquote><strong>Practical rule:</strong> After any change to <code>items.xml</code>, always run <code>ant clean all</code> followed by Update System. Skipping this step is the most common cause of confusing runtime errors where model getters return null or throw <code>AttributeNotSupportedException</code>.</blockquote>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-typesystem-q1",
+      "type": "multiple-choice",
+      "text": "A developer wants to add a custom attribute 'warrantyMonths' to the existing Product type. Which items.xml declaration is correct?",
+      "options": [
+        "<itemtype code=\"Product\" extends=\"GenericItem\" autocreate=\"true\" generate=\"true\">",
+        "<itemtype code=\"Product\" autocreate=\"false\" generate=\"false\">",
+        "<itemtype code=\"Product\" extends=\"GenericItem\" autocreate=\"false\" generate=\"false\">",
+        "<itemtype code=\"CustomProduct\" extends=\"Product\" autocreate=\"true\" generate=\"true\">"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> When modifying an existing type, use <code>autocreate=\"false\" generate=\"false\"</code> and omit the <code>extends</code> attribute entirely. Options A and C incorrectly redeclare <code>extends</code>, which conflicts with the original definition in core <code>items.xml</code>. Option D creates a new subtype rather than modifying the existing one.</p>"
+    },
+    {
+      "id": "cc-typesystem-q2",
+      "type": "multiple-choice",
+      "text": "A new type 'InsuranceProduct' extends 'Product' but has no <deployment> block. What is the result?",
+      "options": [
+        "The build fails — all custom types require a deployment declaration",
+        "InsuranceProduct instances are stored in the same table as Product, identified by their typecode",
+        "InsuranceProduct becomes transient and cannot be persisted to the database",
+        "Commerce Cloud automatically creates a table named 'insuranceproducts'"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Without a deployment, a type shares the nearest ancestor table that has one — in this case, Product's table. Each row is distinguished by its typecode column, so FlexibleSearch queries using <code>{InsuranceProduct}</code> still correctly return only InsuranceProduct instances. Deployment is optional; the build does not fail.</p>"
+    },
+    {
+      "id": "cc-typesystem-q3",
+      "type": "true-false",
+      "text": "A dynamic attribute declared with persistence type='dynamic' can be used in a FlexibleSearch WHERE clause to filter query results.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Dynamic attributes have no database column — they are computed at runtime by an <code>AttributeHandler</code> bean. Because no column exists, FlexibleSearch cannot reference them in WHERE clauses. Only persisted attributes (<code>type=\"property\"</code>) are queryable via FlexibleSearch.</p>"
+    },
+    {
+      "id": "cc-typesystem-q4",
+      "type": "multiple-choice",
+      "text": "What is the purpose of the typecode in a deployment declaration?",
+      "options": [
+        "It defines the SQL column type used for the primary key",
+        "It is a globally unique numeric identifier stored on every database row to identify the item's type at runtime",
+        "It controls the order in which types are loaded during system initialization",
+        "It maps the type to a specific Spring bean in the application context"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> The typecode is persisted as a column on every row and is how the platform knows which Java model class to instantiate when loading data. It must be globally unique. Changing a typecode after data exists requires a full data migration, making it a permanent, high-stakes decision.</p>"
+    },
+    {
+      "id": "cc-typesystem-q5",
+      "type": "true-false",
+      "text": "Generated model classes in the 'gensrc' folder, such as ProductModel.java, should be edited directly to add custom business logic.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Classes in <code>gensrc</code> are fully regenerated on every <code>ant clean all</code>. Any manual edits are lost. Custom business logic belongs in Services, Facades, or Interceptors — never in generated model classes.</p>"
+    },
+    {
+      "id": "cc-typesystem-q6",
+      "type": "multiple-choice",
+      "text": "What does Commerce Cloud create in the database when a many-to-many relation is declared between Category and Product in items.xml?",
+      "options": [
+        "A foreign key column on the Product table pointing to Category",
+        "A foreign key column on the Category table pointing to Product",
+        "A separate link table containing the PKs of both sides, with an optional sequence column if ordered=true",
+        "A serialized collection column on whichever side is declared as the source element"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Option C is correct.</strong> Many-to-many relations always produce a dedicated link table managed by the platform. If <code>ordered=\"true\"</code> is set on the target element, a sequence number column is also added. This table should never be modified manually.</p>"
+    },
+    {
+      "id": "cc-typesystem-q7",
+      "type": "multiple-choice",
+      "text": "What must a developer do after modifying items.xml for the changes to take effect in the running application?",
+      "options": [
+        "Restart the server — it reloads XML configuration on startup automatically",
+        "Run ant clean all, then perform an Initialize or Update System via HAC",
+        "Run ant refresh to hot-reload type definitions without a full rebuild",
+        "No action required — items.xml changes are detected and applied at runtime"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Changes to <code>items.xml</code> require a full rebuild (<code>ant clean all</code>) to regenerate Java model classes, followed by Update System (or Initialize on dev) to apply schema changes to the database. There is no hot-reload mechanism for type definitions.</p>"
+    },
+    {
+      "id": "cc-typesystem-q8",
+      "type": "multiple-choice",
+      "text": "What is the key difference between Initialize and Update System in the HAC?",
+      "options": [
+        "Initialize only runs essential data scripts; Update runs both essential and project data scripts",
+        "Initialize drops and recreates the entire schema losing all data; Update applies changes incrementally and preserves data",
+        "Initialize is disabled in production environments by a platform license check",
+        "There is no functional difference — both operations produce the same end state"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Initialize performs a destructive full reset — all data is dropped. Update is safe and incremental — it adds new tables and columns but never drops existing structures. Both run essential and project data ImpEx scripts, but Initialize does so on a completely clean database.</p>"
+    },
+    {
+      "id": "cc-typesystem-q9",
+      "type": "true-false",
+      "text": "Two extensions can safely declare the same typecode number as long as they define different type names (codes).",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> Typecodes must be globally unique numbers across all extensions. Duplicate numbers cause the build to fail regardless of type names. SAP reserves numbers below 10000; custom extensions should use values above 10000 and maintain a central registry to avoid collisions.</p>"
+    },
+    {
+      "id": "cc-typesystem-q10",
+      "type": "true-false",
+      "text": "The TypeService Spring bean can be used at runtime to introspect the attributes and supertypes of any type defined in the TypeSystem.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>True.</strong> <code>TypeService</code> provides full runtime access to TypeSystem metadata — attribute descriptors, type hierarchies, localization flags, and more. This is the mechanism Backoffice uses to render dynamic forms for any type without compile-time knowledge of its structure.</p>"
+    },
+    {
+      "id": "cc-typesystem-q11",
+      "type": "multiple-choice",
+      "text": "A DynamicAttributeHandler's set() method throws UnsupportedOperationException. What is the practical effect?",
+      "options": [
+        "The build fails because set() must always have a valid implementation",
+        "The attribute is effectively read-only — any attempt to set a value at runtime throws an exception",
+        "Commerce Cloud silently ignores the write and always returns the computed get() value",
+        "The platform falls back to storing the value as a persisted property column automatically"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Option B is correct.</strong> Throwing <code>UnsupportedOperationException</code> from <code>set()</code> is the standard pattern for making a dynamic attribute read-only. Any code calling <code>model.setDisplayLabel(\"x\")</code> will receive a runtime exception. The platform does not provide any fallback storage mechanism.</p>"
+    },
+    {
+      "id": "cc-typesystem-q12",
+      "type": "true-false",
+      "text": "In a one-to-many relation declared in items.xml, the foreign key column is stored on the 'one' side of the relation.",
+      "correctAnswer": false,
+      "explanation": "<p><strong>False.</strong> In a one-to-many relation, the foreign key is stored on the <strong>many</strong> side (the target element). This is standard relational database design — each row on the many side holds a reference back to its single parent on the one side. No link table is created for one-to-many relations.</p>"
+    }
+  ]
+}

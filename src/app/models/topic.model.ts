@@ -31,12 +31,22 @@ export interface Topic {
   title: string;
   description: string;
   icon: string;
+  category: string;   // Matches a Category.id from the index
+  tags: string[];      // Optional finer-grained labels
   sections: TopicSection[];
   questions: Question[];
 }
 
+export interface Category {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;      // Hex color for filter pills and accents
+}
+
 export interface TopicIndex {
-  topics: string[]; // Array of topic filenames (without .json)
+  categories: Category[];
+  topics: string[];    // Array of topic filenames (without .json)
 }
 
 /* --- Progress / localStorage Models --- */

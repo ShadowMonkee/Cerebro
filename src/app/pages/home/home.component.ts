@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TopicService } from '../../services/topic.service';
 import { ProgressService } from '../../services/progress.service';
-import { Topic } from '../../models/topic.model';
+import { Topic, Category } from '../../models/topic.model';
 
 @Component({
   selector: 'app-home',
@@ -28,52 +28,90 @@ import { Topic } from '../../models/topic.model';
         <button class="btn" (click)="loadTopics()">Retry</button>
       </div>
 
-      <!-- Topic Grid -->
-      <div class="topic-grid" *ngIf="!loading && !error">
-        <a
-          *ngFor="let topic of topics"
-          [routerLink]="['/topic', topic.id, 'learn']"
-          class="topic-card"
-        >
-          <div class="card-icon">{{ topic.icon }}</div>
-          <div class="card-body">
-            <h2 class="card-title">{{ topic.title }}</h2>
-            <p class="card-desc">{{ topic.description }}</p>
-            <div class="card-meta">
-              <span
-                class="badge"
-                [ngClass]="{
-                  'badge-done': getStatus(topic.id) === 'done',
-                  'badge-progress': getStatus(topic.id) === 'progress',
-                  'badge-new': getStatus(topic.id) === 'new'
-                }"
-              >
-                {{ getStatusLabel(topic.id) }}
-              </span>
-              <span class="meta-info">
-                <span class="meta-item">{{ topic.sections.length }} sections</span>
-                <span class="meta-dot">·</span>
-                <span class="meta-item">{{ topic.questions.length }} questions</span>
-              </span>
-            </div>
-            <div class="card-score" *ngIf="getStatus(topic.id) === 'done'">
-              <span class="score-label">Best:</span>
-              <span class="score-value">{{ getBestScore(topic.id) }}%</span>
-            </div>
-          </div>
-        </a>
-      </div>
+      <ng-container *ngIf="!loading && !error">
+        <!-- Category Filter Bar -->
+        <div class="filter-bar" *ngIf="categories.length > 0">
+          <button
+            class="filter-pill"
+            [class.active]="activeCategory === 'all'"
+            (click)="filterBy('all')"
+          >
+            All
+            <span class="pill-count">{{ topics.length }}</span>
+          </button>
+          <button
+            *ngFor="let cat of categories"
+            class="filter-pill"
+            [class.active]="activeCategory === cat.id"
+            [style.--pill-color]="cat.color"
+            (click)="filterBy(cat.id)"
+          >
+            <span class="pill-icon">{{ cat.icon }}</span>
+            {{ cat.label }}
+            <span class="pill-count">{{ countByCategory(cat.id) }}</span>
+          </button>
+        </div>
 
-      <!-- Empty State -->
-      <div class="empty-state" *ngIf="!loading && !error && topics.length === 0">
-        <p class="empty-text">No topics found.</p>
-        <p class="empty-hint">Add JSON files to <code>assets/topics/</code> and update <code>topics-index.json</code>.</p>
-      </div>
+        <!-- Topic Grid -->
+        <div class="topic-grid" *ngIf="filteredTopics.length > 0">
+          <a
+            *ngFor="let topic of filteredTopics"
+            [routerLink]="['/topic', topic.id, 'learn']"
+            class="topic-card"
+            [style.--card-accent]="getCategoryColor(topic.category)"
+          >
+            <div class="card-icon">{{ topic.icon }}</div>
+            <div class="card-body">
+              <div class="card-top-row">
+                <h2 class="card-title">{{ topic.title }}</h2>
+                <span
+                  class="category-tag"
+                  [style.--tag-color]="getCategoryColor(topic.category)"
+                >{{ getCategoryLabel(topic.category) }}</span>
+              </div>
+              <p class="card-desc">{{ topic.description }}</p>
+              <div class="card-meta">
+                <span
+                  class="badge"
+                  [ngClass]="{
+                    'badge-done': getStatus(topic.id) === 'done',
+                    'badge-progress': getStatus(topic.id) === 'progress',
+                    'badge-new': getStatus(topic.id) === 'new'
+                  }"
+                >
+                  {{ getStatusLabel(topic.id) }}
+                </span>
+                <span class="meta-info">
+                  <span class="meta-item">{{ topic.sections.length }} sections</span>
+                  <span class="meta-dot">·</span>
+                  <span class="meta-item">{{ topic.questions.length }} questions</span>
+                </span>
+              </div>
+              <div class="card-score" *ngIf="getStatus(topic.id) === 'done'">
+                <span class="score-label">Best:</span>
+                <span class="score-value">{{ getBestScore(topic.id) }}%</span>
+              </div>
+            </div>
+          </a>
+        </div>
+
+        <!-- Empty State (no topics at all) -->
+        <div class="empty-state" *ngIf="topics.length === 0">
+          <p class="empty-text">No topics found.</p>
+          <p class="empty-hint">Add JSON files to <code>assets/topics/</code> and update <code>topics-index.json</code>.</p>
+        </div>
+
+        <!-- Filtered Empty State (topics exist but none match filter) -->
+        <div class="empty-state" *ngIf="topics.length > 0 && filteredTopics.length === 0">
+          <p class="empty-text">No topics in this category yet.</p>
+          <button class="btn" (click)="filterBy('all')">Show all topics</button>
+        </div>
+      </ng-container>
     </div>
   `,
   styles: [`
     .page-header {
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
     }
 
     .page-title {
@@ -88,6 +126,66 @@ import { Topic } from '../../models/topic.model';
       color: var(--text-muted);
     }
 
+    /* --- Filter Bar --- */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 0.5px solid var(--bg-border);
+    }
+
+    .filter-pill {
+      --pill-color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.375rem 0.875rem;
+      border-radius: 999px;
+      border: 0.5px solid var(--bg-border);
+      background: var(--bg-surface);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+
+    .filter-pill:hover {
+      border-color: var(--pill-color);
+      color: var(--text-primary);
+      background: var(--bg-raised);
+    }
+
+    .filter-pill.active {
+      border-color: var(--pill-color);
+      background: color-mix(in srgb, var(--pill-color) 12%, transparent);
+      color: var(--pill-color);
+    }
+
+    .pill-icon {
+      font-size: 0.8125rem;
+      line-height: 1;
+    }
+
+    .pill-count {
+      font-size: 0.625rem;
+      background: var(--bg-border);
+      color: var(--text-muted);
+      padding: 0.0625rem 0.375rem;
+      border-radius: 999px;
+      min-width: 1.125rem;
+      text-align: center;
+    }
+
+    .filter-pill.active .pill-count {
+      background: color-mix(in srgb, var(--pill-color) 25%, transparent);
+      color: var(--pill-color);
+    }
+
+    /* --- Topic Grid --- */
     .topic-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -95,6 +193,7 @@ import { Topic } from '../../models/topic.model';
     }
 
     .topic-card {
+      --card-accent: var(--accent);
       background: var(--bg-surface);
       border: 0.5px solid var(--bg-border);
       border-radius: var(--radius-lg);
@@ -120,13 +219,13 @@ import { Topic } from '../../models/topic.model';
     }
 
     .topic-card:hover {
-      border-color: var(--accent);
+      border-color: var(--card-accent);
       transform: translateY(-2px);
       color: var(--text-primary);
     }
 
     .topic-card:hover::before {
-      background: linear-gradient(90deg, var(--red), var(--accent));
+      background: linear-gradient(90deg, var(--red), var(--card-accent));
     }
 
     .card-icon {
@@ -141,11 +240,33 @@ import { Topic } from '../../models/topic.model';
       min-width: 0;
     }
 
+    .card-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+
     .card-title {
       font-family: var(--font-mono);
       font-size: 0.9375rem;
       font-weight: 600;
-      margin-bottom: 0.25rem;
+    }
+
+    .category-tag {
+      --tag-color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 0.5625rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--tag-color);
+      background: color-mix(in srgb, var(--tag-color) 12%, transparent);
+      padding: 0.125rem 0.5rem;
+      border-radius: 999px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .card-desc {
@@ -249,6 +370,9 @@ import { Topic } from '../../models/topic.model';
 })
 export class HomeComponent implements OnInit {
   topics: Topic[] = [];
+  filteredTopics: Topic[] = [];
+  categories: Category[] = [];
+  activeCategory = 'all';
   loading = true;
   error = '';
 
@@ -264,9 +388,18 @@ export class HomeComponent implements OnInit {
   loadTopics(): void {
     this.loading = true;
     this.error = '';
+
+    // Load categories
+    this.topicService.getCategories().subscribe({
+      next: categories => this.categories = categories,
+      error: () => {} // Non-critical, filter bar just won't show
+    });
+
+    // Load topics
     this.topicService.getAllTopics().subscribe({
       next: topics => {
         this.topics = topics;
+        this.applyFilter();
         this.loading = false;
       },
       error: () => {
@@ -274,6 +407,33 @@ export class HomeComponent implements OnInit {
         this.loading = false;
       }
     });
+  }
+
+  filterBy(categoryId: string): void {
+    this.activeCategory = categoryId;
+    this.applyFilter();
+  }
+
+  private applyFilter(): void {
+    if (this.activeCategory === 'all') {
+      this.filteredTopics = [...this.topics];
+    } else {
+      this.filteredTopics = this.topics.filter(t => t.category === this.activeCategory);
+    }
+  }
+
+  countByCategory(categoryId: string): number {
+    return this.topics.filter(t => t.category === categoryId).length;
+  }
+
+  getCategoryColor(categoryId: string): string {
+    const cat = this.categories.find(c => c.id === categoryId);
+    return cat?.color ?? 'var(--accent)';
+  }
+
+  getCategoryLabel(categoryId: string): string {
+    const cat = this.categories.find(c => c.id === categoryId);
+    return cat?.label ?? categoryId;
   }
 
   getStatus(topicId: string): string {

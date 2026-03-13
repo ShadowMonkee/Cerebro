@@ -8,6 +8,7 @@ Cerebro lets you organize study material into topics with theory sections and qu
 
 ## Features
 
+- **Category filtering** — Filter topics by subject area (Angular, CSS, TypeScript, etc.)
 - **Theory viewer** — Paginated HTML content with prev/next navigation and section dots
 - **Quiz stepper** — One question at a time, supports multiple choice and true/false
 - **Review screen** — Score summary, per-question feedback with explanations
@@ -58,6 +59,8 @@ Add a new file to `src/assets/topics/`, e.g. `my-topic.json`:
   "title": "My Topic",
   "description": "A brief description",
   "icon": "📚",
+  "category": "general",
+  "tags": ["web", "fundamentals"],
   "sections": [
     {
       "title": "Section Title",
@@ -86,10 +89,16 @@ Add a new file to `src/assets/topics/`, e.g. `my-topic.json`:
 
 ### 2. Register it in the index
 
-Edit `src/assets/topics/topics-index.json`:
+Edit `src/assets/topics/topics-index.json` — add your topic to the `topics` array, and if you used a new category, add it to `categories`:
 
 ```json
 {
+  "categories": [
+    { "id": "angular", "label": "Angular", "icon": "📐", "color": "#f87171" },
+    { "id": "css", "label": "CSS", "icon": "🎨", "color": "#c4b5fd" },
+    { "id": "general", "label": "General Web", "icon": "🌐", "color": "#fcd34d" },
+    { "id": "my-category", "label": "My Category", "icon": "🆕", "color": "#86efac" }
+  ],
   "topics": [
     "angular-basics",
     "css-fundamentals",
