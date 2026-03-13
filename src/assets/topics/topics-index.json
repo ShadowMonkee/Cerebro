@@ -1,4 +1,7 @@
 {
+  "categories": [
+    { "id": "sap-commerce-cloud", "label": "SAP Commerce Cloud", "icon": "🛒", "color": "#60a5fa" }
+  ],
   "topics": [
     "cc-typesystem",
     "cc-spring-basics",
