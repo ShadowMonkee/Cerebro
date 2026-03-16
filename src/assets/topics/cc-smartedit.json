@@ -1,0 +1,169 @@
+{
+  "id": "cc-smartedit",
+  "title": "SmartEdit — In-Context Editing & Personalisation",
+  "description": "Use SmartEdit for visual, in-context CMS editing, page versioning, experience personalisation, and storefront preview.",
+  "icon": "✏️",
+  "category": "cc-tier-4",
+  "tags": ["smartedit", "in-context-editing", "personalisation", "page-versioning", "drag-and-drop", "preview", "cms-editing"],
+  "sections": [
+    {
+      "title": "What is SmartEdit?",
+      "content": "<p><strong>SmartEdit</strong> is the in-context, visual editing tool for SAP Commerce Cloud. It allows merchandisers and content managers to edit CMS content directly on a live preview of the storefront — what you see is what you get. Instead of navigating Backoffice forms and imagining how content will look, users see the actual storefront with editable overlays and make changes in place.</p><p>SmartEdit is a <strong>single-page application</strong> built with Angular that loads the storefront in an <strong>iframe</strong> and overlays editing controls on top. The storefront itself is unmodified — SmartEdit injects a thin JavaScript layer (the SmartEdit contract) that enables communication between the editing frame and the storefront frame. This architecture means SmartEdit works with both the legacy JSP/Freemarker accelerator storefronts and the modern Spartacus (Angular) composable storefront.</p><p>SmartEdit operates on the <strong>Staged</strong> catalog version. All changes made through SmartEdit are saved to Staged content, and a synchronisation step (which can be triggered from within SmartEdit) pushes them to Online. This maintains the same editorial workflow as Backoffice — edit in Staged, preview, then publish.</p><p>SmartEdit is accessed via a dedicated URL (typically <code>/smartedit</code>) and requires appropriate user permissions. It is the recommended tool for merchandiser-driven content updates, while Backoffice remains the tool for bulk operations, data management, and developer-level configuration.</p>"
+    },
+    {
+      "title": "In-Context Editing — Slots, Components & Drag-and-Drop",
+      "content": "<p>The core SmartEdit experience revolves around <strong>visual editing of content slots and components</strong> directly on the storefront preview.</p><p>When a merchandiser opens a page in SmartEdit, content slots are highlighted with <strong>blue borders</strong> and component boundaries are indicated with overlays. Clicking on a slot reveals its components and provides options to <strong>add</strong>, <strong>remove</strong>, <strong>reorder</strong> (via drag-and-drop), or <strong>edit</strong> components. Clicking on a specific component opens an <strong>inline editor panel</strong> where the user can modify attributes (text, images, links, visibility settings) and see changes reflected immediately in the storefront preview.</p><p><strong>Drag-and-drop</strong> is supported for reordering components within a slot and for moving components between slots on the same page. This makes layout adjustments intuitive — a merchandiser can rearrange a homepage by dragging a promotional banner above a product carousel without leaving the visual editor.</p><p>SmartEdit also provides a <strong>component library panel</strong> from which users can drag new components onto the page. The available component types are filtered by the component type groups configured for the current slot — the same type group registration used in Backoffice. Custom CMS components that are properly registered appear in this library alongside standard ones.</p><p>All edits are performed against the <strong>Staged</strong> catalog version. The storefront preview in SmartEdit always renders Staged content, so changes are visible immediately to the editor but not to customers until synchronised to Online.</p>"
+    },
+    {
+      "title": "Page Versioning & Workflow",
+      "content": "<p>SmartEdit includes a <strong>page versioning</strong> feature that lets merchandisers create named snapshots of a page's content at a specific point in time. This is invaluable for campaign management — save the current homepage as \"Spring Campaign v1\", make changes for the summer campaign, and if needed, roll back to the spring version with a single click.</p><p>Page versions capture the <strong>complete state</strong> of all content slots and components on the page at the time the version is created. Restoring a version replaces the current Staged content with the saved snapshot. Versions are named and timestamped, making it easy to track which version corresponds to which campaign or time period.</p><p>SmartEdit also supports an <strong>approval workflow</strong> for content changes. When enabled, changes made by a merchandiser are not immediately available for synchronisation — they must be reviewed and approved by a designated reviewer before they can be published. The workflow includes states like <strong>Draft</strong>, <strong>Pending Approval</strong>, <strong>Approved</strong>, and <strong>Rejected</strong>. Rejected changes include feedback comments so the merchandiser knows what to fix.</p><p>This workflow is particularly important for regulated industries or large teams where multiple merchandisers work on the same site. It prevents unapproved content (incorrect pricing claims, legally problematic statements, off-brand imagery) from reaching the live storefront.</p><p>The synchronisation step can be triggered from SmartEdit's toolbar — a <strong>Sync</strong> button that pushes approved Staged content to Online for the current page or for the entire content catalog. The sync status is visible in SmartEdit, indicating whether the current page is in sync or has pending changes.</p>"
+    },
+    {
+      "title": "Personalisation & Experience Management",
+      "content": "<p>SmartEdit integrates with Commerce Cloud's <strong>personalisation</strong> capabilities, allowing merchandisers to create targeted content experiences for different customer segments — all within the visual editor.</p><p>The personalisation framework works through <strong>variations</strong> (also called <strong>customisations</strong> or <strong>experiences</strong>). A variation defines an alternative version of one or more content slots that is shown to customers matching specific <strong>target group</strong> criteria. For example: VIP customers see a premium banner in the hero slot, while new visitors see a welcome offer banner — same page, same slot, different components based on customer segment.</p><p><strong>Target groups</strong> are defined by rules that evaluate customer data: customer group membership, geographic location, browsing behaviour (visited specific categories, viewed specific products), cart contents (items in cart, cart value), order history, or custom segment assignments from an external marketing system.</p><p>In SmartEdit, merchandisers can <strong>switch between variations</strong> using a dropdown in the toolbar. They see the default experience and each targeted variation side by side (or toggle between them), editing each variation's components independently. This visual approach makes personalisation accessible to non-technical users — they don't need to understand the targeting rules to create the content, only to select which target group each variation serves.</p><p>Personalisation is evaluated at <strong>runtime</strong> when the storefront renders a page. The personalisation engine checks which target groups the current customer matches and serves the appropriate variation. If no variation matches, the default content is shown. The evaluation is efficient — target group membership is typically resolved once per session and cached.</p>"
+    },
+    {
+      "title": "SmartEdit Architecture & the Storefront Contract",
+      "content": "<p>SmartEdit's architecture is designed for <strong>loose coupling</strong> with the storefront. The SmartEdit application and the storefront are separate applications that communicate through a well-defined <strong>contract</strong>.</p><p>The <strong>SmartEdit container</strong> is the Angular application that provides the editing toolbar, component panels, and overlay controls. It loads the <strong>storefront in an iframe</strong>. The storefront (whether JSP-based or Spartacus) includes a thin JavaScript layer called the <strong>SmartEdit contract</strong> (or web application injector) that: marks CMS components and slots with <strong>HTML attributes</strong> (data attributes containing component IDs, slot IDs, catalog version), listens for messages from the SmartEdit container, and triggers storefront re-rendering when the container signals that content has changed.</p><p>For <strong>Spartacus</strong> (Angular composable storefront), SmartEdit integration is provided by the <code>@spartacus/smartedit</code> library. This library implements the contract by adding the required data attributes to CMS component elements and handling the bi-directional communication with the SmartEdit container.</p><p>For <strong>custom storefronts</strong> (headless implementations using OCC API), SmartEdit integration requires implementing the contract manually: marking rendered CMS elements with the appropriate data attributes and handling the SmartEdit message protocol. Without this contract, SmartEdit cannot identify which parts of the page correspond to which CMS components and slots.</p><p>SmartEdit communicates with the Commerce Cloud backend through the <strong>CMS Web Services (CMSWebServices)</strong> — REST APIs that allow reading and writing CMS data (pages, slots, components, restrictions). These are the same APIs that Spartacus uses to render CMS content, extended with additional endpoints for SmartEdit-specific operations like page versioning and sync.</p>"
+    },
+    {
+      "title": "SmartEdit Best Practices & Exam Tips",
+      "content": "<p>SmartEdit is a powerful tool when used correctly, but it requires proper setup and governance.</p><p><strong>SmartEdit vs Backoffice for CMS.</strong> Use SmartEdit for visual, page-level content editing — swapping banners, adjusting text, reordering components, previewing personalisation. Use Backoffice for bulk operations (creating many components, managing shared slots across pages, importing content via ImpEx), data-level configuration (component type groups, page templates), and developer tasks (custom component setup, slot assignments). Most teams use both tools — SmartEdit for the last mile of content refinement, Backoffice for structural setup.</p><p><strong>Permissions matter.</strong> SmartEdit respects the same CMS access rights as Backoffice. A user without write access to the Staged content catalog cannot edit content in SmartEdit. Configure permissions carefully to ensure merchandisers can edit their assigned pages but not structural elements they shouldn't touch.</p><p><strong>Personalisation governance.</strong> Personalisation is powerful but can become unmanageable if every merchandiser creates variations without coordination. Establish clear ownership of target groups, naming conventions for variations, and a review process for personalised content to avoid conflicting or overlapping experiences.</p><p><strong>Key exam points:</strong> SmartEdit is an Angular SPA that loads the storefront in an iframe. It works on Staged content and requires sync to publish. The storefront contract (data attributes + message protocol) enables communication between SmartEdit and the storefront. SmartEdit supports drag-and-drop component editing, page versioning, approval workflows, and personalisation. Personalisation uses target groups and variations to show different content to different customer segments. CMS Web Services (REST API) is the backend communication layer. SmartEdit works with both accelerator storefronts and Spartacus. Custom storefronts must implement the SmartEdit contract manually.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-smartedit-q1",
+      "type": "multiple-choice",
+      "text": "How does SmartEdit load and interact with the storefront?",
+      "options": [
+        "It replaces the storefront with its own rendering engine",
+        "It loads the storefront in an iframe and overlays editing controls on top",
+        "It modifies the storefront's source code at build time to add editing features",
+        "It generates a separate preview site from CMS data"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>SmartEdit is an Angular application that loads the <strong>storefront in an iframe</strong> and overlays editing controls. The storefront itself is unmodified — a thin JavaScript contract enables communication between the SmartEdit container and the storefront frame.</p>"
+    },
+    {
+      "id": "cc-smartedit-q2",
+      "type": "true-false",
+      "text": "Changes made in SmartEdit are saved directly to the Online catalog version and are immediately visible to customers.",
+      "correctAnswer": false,
+      "explanation": "<p>SmartEdit operates on the <strong>Staged</strong> catalog version. All changes are saved to Staged and must be <strong>synchronised to Online</strong> before customers can see them. This maintains the standard editorial workflow.</p>"
+    },
+    {
+      "id": "cc-smartedit-q3",
+      "type": "multiple-choice",
+      "text": "What does a page version in SmartEdit capture?",
+      "options": [
+        "Only the page's metadata (title, description, keywords)",
+        "The complete state of all content slots and components on the page at that point in time",
+        "Only the components that were modified since the last version",
+        "The page template and its structural layout"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>A page version captures the <strong>complete state</strong> of all content slots and components on the page at the time of creation. Restoring a version replaces the current Staged content with the full saved snapshot.</p>"
+    },
+    {
+      "id": "cc-smartedit-q4",
+      "type": "true-false",
+      "text": "SmartEdit supports drag-and-drop for reordering components within a slot and moving components between slots.",
+      "correctAnswer": true,
+      "explanation": "<p>SmartEdit supports <strong>drag-and-drop</strong> for reordering components within a slot and moving them between slots on the same page. This makes layout adjustments intuitive for non-technical merchandisers.</p>"
+    },
+    {
+      "id": "cc-smartedit-q5",
+      "type": "multiple-choice",
+      "text": "What is a 'variation' in the context of SmartEdit personalisation?",
+      "options": [
+        "A different version of the page template",
+        "An alternative version of content slot contents shown to customers matching specific target group criteria",
+        "A translated version of the page for a different language",
+        "A mobile-specific layout of the same page"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>A <strong>variation</strong> defines alternative content for one or more slots, shown to customers matching specific <strong>target group</strong> criteria. For example, VIP customers see a premium banner while new visitors see a welcome offer — same page, different content based on segment.</p>"
+    },
+    {
+      "id": "cc-smartedit-q6",
+      "type": "true-false",
+      "text": "Target groups for personalisation can be based on customer group membership, geographic location, browsing behaviour, and cart contents.",
+      "correctAnswer": true,
+      "explanation": "<p>Target groups evaluate multiple customer data dimensions: <strong>customer group</strong>, <strong>location</strong>, <strong>browsing behaviour</strong> (categories/products viewed), <strong>cart contents</strong> (items, value), <strong>order history</strong>, and custom segments from external systems.</p>"
+    },
+    {
+      "id": "cc-smartedit-q7",
+      "type": "multiple-choice",
+      "text": "What is the SmartEdit 'contract' that the storefront must implement?",
+      "options": [
+        "A licensing agreement between SAP and the customer",
+        "HTML data attributes on CMS elements plus a message protocol for communication with the SmartEdit container",
+        "A REST API specification that the storefront must expose",
+        "A CSS stylesheet that enables the editing overlay"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The SmartEdit contract consists of <strong>HTML data attributes</strong> on CMS components and slots (containing IDs and catalog version info) plus a <strong>message protocol</strong> for bi-directional communication between the SmartEdit container and the storefront iframe.</p>"
+    },
+    {
+      "id": "cc-smartedit-q8",
+      "type": "true-false",
+      "text": "SmartEdit only works with Spartacus (Angular) storefronts — it does not support JSP-based accelerator storefronts.",
+      "correctAnswer": false,
+      "explanation": "<p>SmartEdit works with <strong>both</strong> JSP/Freemarker accelerator storefronts and Spartacus (Angular). The storefront contract is framework-agnostic — any storefront that implements the required data attributes and message protocol can integrate with SmartEdit.</p>"
+    },
+    {
+      "id": "cc-smartedit-q9",
+      "type": "multiple-choice",
+      "text": "Which Spartacus library provides SmartEdit integration?",
+      "options": [
+        "@spartacus/core",
+        "@spartacus/storefront",
+        "@spartacus/smartedit",
+        "@spartacus/cms"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>@spartacus/smartedit</strong> provides the SmartEdit integration for Spartacus. It implements the contract by adding required data attributes to CMS component elements and handling communication with the SmartEdit container.</p>"
+    },
+    {
+      "id": "cc-smartedit-q10",
+      "type": "true-false",
+      "text": "When SmartEdit's approval workflow is enabled, content changes must be reviewed and approved before they can be synchronised to Online.",
+      "correctAnswer": true,
+      "explanation": "<p>The approval workflow requires changes to be <strong>reviewed and approved</strong> before synchronisation. Changes move through Draft → Pending Approval → Approved (or Rejected). This prevents unapproved content from reaching the live storefront.</p>"
+    },
+    {
+      "id": "cc-smartedit-q11",
+      "type": "multiple-choice",
+      "text": "SmartEdit communicates with the Commerce Cloud backend through which API layer?",
+      "options": [
+        "The ModelService directly via RMI",
+        "FlexibleSearch queries embedded in JavaScript",
+        "CMS Web Services (CMSWebServices) REST APIs",
+        "SOAP-based CMS services"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>SmartEdit uses <strong>CMS Web Services (CMSWebServices)</strong> — REST APIs for reading and writing CMS data. These APIs support pages, slots, components, restrictions, page versioning, and sync operations.</p>"
+    },
+    {
+      "id": "cc-smartedit-q12",
+      "type": "true-false",
+      "text": "If no personalisation variation matches the current customer, the default content is shown.",
+      "correctAnswer": true,
+      "explanation": "<p>Personalisation works on a <strong>fallback model</strong>. The engine checks which target groups the customer matches and serves the appropriate variation. If <strong>no variation matches</strong>, the default (non-personalised) content is displayed.</p>"
+    },
+    {
+      "id": "cc-smartedit-q13",
+      "type": "multiple-choice",
+      "text": "For a custom headless storefront (not using Spartacus or the accelerator), what is required for SmartEdit integration?",
+      "options": [
+        "No additional work — SmartEdit auto-detects CMS content on any page",
+        "Installing the @spartacus/smartedit npm package",
+        "Manually implementing the SmartEdit contract: data attributes on CMS elements and the message protocol",
+        "Converting the storefront to use the ZK framework"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Custom headless storefronts must <strong>manually implement the SmartEdit contract</strong>: marking rendered CMS elements with appropriate data attributes (component IDs, slot IDs, catalog version) and handling the SmartEdit message protocol. Without this, SmartEdit cannot identify CMS elements on the page.</p>"
+    }
+  ]
+}

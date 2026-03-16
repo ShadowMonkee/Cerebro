@@ -1,0 +1,169 @@
+{
+  "id": "cc-spartacus-architecture",
+  "title": "Spartacus Architecture — Modules, Routing & State",
+  "description": "Understand the Spartacus composable storefront — Angular foundation, feature modules, CMS-driven pages, NgRx state management, and OCC integration.",
+  "icon": "🏛️",
+  "category": "cc-tier-7",
+  "tags": ["spartacus", "composable-storefront", "angular", "ngrx", "routing", "modules", "state-management", "cms-driven"],
+  "sections": [
+    {
+      "title": "What is Spartacus?",
+      "content": "<p><strong>Spartacus</strong> is SAP's open-source, Angular-based <strong>composable storefront</strong> for Commerce Cloud. It replaces the legacy JSP-based accelerator storefronts with a modern, decoupled, single-page application that communicates with Commerce Cloud exclusively through the <strong>OCC REST API</strong>.</p><p>Spartacus is a <strong>true decoupled frontend</strong>: it runs entirely in the browser (or on a Node.js server for SSR), has no direct access to the Commerce Cloud database or Java services, and treats Commerce Cloud as a headless API backend. Every product listing, cart operation, checkout step, and CMS content block is fetched via OCC endpoints.</p><p>The project is open-source (Apache 2.0 license) and available on <strong>GitHub</strong> and <strong>npm</strong>. SAP maintains and releases it alongside Commerce Cloud platform releases. The npm packages are scoped under <code>@spartacus/</code> — for example, <code>@spartacus/core</code>, <code>@spartacus/storefront</code>, <code>@spartacus/cart</code>, <code>@spartacus/checkout</code>.</p><p>Spartacus is the <strong>strategic storefront direction</strong> for SAP Commerce Cloud. New features, integrations, and optimisations from SAP are delivered as Spartacus libraries. While the JSP accelerator is still supported, it is in maintenance mode and no longer receives new features. For the exam and for real projects, Spartacus is the recommended frontend.</p><p>Key architectural principles: <strong>CMS-driven</strong> (page structure comes from Commerce Cloud's CMS, not hard-coded templates), <strong>upgrade-safe customisation</strong> (extend, don't modify — customisations survive library upgrades), and <strong>progressive enhancement</strong> (server-side rendering for SEO, lazy loading for performance).</p>"
+    },
+    {
+      "title": "Angular Foundation & Module Structure",
+      "content": "<p>Spartacus is built on <strong>Angular</strong> (not AngularJS) and follows standard Angular architectural patterns: modules, components, services, dependency injection, reactive programming (RxJS), and the Angular CLI for scaffolding and building.</p><p>The Spartacus codebase is organised into <strong>feature libraries</strong>, each packaged as a separate npm module. Core libraries include: <code>@spartacus/core</code> (foundational services — OCC connectors, state management, configuration, i18n, authentication), <code>@spartacus/storefront</code> (reusable UI components — header, footer, navigation, search box, product cards), <code>@spartacus/cart</code> (cart functionality), <code>@spartacus/checkout</code> (checkout flow), <code>@spartacus/order</code> (order history), <code>@spartacus/user</code> (login, registration, profile), and <code>@spartacus/product</code> (product listing, detail, search).</p><p>Each feature library is further divided into sub-entry points: <strong>core</strong> (services, state, connectors — no UI), <strong>components</strong> (Angular components with templates and styles), <strong>occ</strong> (OCC API adapters), and <strong>assets</strong> (i18n translation files). This separation means you can import only the pieces you need and replace individual layers independently.</p><p>A Spartacus project is a standard <strong>Angular application</strong> created via the Angular CLI, with Spartacus libraries added as dependencies. The project's <code>app.module.ts</code> imports the Spartacus feature modules, and the Spartacus <strong>configuration module</strong> provides the backend OCC URL, site context, and feature flags. Your custom code (components, services, modules) lives alongside Spartacus in the same Angular project.</p>"
+    },
+    {
+      "title": "CMS-Driven Page Rendering",
+      "content": "<p>One of Spartacus's most distinctive features is <strong>CMS-driven page rendering</strong>. Unlike traditional SPAs where page layouts are hard-coded in Angular templates, Spartacus dynamically builds each page based on the <strong>CMS page structure</strong> retrieved from Commerce Cloud's WCMS system via OCC.</p><p>The flow works as follows: <strong>1.</strong> The user navigates to a URL. <strong>2.</strong> Spartacus resolves the URL to a CMS page (ContentPage by label/URL, ProductPage by product code, CategoryPage by category code). <strong>3.</strong> Spartacus fetches the page from OCC — the response includes the page template, content slots, and the components within each slot. <strong>4.</strong> Spartacus renders the page template layout, iterating over each slot and rendering the components within it. <strong>5.</strong> Each CMS component is mapped to an <strong>Angular component</strong> via the <strong>CMS component mapping</strong> configuration.</p><p>The CMS component mapping is the key configuration: it maps a CMS component type (e.g. <code>BannerComponent</code>) to an Angular component class (e.g. <code>BannerComponent</code> in Spartacus). When Spartacus encounters a BannerComponent in a slot, it looks up the mapping, instantiates the Angular component, and passes the CMS data as input. This is how the same Angular application renders completely different pages based on CMS configuration — merchandisers control the storefront structure without frontend deployments.</p><p><strong>Page templates</strong> are mapped to Angular layout configurations that define which named slots exist and where they render on the page. The <code>LayoutConfig</code> in Spartacus maps template names (from CMS) to slot positions (header, navigation, body, footer). Custom templates require adding a new layout configuration entry.</p><p>This CMS-driven approach means that adding a new CMS component type to the storefront requires: creating the CMS type in Commerce Cloud (items.xml), creating the Angular component in Spartacus, and registering the component mapping. No page-level code changes are needed.</p>"
+    },
+    {
+      "title": "State Management with NgRx",
+      "content": "<p>Spartacus uses <strong>NgRx</strong> — Angular's implementation of the Redux pattern — for state management. NgRx provides a predictable, centralised <strong>store</strong> that holds application state (cart contents, user session, product data, CMS pages) and enforces unidirectional data flow.</p><p>The NgRx pattern has four key concepts: <strong>Store</strong> — the single source of truth for application state, structured as a state tree. <strong>Actions</strong> — events that describe something that happened (e.g. <code>CartActions.AddEntry</code>, <code>UserActions.Login</code>). <strong>Reducers</strong> — pure functions that take the current state + an action and return a new state. <strong>Effects</strong> — side-effect handlers that listen for actions and perform async operations (like OCC API calls), then dispatch new actions with the results.</p><p>A typical Spartacus data flow: the user clicks \"Add to Cart\" → the component dispatches a <code>CartActions.CartAddEntry</code> action → an <strong>effect</strong> intercepts the action and calls the OCC cart API → on success, the effect dispatches a <code>CartActions.CartAddEntrySuccess</code> action → a <strong>reducer</strong> updates the cart state in the store → components subscribed to the cart state via <strong>selectors</strong> automatically re-render with the updated cart.</p><p>For most Spartacus customisations, you don't need to write custom NgRx code — you use the provided <strong>facades</strong> (service classes that wrap NgRx interactions). For example, <code>ActiveCartFacade</code> provides methods like <code>addEntry()</code>, <code>getEntries()</code>, and <code>getActive()</code> that abstract the NgRx details. Facades are the recommended API for components — direct store access should be rare.</p><p>Understanding NgRx is important for debugging and for advanced customisations (custom state slices, custom effects for new API calls), but facades shield most development work from NgRx complexity.</p>"
+    },
+    {
+      "title": "Routing & Site Context",
+      "content": "<p>Spartacus uses <strong>Angular Router</strong> for navigation, extended with Commerce Cloud–specific routing logic. Routes are not hard-coded for every product or category — instead, Spartacus uses a <strong>dynamic routing</strong> mechanism that resolves URLs to CMS pages at runtime.</p><p>The <strong>CMS page resolver</strong> intercepts navigation requests, calls OCC to determine which CMS page matches the URL, and loads the corresponding page template and content. This means new pages created in CMS (with a URL path) are automatically accessible in Spartacus — no frontend routing changes needed.</p><p>For product and category pages, Spartacus uses <strong>semantic URLs</strong> (also called URL aliases). Instead of <code>/product/12345</code>, the URL might be <code>/Cameras/Digital-Camera-DSC-T90/p/12345</code> — with category and product name segments for SEO. These aliases are generated from product and category data and managed through Commerce Cloud's URL resolution service.</p><p><strong>Site context</strong> controls the multi-site, multi-language, multi-currency experience. Spartacus's <code>SiteContextModule</code> manages: <strong>language</strong> (which locale is active), <strong>currency</strong> (which currency prices are displayed in), and <strong>base site</strong> (which Commerce Cloud site the storefront connects to). Site context can be encoded in the URL (e.g. <code>/en/USD/...</code>), stored in cookies, or set via configuration. Changes to site context (user switches language or currency) trigger page reloads with the new context.</p><p>The site context is passed to OCC in every request — language as a query parameter or header, currency similarly. This ensures the backend returns data localised for the user's context.</p>"
+    },
+    {
+      "title": "Server-Side Rendering, Performance & Exam Tips",
+      "content": "<p><strong>Server-Side Rendering (SSR)</strong> is a critical Spartacus capability for SEO and initial load performance. With SSR, the first page load is rendered on a <strong>Node.js server</strong> (using Angular Universal) and sent to the browser as fully formed HTML. Search engine crawlers see complete page content (products, descriptions, prices) rather than an empty Angular shell. After the initial HTML load, Spartacus <strong>hydrates</strong> on the client side and becomes a regular SPA for subsequent navigation.</p><p>SSR is especially important for <strong>product pages and category pages</strong> — these must be indexable by Google for organic search traffic. Without SSR, search engines may not index JavaScript-rendered content effectively.</p><p><strong>Lazy loading</strong> is another performance feature. Spartacus feature modules are configured for lazy loading — they are loaded only when the user navigates to a feature that requires them. For example, the checkout module is not loaded until the user enters the checkout flow. This reduces the initial JavaScript bundle size and improves time-to-interactive.</p><p><strong>Transfer state</strong> prevents double-fetching when SSR is enabled. Data fetched during server-side rendering is serialised and transferred to the client — the client-side Angular app uses this transferred state instead of re-fetching from OCC. This avoids a flash of loading states after the initial HTML render.</p><p><strong>Key exam points:</strong> Spartacus is Angular-based, open-source, and communicates exclusively via OCC. CMS-driven rendering: page structure from WCMS, component mapping connects CMS types to Angular components. NgRx for state management: Store/Actions/Reducers/Effects — but use facades in components. Dynamic routing resolves URLs to CMS pages at runtime. Site context manages language/currency/base site. SSR via Angular Universal on Node.js for SEO. Lazy loading for performance. Feature libraries are modular npm packages under @spartacus/. Spartacus is SAP's strategic storefront — JSP accelerator is in maintenance mode.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-spartacus-architecture-q1",
+      "type": "multiple-choice",
+      "text": "How does Spartacus communicate with SAP Commerce Cloud?",
+      "options": [
+        "Direct database connection via JDBC",
+        "Server-side Java API calls within the same JVM",
+        "Exclusively through the OCC REST API",
+        "Through a shared message queue (JMS)"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Spartacus communicates <strong>exclusively through OCC</strong>. It is a fully decoupled frontend with no direct access to the database or Java services. Every operation — products, cart, checkout, CMS — goes through OCC REST endpoints.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q2",
+      "type": "true-false",
+      "text": "Spartacus page layouts are hard-coded in Angular templates — CMS configuration has no effect on the page structure.",
+      "correctAnswer": false,
+      "explanation": "<p>Spartacus uses <strong>CMS-driven page rendering</strong>. Page structure (template, slots, components) is fetched from Commerce Cloud's WCMS via OCC at runtime. Angular components are mapped to CMS component types via configuration — merchandisers control the storefront structure without frontend code changes.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q3",
+      "type": "multiple-choice",
+      "text": "What design pattern does Spartacus use for state management?",
+      "options": [
+        "MVC (Model-View-Controller)",
+        "NgRx (Redux pattern — Store, Actions, Reducers, Effects)",
+        "Two-way data binding with services",
+        "Local component state with @Input/@Output only"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Spartacus uses <strong>NgRx</strong> — the Redux pattern for Angular. State is held in a centralised store. Actions describe events, reducers update state, and effects handle async operations (like OCC calls). Facades abstract NgRx for component developers.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q4",
+      "type": "true-false",
+      "text": "Spartacus components should interact with NgRx directly by dispatching actions and subscribing to the store, rather than using facade services.",
+      "correctAnswer": false,
+      "explanation": "<p>Components should use <strong>facades</strong> (e.g. ActiveCartFacade, ProductFacade) that wrap NgRx interactions. Facades provide a clean API and shield components from NgRx complexity. Direct store access should be rare and reserved for advanced customisations.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q5",
+      "type": "multiple-choice",
+      "text": "How does Spartacus map a CMS component type (e.g. BannerComponent) to an Angular component?",
+      "options": [
+        "By naming the Angular component exactly the same as the CMS type",
+        "Through a CMS component mapping configuration that links CMS types to Angular component classes",
+        "By placing Angular components in a /cms/ folder structure that mirrors the CMS hierarchy",
+        "Automatically via reflection — no configuration needed"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Spartacus uses a <strong>CMS component mapping configuration</strong> that explicitly maps CMS component type names to Angular component classes. When a CMS component appears in a slot, Spartacus looks up the mapping, instantiates the Angular component, and passes the CMS data.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q6",
+      "type": "true-false",
+      "text": "New CMS pages created in Commerce Cloud with a URL path are automatically accessible in Spartacus without frontend routing changes.",
+      "correctAnswer": true,
+      "explanation": "<p>Spartacus uses <strong>dynamic routing</strong> that resolves URLs to CMS pages at runtime via OCC. When a new ContentPage is created in CMS with a URL path, Spartacus can serve it automatically — no Angular routing code changes required.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q7",
+      "type": "multiple-choice",
+      "text": "What is the primary purpose of Server-Side Rendering (SSR) in Spartacus?",
+      "options": [
+        "To bypass the OCC API and render pages from the database directly",
+        "To provide fully formed HTML for SEO crawlers and improve initial load performance",
+        "To replace the Angular framework with a server-side template engine",
+        "To enable Backoffice editing of Spartacus components"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>SSR renders the first page on a <strong>Node.js server</strong> as complete HTML. Search engines see full content (products, prices, descriptions) instead of an empty Angular shell. After the HTML loads, Spartacus hydrates to a regular SPA. SSR is critical for SEO on product and category pages.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q8",
+      "type": "true-false",
+      "text": "Spartacus feature modules support lazy loading — they are loaded only when the user navigates to a feature that requires them.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>Lazy loading</strong> reduces the initial JavaScript bundle. Feature modules (checkout, order history, etc.) are loaded on demand when the user navigates to them. This improves time-to-interactive — the initial page loads faster because unnecessary code isn't included.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q9",
+      "type": "multiple-choice",
+      "text": "Which Spartacus module manages language, currency, and base site selection?",
+      "options": [
+        "RoutingModule",
+        "SiteContextModule",
+        "CmsModule",
+        "AuthModule"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>SiteContextModule</strong> manages the multi-site, multi-language, multi-currency experience. It controls which language, currency, and base site are active, and passes this context to OCC in every request for properly localised responses.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q10",
+      "type": "true-false",
+      "text": "The JSP accelerator storefront is SAP's strategic frontend direction and receives new features in every Commerce Cloud release.",
+      "correctAnswer": false,
+      "explanation": "<p>The JSP accelerator is in <strong>maintenance mode</strong>. <strong>Spartacus</strong> is SAP's strategic storefront direction. New features, integrations, and optimisations are delivered as Spartacus libraries. Spartacus should be recommended for all new projects.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q11",
+      "type": "multiple-choice",
+      "text": "In the NgRx data flow, which component handles async operations like OCC API calls?",
+      "options": [
+        "Reducers",
+        "Selectors",
+        "Effects",
+        "Guards"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Effects</strong> handle side effects — they listen for actions, perform async operations (like OCC API calls), and dispatch new actions with the results. Reducers are pure functions that update state synchronously. Selectors read state. Guards protect routes.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q12",
+      "type": "true-false",
+      "text": "Transfer state in Spartacus SSR prevents data from being fetched twice — once on the server and again on the client.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>Transfer state</strong> serialises data fetched during SSR and passes it to the client. The client-side app uses this transferred state instead of re-fetching from OCC. This prevents double-fetching and avoids loading flashes after the initial render.</p>"
+    },
+    {
+      "id": "cc-spartacus-architecture-q13",
+      "type": "multiple-choice",
+      "text": "Spartacus feature libraries are published as npm packages under which scope?",
+      "options": [
+        "@sap/",
+        "@commerce/",
+        "@spartacus/",
+        "@hybris/"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Spartacus packages are scoped under <strong>@spartacus/</strong> on npm — for example, <code>@spartacus/core</code>, <code>@spartacus/storefront</code>, <code>@spartacus/cart</code>, <code>@spartacus/checkout</code>. Each is an independently versioned npm package.</p>"
+    }
+  ]
+}

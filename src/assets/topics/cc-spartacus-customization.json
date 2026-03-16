@@ -1,0 +1,169 @@
+{
+  "id": "cc-spartacus-customization",
+  "title": "Spartacus Customisation — Components, Layouts & Overrides",
+  "description": "Customise the Spartacus storefront — override components, remap CMS types, configure layouts, extend services, and apply custom styling.",
+  "icon": "🎨",
+  "category": "cc-tier-7",
+  "tags": ["spartacus", "customisation", "component-override", "layout", "styling", "cms-mapping", "service-override", "angular-di"],
+  "sections": [
+    {
+      "title": "Customisation Philosophy — Configuration over Code",
+      "content": "<p>Spartacus is designed for <strong>customisation without forking</strong>. You never modify Spartacus source code — instead, you override, extend, or replace specific pieces using Angular's dependency injection, the CMS component mapping system, and Spartacus's configuration-driven architecture.</p><p>This philosophy enables <strong>upgradability</strong>. Because your customisations sit in your own Angular modules (not in modified Spartacus source), upgrading Spartacus to a new version only requires updating npm packages and running migration schematics — your overrides continue to work as long as the interfaces you depend on haven't changed.</p><p>The customisation hierarchy from least invasive to most invasive: <strong>1. Configuration</strong> — change behaviour via <code>provideConfig()</code> (component mappings, routes, layout, feature toggles). No custom code needed. <strong>2. CSS overrides</strong> — restyle existing components without touching their logic. <strong>3. Component replacement</strong> — provide a completely new Angular component for a CMS component type. <strong>4. Service override</strong> — replace a Spartacus service with a custom implementation via Angular DI. <strong>5. Custom feature module</strong> — add entirely new functionality that doesn't exist in standard Spartacus.</p><p>The golden rule: <strong>start at level 1 and only escalate when necessary</strong>. A configuration change that takes 5 minutes is always preferable to a custom component that takes 5 hours and must be maintained through upgrades.</p>"
+    },
+    {
+      "title": "Overriding CMS Component Mappings",
+      "content": "<p>The most common Spartacus customisation is <strong>replacing an Angular component</strong> that renders a CMS component type. This is done entirely through configuration — no modification of Spartacus code is needed.</p><p>The pattern: <strong>1.</strong> Create your custom Angular component (e.g. <code>CustomBannerComponent</code>). <strong>2.</strong> Register it as the renderer for a CMS component type via <code>provideConfig()</code>:</p><pre><code>provideConfig({\n  cmsComponents: {\n    BannerComponent: {\n      component: CustomBannerComponent\n    }\n  }\n})</code></pre><p>This replaces the standard Spartacus <code>BannerComponent</code> with your custom version for every instance of the CMS BannerComponent type on every page. The CMS data (media, headline, link, content) still flows from the backend — only the Angular rendering changes.</p><p>Your custom component can inject the <strong>CMS component data</strong> via <code>CmsComponentData&lt;CmsBannerComponent&gt;</code> — a service provided by Spartacus that delivers the CMS data for the current component instance as an Observable. This means your component receives the same data the standard component would — you just render it differently.</p><p>For <strong>custom CMS component types</strong> (defined in items.xml on the backend), you create an Angular component and map it to the custom type name. This is the frontend counterpart of the 4-step custom CMS component process described in the WCMS topic: the backend type + Backoffice config + component type group registration is handled on the Commerce Cloud side, and the Angular component + CMS mapping is handled on the Spartacus side.</p><p>Component mapping overrides are <strong>deep-merged</strong> — you only override the types you want to change. All other standard mappings remain active.</p>"
+    },
+    {
+      "title": "Layout Configuration",
+      "content": "<p>Spartacus provides a <strong>layout configuration</strong> system that controls how content slots are arranged on the page — independent of the Angular components within those slots.</p><p>The layout defines which CSS classes and structural positions are applied to each named content slot. It is configured via <code>LayoutConfig</code>:</p><pre><code>provideConfig({\n  layoutSlots: {\n    header: {\n      lg: { slots: ['SiteLogo', 'SearchBox', 'MiniCart'] },\n      xs: { slots: ['SiteLogo', 'MiniCart'] }\n    },\n    LandingPageTemplate: {\n      slots: ['Section1', 'Section2A', 'Section2B', 'Section3']\n    }\n  }\n})</code></pre><p>Layouts can be defined <strong>per page template</strong> (matching Commerce Cloud's PageTemplate names) and support <strong>responsive breakpoints</strong> (different slot arrangements for large screens vs mobile). This means the header can show SearchBox on desktop but hide it on mobile — controlled by configuration, not custom CSS media queries.</p><p>The layout system works with Spartacus's <strong>page layout component</strong> (<code>cx-page-layout</code>) which reads the CMS page's template, looks up the layout configuration, and renders the slots in the configured positions. Slots that exist in the CMS data but are not in the layout configuration are not rendered — this gives the frontend control over which slots appear even if the CMS page defines more.</p><p>Layout customisation is one of the most impactful and least invasive ways to change the storefront's appearance. Rearranging the homepage sections, changing the header structure, or creating a custom landing page layout is purely configuration — no components need to be written or modified.</p>"
+    },
+    {
+      "title": "Styling & Theming",
+      "content": "<p>Spartacus uses <strong>SCSS</strong> for styling and provides a structured theming approach. The default Spartacus theme is functional but intentionally minimal — it is meant to be customised to match the brand.</p><p>Spartacus styling is organised into <strong>component-level SCSS files</strong> and <strong>global theme files</strong>. Each Spartacus component has its own SCSS that defines its default appearance. These styles use <strong>CSS custom properties (variables)</strong> and <strong>SCSS variables</strong> for colours, spacing, typography, and breakpoints. Overriding these variables is the fastest way to rebrand the storefront:</p><pre><code>// In your global styles.scss\n$primary: #1a3c6e;\n$font-family: 'Inter', sans-serif;\n@import '@spartacus/styles';</code></pre><p>For <strong>component-level style overrides</strong>, you can target Spartacus components using their <code>cx-*</code> CSS class names. Spartacus components use well-defined CSS classes that serve as stable hooks for custom styling. Use these classes rather than targeting Angular-generated selectors, which can change between versions.</p><p>For deeper visual changes, you can <strong>replace the entire stylesheet</strong> for a component by providing your own SCSS in your custom component (when using component replacement) or by overriding the global theme imports selectively.</p><p>Spartacus also supports <strong>directionality</strong> (LTR/RTL) through its layout system — important for storefronts serving Arabic, Hebrew, or other RTL languages. The layout and styling system automatically adjusts when the language direction changes.</p><p>Best practice: <strong>use SCSS variables and CSS custom properties</strong> for branding (colours, fonts, spacing). Use <strong>component CSS class overrides</strong> for layout adjustments. Only replace components when the HTML structure itself needs to change — purely visual changes should be achievable through styling alone.</p>"
+    },
+    {
+      "title": "Service Overrides via Angular DI",
+      "content": "<p>When you need to change <strong>business logic</strong> rather than presentation, Spartacus supports overriding services via Angular's <strong>dependency injection</strong>.</p><p>Every Spartacus service is provided as an Angular injectable. To override one, you create a custom service class that <strong>extends</strong> the standard Spartacus service, override the methods you want to change, and <strong>provide</strong> your class in place of the original:</p><pre><code>@Injectable()\nexport class CustomCartService extends CartService {\n  addEntry(productCode: string, quantity: number): void {\n    // Custom validation logic\n    if (quantity > 100) {\n      // Show warning, limit quantity, etc.\n    }\n    super.addEntry(productCode, quantity);\n  }\n}\n\n// In your module:\nproviders: [\n  { provide: CartService, useClass: CustomCartService }\n]</code></pre><p>The Angular DI system ensures that everywhere Spartacus (or your own code) injects <code>CartService</code>, it receives your <code>CustomCartService</code> instead. The override is transparent to consuming code.</p><p>Common service override scenarios: adding <strong>custom validation</strong> to cart or checkout operations, modifying <strong>price display logic</strong> (e.g. showing tax-inclusive vs tax-exclusive prices), customising <strong>authentication flow</strong> (integrating a custom identity provider), extending <strong>search behaviour</strong> (adding custom filters or boost logic), and modifying <strong>order placement</strong> (adding pre- or post-order side effects).</p><p>You can also override <strong>OCC adapters</strong> to modify how Spartacus communicates with the backend — for example, adding custom headers, transforming request/response data, or calling a different endpoint entirely. This is the extension point for integrating Spartacus with non-standard backends.</p><p>Best practice: always <strong>extend</strong> the original service and call <code>super</code> for unchanged methods. This ensures you inherit all existing logic and only modify what you need. Completely replacing a service (without extending) is risky because you lose future bug fixes and enhancements from Spartacus upgrades.</p>"
+    },
+    {
+      "title": "Custom Feature Modules & Exam Tips",
+      "content": "<p>For entirely new functionality that doesn't exist in Spartacus, you create a <strong>custom Angular feature module</strong>. This module lives in your project (not in Spartacus source), contains its own components, services, routes, and state management, and is imported into your application.</p><p>Examples of custom feature modules: a <strong>loyalty programme dashboard</strong> (points balance, rewards catalog, redemption history), a <strong>product customiser</strong> (3D configurator or engraving tool), a <strong>store locator</strong> with custom map integration, a <strong>B2B approval workflow UI</strong> with custom business rules, or a <strong>subscription management</strong> portal.</p><p>Custom modules follow standard Angular patterns: components, services, routes, and optionally NgRx state (actions, effects, reducers) for complex data flows. They can consume Spartacus services (CartService, UserService, etc.) and OCC endpoints — or call custom backend endpoints that you've built (see the API Extensions topic).</p><p>For custom modules that include CMS-managed content, create <strong>custom CMS component types</strong> on the backend and map them in Spartacus — this gives merchandisers control over where your custom content appears on the page.</p><p><strong>Key exam points:</strong> Customisation hierarchy: configuration → CSS → component replacement → service override → custom module. CMS component mapping via provideConfig() replaces Angular renderers for CMS types. Layout configuration controls slot arrangement per page template with responsive breakpoints. SCSS variables and CSS custom properties for theming. Angular DI for service overrides (extend + provide pattern). Extend the original service and call super — don't replace entirely. Custom feature modules for new functionality. CmsComponentData provides CMS data to custom components. All overrides are deep-merged — you only change what you need. Never modify Spartacus source — always override from your own modules.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-spartacus-customization-q1",
+      "type": "multiple-choice",
+      "text": "What is the recommended customisation hierarchy in Spartacus, from least to most invasive?",
+      "options": [
+        "Custom module → Service override → Component replacement → CSS → Configuration",
+        "Configuration → CSS overrides → Component replacement → Service override → Custom feature module",
+        "Fork Spartacus source → Modify directly → Rebuild → Deploy",
+        "Service override → Configuration → CSS → Component replacement → Custom module"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The hierarchy from least to most invasive: <strong>Configuration</strong> (provideConfig) → <strong>CSS overrides</strong> (restyle without logic changes) → <strong>Component replacement</strong> (new Angular component for a CMS type) → <strong>Service override</strong> (replace business logic via DI) → <strong>Custom feature module</strong> (entirely new functionality). Always start at the least invasive level.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q2",
+      "type": "true-false",
+      "text": "To customise Spartacus, you should fork the Spartacus source code repository and modify the source files directly.",
+      "correctAnswer": false,
+      "explanation": "<p>You should <strong>never modify Spartacus source code</strong>. All customisations are done through overrides in your own Angular modules: configuration changes, component mappings, service replacements, and custom modules. This ensures upgradability — updating Spartacus packages doesn't conflict with your customisations.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q3",
+      "type": "multiple-choice",
+      "text": "How do you replace the Angular component that renders a specific CMS component type in Spartacus?",
+      "options": [
+        "Modify the Spartacus BannerComponent.ts file directly",
+        "Use provideConfig() with cmsComponents to map the CMS type to your custom Angular component",
+        "Create a CSS override that hides the standard component and shows your custom one",
+        "Register your component in the Angular Router as a replacement route"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Use <code>provideConfig()</code> with the <code>cmsComponents</code> section to map the CMS type to your custom component. This is purely configuration — no Spartacus source modification needed. The override is deep-merged, so only the types you specify are affected.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q4",
+      "type": "true-false",
+      "text": "CMS component mapping overrides in Spartacus are deep-merged — you only need to specify the types you want to change.",
+      "correctAnswer": true,
+      "explanation": "<p>Component mapping uses <strong>deep-merge</strong>. Providing a mapping for BannerComponent replaces only that mapping — all other standard mappings (ProductCarousel, Paragraph, Navigation, etc.) remain active and unchanged.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q5",
+      "type": "multiple-choice",
+      "text": "How does a custom Angular component in Spartacus receive the CMS data for the component instance it is rendering?",
+      "options": [
+        "By calling the OCC CMS API directly with the component ID",
+        "By injecting CmsComponentData<T> which provides the CMS data as an Observable",
+        "By reading a global JavaScript variable set by SmartEdit",
+        "By accessing the Angular Router's data property"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Custom components inject <code>CmsComponentData&lt;T&gt;</code> — a Spartacus service that provides the CMS data for the current component instance as an <strong>Observable</strong>. The component subscribes to it (or uses the async pipe) to render the CMS-managed content.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q6",
+      "type": "true-false",
+      "text": "Spartacus layout configuration supports responsive breakpoints — different slot arrangements for different screen sizes.",
+      "correctAnswer": true,
+      "explanation": "<p>Layout configuration supports <strong>responsive breakpoints</strong> (lg, md, sm, xs). You can define different slot arrangements per breakpoint — for example, showing SearchBox in the header on desktop but hiding it on mobile — controlled purely through configuration.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q7",
+      "type": "multiple-choice",
+      "text": "What is the fastest way to rebrand a Spartacus storefront with custom colours and fonts?",
+      "options": [
+        "Replace every Spartacus component with custom versions that use the new colours",
+        "Override SCSS variables and CSS custom properties in your global styles",
+        "Edit the @spartacus/styles npm package directly",
+        "Create a Backoffice configuration for theme colours"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Overriding <strong>SCSS variables and CSS custom properties</strong> ($primary, $font-family, etc.) in your global styles.scss is the fastest rebranding approach. This changes colours, fonts, and spacing across the entire storefront without touching any component code.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q8",
+      "type": "true-false",
+      "text": "When overriding a Spartacus service via Angular DI, best practice is to extend the original service and call super for unchanged methods.",
+      "correctAnswer": true,
+      "explanation": "<p>Always <strong>extend</strong> the original service and call <code>super</code> for methods you don't modify. This preserves existing logic and ensures your override benefits from bug fixes and enhancements in future Spartacus versions. Completely replacing without extending is risky.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q9",
+      "type": "multiple-choice",
+      "text": "You need to add custom validation that prevents adding more than 100 units of any product to the cart. What is the correct customisation approach?",
+      "options": [
+        "Modify the Spartacus CartService source code to add the validation",
+        "Create a custom service extending CartService, override the addEntry method with validation, and provide it via Angular DI",
+        "Add a CSS rule that disables the Add to Cart button above 100",
+        "Create a CMS component mapping that hides the quantity field"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>This is a <strong>business logic change</strong>, so a service override is the correct approach. Extend CartService, override <code>addEntry()</code> with your validation logic, call <code>super.addEntry()</code> for valid quantities, and provide your custom class via Angular DI.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q10",
+      "type": "true-false",
+      "text": "Slots defined in the CMS data but not included in the Spartacus layout configuration are still rendered on the page.",
+      "correctAnswer": false,
+      "explanation": "<p>Slots not included in the layout configuration are <strong>not rendered</strong>. The layout configuration controls which slots appear — even if the CMS page defines additional slots. This gives the frontend control over page structure independent of CMS data.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q11",
+      "type": "multiple-choice",
+      "text": "When styling Spartacus components, what should you target instead of Angular-generated selectors?",
+      "options": [
+        "Element IDs generated by Angular",
+        "The cx-* CSS class names provided by Spartacus components",
+        "NgRx state selectors",
+        "The CMS component type names"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Spartacus components use well-defined <strong><code>cx-*</code> CSS classes</strong> as stable styling hooks. Target these rather than Angular-generated attributes (like <code>_ngcontent-*</code>) which change between builds and versions.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q12",
+      "type": "true-false",
+      "text": "OCC adapters can be overridden in Spartacus to modify how the frontend communicates with the backend — for example, adding custom headers or calling different endpoints.",
+      "correctAnswer": true,
+      "explanation": "<p>OCC adapters can be <strong>overridden via Angular DI</strong>, just like services. This allows adding custom headers, transforming requests/responses, or pointing to different endpoints — the extension point for integrating Spartacus with non-standard or customised backends.</p>"
+    },
+    {
+      "id": "cc-spartacus-customization-q13",
+      "type": "multiple-choice",
+      "text": "A purely visual change to a Spartacus component (different colours, spacing, font) should be achieved through:",
+      "options": [
+        "Replacing the component with a custom Angular component",
+        "Overriding the component's service via Angular DI",
+        "CSS/SCSS overrides targeting the component's cx-* classes or SCSS variables",
+        "Creating a custom CMS component type on the backend"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Purely visual changes should be handled through <strong>CSS/SCSS</strong> — overriding SCSS variables for global changes or targeting <code>cx-*</code> classes for component-specific changes. Component replacement should only be used when the HTML structure itself needs to change.</p>"
+    }
+  ]
+}

@@ -1,0 +1,169 @@
+{
+  "id": "cc-occ-api",
+  "title": "OCC REST API — Endpoints, DTOs & Configuration",
+  "description": "Understand the Omni Commerce Connect API — REST endpoints, data transfer objects, authentication, and how Spartacus consumes OCC.",
+  "icon": "🌐",
+  "category": "cc-tier-5",
+  "tags": ["occ", "rest-api", "endpoints", "dto", "wsdto", "authentication", "oauth", "api-versioning", "spartacus"],
+  "sections": [
+    {
+      "title": "What is OCC?",
+      "content": "<p><strong>OCC (Omni Commerce Connect)</strong> is SAP Commerce Cloud's RESTful API layer. It exposes all commerce functionality — products, catalogs, carts, checkout, orders, users, CMS, search, promotions, and more — as HTTP endpoints that any client application can consume.</p><p>OCC is the <strong>API that powers the composable storefront</strong>. Spartacus (the Angular-based storefront) is a pure OCC client — it has no direct access to the Commerce Cloud database or Java services. Every product listing, cart operation, and checkout step goes through OCC. This makes OCC the critical contract between the backend and the frontend.</p><p>OCC also enables <strong>headless commerce</strong> beyond Spartacus: mobile apps, progressive web apps, kiosks, third-party marketplace integrations, and custom frontends all consume OCC. This is the architectural shift from monolithic, server-rendered storefronts (JSP accelerators) to decoupled, API-driven frontends.</p><p>The OCC API is versioned (the current version is <strong>v2</strong>) and follows RESTful conventions: resources are identified by URLs, HTTP methods indicate operations (GET for reading, POST for creating, PUT/PATCH for updating, DELETE for removing), and responses are in <strong>JSON</strong> (XML is also supported but JSON is the standard). The base URL pattern is: <code>/occ/v2/{baseSiteId}/...</code> — every request is scoped to a specific base site.</p><p>OCC is implemented by the <code>commercewebservices</code> extension (and related extensions like <code>cmsocc</code> for CMS endpoints, <code>smarteditwebservices</code> for SmartEdit). These extensions contain Spring MVC controllers annotated with <code>@RestController</code> that handle HTTP requests and delegate to the commerce service layer.</p>"
+    },
+    {
+      "title": "Key Endpoint Areas",
+      "content": "<p>OCC organises endpoints into logical resource groups. Understanding these groups is essential for both building frontends and extending the API.</p><p><strong>Products</strong> (<code>/products</code>) — search products, get product details, reviews, references, and stock levels. The product detail endpoint returns a rich response including name, description, images, prices, classifications, categories, and stock status. Search uses Solr under the hood and supports faceted filtering, sorting, and pagination.</p><p><strong>Catalogs</strong> (<code>/catalogs</code>) — browse catalog structure, categories, and category hierarchies. Used for navigation menus and category pages.</p><p><strong>Cart</strong> (<code>/users/{userId}/carts</code>) — create carts, add/update/remove entries, apply vouchers, set delivery address, set delivery mode, and set payment details. The cart endpoint is the most frequently called during a shopping session. Anonymous carts use <code>anonymous</code> as the userId and a cart GUID.</p><p><strong>Checkout</strong> — spans multiple endpoints for address validation, delivery modes, payment creation (via PSP integration), and order placement. The <code>POST /orders</code> endpoint converts the cart into an order.</p><p><strong>Orders</strong> (<code>/users/{userId}/orders</code>) — retrieve order history and order details for authenticated users.</p><p><strong>Users</strong> (<code>/users</code>) — registration, login, profile management, address book, and payment methods. The <code>current</code> keyword as userId refers to the authenticated user.</p><p><strong>CMS</strong> (<code>/cms</code>) — retrieve pages, content slots, components, and navigation nodes. This is how Spartacus fetches the page structure and dynamic content managed in WCMS and SmartEdit.</p><p><strong>Stores</strong> (<code>/stores</code>) — store locator functionality with geographic search.</p>"
+    },
+    {
+      "title": "Data Transfer Objects — WsDTO",
+      "content": "<p>OCC never returns raw Commerce Cloud model objects (ItemModel instances) to the client. Instead, it uses <strong>Data Transfer Objects (DTOs)</strong> — lightweight Java objects that contain only the data the API consumer needs. In OCC, these are called <strong>WsDTOs</strong> (Web Service DTOs).</p><p>Each endpoint returns a specific WsDTO. For example: <code>ProductWsDTO</code> (product details), <code>CartWsDTO</code> (cart data with entries, totals, promotions), <code>OrderWsDTO</code> (order details), <code>UserWsDTO</code> (user profile). WsDTOs are simple POJOs with getters and setters — they are serialised to JSON (or XML) by Spring's message converters.</p><p>The mapping from internal models to WsDTOs is handled by the <strong>Data Mapper</strong> framework (using Orika or a similar mapping library). A <code>Converter</code> or <code>Populator</code> transforms a model object into a DTO, selecting which fields to include and how to transform them. For example, the product populator maps ProductModel's localised name, price (resolved via the price factory), stock level, images (media URLs), and categories into the corresponding ProductWsDTO fields.</p><p>A key feature of OCC is <strong>field-level response control</strong>. Clients can specify which fields they want in the response using the <code>fields</code> query parameter. For example: <code>/products/12345?fields=code,name,price(FULL)</code> returns only the code, name, and full price object — reducing payload size and improving performance. Three shorthand levels exist: <code>BASIC</code> (minimal fields), <code>DEFAULT</code> (standard set), and <code>FULL</code> (everything). Clients can also specify individual field names for custom selection.</p><p>This field-level control is important for <strong>mobile and performance-sensitive clients</strong> that need to minimise data transfer. Spartacus uses it extensively to request only the fields each component needs.</p>"
+    },
+    {
+      "title": "Authentication & Authorisation",
+      "content": "<p>OCC uses <strong>OAuth 2.0</strong> for authentication. Commerce Cloud includes an embedded OAuth server that issues access tokens to clients. The standard flows are:</p><p><strong>Client Credentials Grant</strong> — used for server-to-server communication where no user context is needed (e.g. fetching public product data, catalog information). The client sends its client ID and secret, receives an access token, and includes it in subsequent API requests as a Bearer token.</p><p><strong>Resource Owner Password Grant</strong> — used when a user logs in through the storefront. The client sends the user's username and password (plus client credentials), and receives an access token scoped to that user. This token is included in subsequent requests to access user-specific resources (cart, orders, profile). Spartacus uses this flow for its login implementation.</p><p>Tokens have a <strong>limited lifetime</strong> (configurable, typically 300 seconds for access tokens). When a token expires, the client uses a <strong>refresh token</strong> to obtain a new access token without re-authenticating. Refresh tokens have a longer lifetime (typically 30 days).</p><p>Some endpoints are <strong>public</strong> (accessible without authentication — e.g. product search, catalog browsing) while others require <strong>user authentication</strong> (cart operations for registered users, order history, profile management). The OAuth scope and user context determine what the token holder can access.</p><p>Clients (OAuth applications) are registered in the system with a <strong>client ID</strong> and <strong>client secret</strong>. Spartacus has a default client configuration, but production deployments should create a dedicated OAuth client with appropriate scopes and grant types. Client credentials should never be exposed in frontend JavaScript — they are typically managed through a backend-for-frontend (BFF) pattern or secure configuration.</p>"
+    },
+    {
+      "title": "OCC Configuration & Customisation",
+      "content": "<p>OCC behaviour is controlled through several configuration mechanisms.</p><p><strong>Base site scoping.</strong> Every OCC request is scoped to a base site via the URL path (<code>/occ/v2/{baseSiteId}/...</code>). The base site determines which store, catalogs, currencies, languages, and payment configurations apply. This enables multi-site deployments where different sites have different product catalogs, pricing, and CMS content — all served by the same OCC API.</p><p><strong>CORS (Cross-Origin Resource Sharing).</strong> Since Spartacus runs as a separate application (different origin), OCC must be configured to allow cross-origin requests. CORS settings are defined in <code>project.properties</code> or environment-specific properties, specifying allowed origins, methods, and headers. Misconfigured CORS is one of the most common issues when setting up Spartacus — the browser blocks API calls if the OCC server doesn't return the correct CORS headers.</p><p><strong>Field mappings.</strong> The <code>fields</code> parameter behaviour (BASIC, DEFAULT, FULL) is configured through <strong>field set level mappings</strong> defined in Spring configuration. You can customise which fields each level includes for each DTO — for example, adding a custom product attribute to the DEFAULT level so it is returned without the client explicitly requesting it.</p><p><strong>Response caching.</strong> OCC supports HTTP caching headers (Cache-Control, ETag) for read endpoints. Proper cache configuration reduces server load and improves frontend performance — especially for product and catalog data that changes infrequently.</p><p><strong>Error handling.</strong> OCC returns standardised error responses with HTTP status codes (400 for validation errors, 401 for authentication failures, 404 for not found, etc.) and a JSON error body containing an error code, message, and details. Custom error handlers can be registered to provide business-specific error information.</p>"
+    },
+    {
+      "title": "OCC Best Practices & Exam Tips",
+      "content": "<p>OCC is the foundation of modern Commerce Cloud architecture. Here are the key practices and exam points.</p><p><strong>OCC is the only way Spartacus communicates with Commerce Cloud.</strong> There is no direct database access, no server-side rendering through Commerce Cloud, and no Java API calls from the frontend. Every interaction goes through OCC. If functionality doesn't have an OCC endpoint, Spartacus cannot use it — you must create a custom endpoint (covered in the next topic).</p><p><strong>Performance starts at the API.</strong> OCC response times directly affect storefront performance. Use the <code>fields</code> parameter to minimise payload size. Enable HTTP caching for static data. Monitor slow endpoints (product search, cart calculation) and optimise the underlying services. A 500ms OCC response means a 500ms+ page load component.</p><p><strong>Versioning.</strong> OCC v2 is the current version. v1 is deprecated. Always use the v2 base path. API changes between Commerce Cloud releases are documented in release notes — review them during upgrades to catch breaking changes in endpoints or DTO structures.</p><p><strong>Key exam points:</strong> OCC is RESTful (HTTP methods, JSON responses, URL-based resources). Base URL is <code>/occ/v2/{baseSiteId}/...</code>. Implemented by commercewebservices extension (Spring MVC controllers). WsDTOs are returned (not model objects). Populators/converters map models to DTOs. The <code>fields</code> parameter controls response content (BASIC/DEFAULT/FULL). OAuth 2.0 for authentication (Client Credentials for anonymous, Resource Owner Password for logged-in users). CORS must be configured for Spartacus. Every OCC request is scoped to a base site. CMS endpoints power SmartEdit and Spartacus content rendering.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-occ-api-q1",
+      "type": "multiple-choice",
+      "text": "What does OCC stand for in SAP Commerce Cloud?",
+      "options": [
+        "Open Commerce Connector",
+        "Omni Commerce Connect",
+        "Online Customer Channel",
+        "Order and Catalog Controller"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Omni Commerce Connect (OCC)</strong> is Commerce Cloud's RESTful API layer. It exposes all commerce functionality as HTTP endpoints that any client — Spartacus, mobile apps, third-party integrations — can consume.</p>"
+    },
+    {
+      "id": "cc-occ-api-q2",
+      "type": "true-false",
+      "text": "Spartacus communicates with Commerce Cloud exclusively through OCC — it has no direct access to the database or Java services.",
+      "correctAnswer": true,
+      "explanation": "<p>Spartacus is a <strong>pure OCC client</strong>. Every product listing, cart operation, and checkout step goes through OCC REST endpoints. There is no direct database access or server-side Java API call from the Spartacus frontend.</p>"
+    },
+    {
+      "id": "cc-occ-api-q3",
+      "type": "multiple-choice",
+      "text": "What is the base URL pattern for OCC v2 endpoints?",
+      "options": [
+        "/api/commerce/{version}/...",
+        "/occ/v2/{baseSiteId}/...",
+        "/rest/{baseSiteId}/v2/...",
+        "/ws/occ/{baseSiteId}/..."
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The base URL pattern is <code>/occ/v2/{baseSiteId}/...</code>. Every request is scoped to a specific base site, which determines the applicable store, catalogs, currencies, and configurations.</p>"
+    },
+    {
+      "id": "cc-occ-api-q4",
+      "type": "true-false",
+      "text": "OCC endpoints return raw Commerce Cloud model objects (ItemModel instances) directly to the client.",
+      "correctAnswer": false,
+      "explanation": "<p>OCC never returns raw model objects. It uses <strong>WsDTOs (Web Service Data Transfer Objects)</strong> — lightweight POJOs containing only the data the API consumer needs. Populators and converters handle the mapping from models to DTOs.</p>"
+    },
+    {
+      "id": "cc-occ-api-q5",
+      "type": "multiple-choice",
+      "text": "What does the 'fields' query parameter control in OCC responses?",
+      "options": [
+        "Which database columns are queried",
+        "Which fields are included in the response DTO — allowing BASIC, DEFAULT, FULL, or custom field selection",
+        "The sort order of the response",
+        "Which language the fields are returned in"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <code>fields</code> parameter controls <strong>which fields are included in the response</strong>. Three shorthand levels exist: BASIC (minimal), DEFAULT (standard), FULL (everything). Clients can also specify individual field names. This reduces payload size and improves performance.</p>"
+    },
+    {
+      "id": "cc-occ-api-q6",
+      "type": "true-false",
+      "text": "OCC uses OAuth 2.0 for authentication, with support for both Client Credentials and Resource Owner Password grant types.",
+      "correctAnswer": true,
+      "explanation": "<p>OCC uses <strong>OAuth 2.0</strong>. Client Credentials grant is for anonymous/server-to-server access (no user context). Resource Owner Password grant is for user login (user-scoped access tokens). Spartacus uses the password grant for its login flow.</p>"
+    },
+    {
+      "id": "cc-occ-api-q7",
+      "type": "multiple-choice",
+      "text": "Which Commerce Cloud extension implements the OCC REST API controllers?",
+      "options": [
+        "commerceservices",
+        "commercewebservices",
+        "occaddon",
+        "apiextension"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <strong>commercewebservices</strong> extension contains the Spring MVC controllers (annotated with @RestController) that implement OCC endpoints. Related extensions like cmsocc and smarteditwebservices add CMS and SmartEdit-specific endpoints.</p>"
+    },
+    {
+      "id": "cc-occ-api-q8",
+      "type": "true-false",
+      "text": "CORS (Cross-Origin Resource Sharing) must be configured on the OCC server for Spartacus to make API calls successfully.",
+      "correctAnswer": true,
+      "explanation": "<p>Since Spartacus runs as a separate application (different origin), the browser enforces CORS. The OCC server must be configured to allow cross-origin requests with the correct allowed origins, methods, and headers. Misconfigured CORS is one of the most common Spartacus setup issues.</p>"
+    },
+    {
+      "id": "cc-occ-api-q9",
+      "type": "multiple-choice",
+      "text": "How does OCC handle mapping from internal model objects to response DTOs?",
+      "options": [
+        "Direct JSON serialisation of the model with @JsonIgnore annotations",
+        "Populators and converters that transform models into WsDTOs",
+        "Automatic reflection-based field copying",
+        "SQL views that pre-format the data"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>OCC uses a <strong>Populator/Converter</strong> pattern. Populators extract data from model objects and set it on WsDTO fields. Converters orchestrate the population process. This design allows selective field mapping and transformation without exposing internal model structure.</p>"
+    },
+    {
+      "id": "cc-occ-api-q10",
+      "type": "true-false",
+      "text": "Access tokens issued by Commerce Cloud's OAuth server have an unlimited lifetime and never expire.",
+      "correctAnswer": false,
+      "explanation": "<p>Access tokens have a <strong>limited lifetime</strong> (typically 300 seconds, configurable). When expired, the client uses a <strong>refresh token</strong> (longer lifetime, typically 30 days) to obtain a new access token without re-authenticating the user.</p>"
+    },
+    {
+      "id": "cc-occ-api-q11",
+      "type": "multiple-choice",
+      "text": "A frontend developer needs to retrieve a product with only its code, name, and price. Which approach minimises the response payload?",
+      "options": [
+        "Call the product endpoint and filter the JSON response client-side",
+        "Use the fields parameter: /products/12345?fields=code,name,price(FULL)",
+        "Create a custom lightweight endpoint for each use case",
+        "Configure the server to always return minimal product data"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <code>fields</code> parameter is designed for this: <code>/products/12345?fields=code,name,price(FULL)</code> returns only the requested fields. This <strong>server-side filtering</strong> reduces payload size and network transfer — much more efficient than downloading everything and filtering client-side.</p>"
+    },
+    {
+      "id": "cc-occ-api-q12",
+      "type": "true-false",
+      "text": "CMS content managed in WCMS and SmartEdit is served to Spartacus through OCC CMS endpoints.",
+      "correctAnswer": true,
+      "explanation": "<p>CMS endpoints (<code>/cms</code>) serve pages, content slots, components, and navigation nodes to Spartacus. This is how the dynamic page structure and content managed by merchandisers in Backoffice and SmartEdit reaches the composable storefront.</p>"
+    },
+    {
+      "id": "cc-occ-api-q13",
+      "type": "multiple-choice",
+      "text": "For anonymous cart operations via OCC, what is used as the userId in the endpoint path?",
+      "options": [
+        "null",
+        "guest",
+        "anonymous",
+        "The session ID"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Anonymous cart endpoints use <code>anonymous</code> as the userId: <code>/users/anonymous/carts/{cartGuid}</code>. The cart is identified by a GUID rather than a user-scoped cart ID. For authenticated users, <code>current</code> can be used as a shorthand for the logged-in user's ID.</p>"
+    }
+  ]
+}

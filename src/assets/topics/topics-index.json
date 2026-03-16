@@ -30,6 +30,17 @@
     "cc-order-management",
     "cc-promotions",
     "cc-vouchers",
+    "cc-backoffice",
+    "cc-wcms",
+    "cc-smartedit",
+    "cc-occ-api",
+    "cc-api-extensions",
+    "cc-integration-patterns",
+    "cc-ccv2-overview",
+    "cc-cloud-portal",
+    "cc-properties-config",
+    "cc-spartacus-architecture",
+    "cc-spartacus-customization",
 
 
     "cpq-overview",

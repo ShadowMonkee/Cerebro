@@ -1,0 +1,176 @@
+{
+  "id": "cc-ccv2-overview",
+  "title": "CCV2 — Architecture, Builds & Environments",
+  "description": "Understand SAP Commerce Cloud v2 — cloud-native architecture, build pipelines, environment management, and deployment model.",
+  "icon": "☁️",
+  "category": "cc-tier-6",
+  "tags": ["ccv2", "cloud", "builds", "deployments", "environments", "manifest", "kubernetes", "infrastructure"],
+  "sections": [
+    {
+      "title": "What is CCV2?",
+      "content": "<p><strong>CCV2 (Commerce Cloud v2)</strong> is SAP's cloud-hosted, managed deployment model for SAP Commerce Cloud. Instead of installing and managing Commerce Cloud on your own servers, SAP provisions, operates, and maintains the infrastructure. CCV2 runs on <strong>Microsoft Azure</strong> infrastructure managed by SAP, with Commerce Cloud instances deployed as <strong>containerised applications</strong> on Kubernetes.</p><p>CCV2 replaces the previous on-premise and self-managed cloud models. While the Commerce Cloud <strong>application code</strong> (type system, services, extensions, OCC) is the same, the <strong>operational model</strong> is fundamentally different: you don't manage servers, install databases, or configure load balancers. SAP handles infrastructure, patching, scaling, backups, and monitoring. Your responsibility is the <strong>application layer</strong>: custom extensions, configuration, data, and deployment orchestration.</p><p>Every CCV2 subscription includes multiple <strong>environments</strong>: typically <strong>Development</strong> (d1), <strong>Staging</strong> (s1), and <strong>Production</strong> (p1). Additional environments can be provisioned for QA, performance testing, or disaster recovery. Each environment is an isolated Commerce Cloud instance with its own database, Solr indexes, and application configuration.</p><p>The CCV2 architecture includes: <strong>application nodes</strong> (running Commerce Cloud), <strong>background processing nodes</strong> (for CronJobs, batch imports, indexing), <strong>Solr nodes</strong> (search), a <strong>database</strong> (Microsoft SQL Server or SAP HANA, managed by SAP), <strong>Azure Blob Storage</strong> (for media, hot folders, backups), and a <strong>CDN/load balancer</strong> (for traffic distribution and SSL termination). All of these are provisioned and managed through the <strong>Cloud Portal</strong>.</p>"
+    },
+    {
+      "title": "The Build Process",
+      "content": "<p>In CCV2, you don't deploy code directly to servers. Instead, you follow a <strong>build-then-deploy</strong> pipeline: push your code to a repository, trigger a build that produces a deployable artifact (a Docker image), and then deploy that artifact to an environment.</p><p>The build process starts with your <strong>code repository</strong>. CCV2 supports Git repositories (SAP provides a built-in Git repository, or you can connect external repos like GitHub, GitLab, or Azure DevOps). Your repository contains: custom extensions, the <code>manifest.json</code> file (see next section), configuration files, ImpEx scripts, and any other project-specific resources.</p><p>When a build is triggered (via the Cloud Portal, Cloud Portal API, or CI/CD pipeline), CCV2's <strong>build engine</strong>: clones your repository, resolves the Commerce Cloud platform version specified in the manifest, downloads and adds SAP's standard extensions, compiles your custom extensions, runs any configured build steps, packages everything into a <strong>Docker image</strong>, and registers the image in the artifact registry. The result is a versioned, immutable <strong>build artifact</strong> identified by a build code.</p><p>Builds are <strong>immutable</strong> — once created, a build artifact cannot be changed. If you need to modify something, you create a new build. This immutability ensures that what you test in staging is exactly what you deploy to production — no drift, no manual changes.</p><p>Build times vary depending on the number of custom extensions and the Commerce Cloud version, but typically range from <strong>10 to 30 minutes</strong>. Builds can be triggered automatically by Git webhooks (push to a branch triggers a build) or manually through the Cloud Portal.</p>"
+    },
+    {
+      "title": "The Manifest — manifest.json",
+      "content": "<p>The <strong>manifest.json</strong> file is the central configuration document for a CCV2 project. It lives in the root of your code repository and tells the build engine everything it needs to know about your project.</p><p>Key sections of the manifest include: <strong>commerceSuiteVersion</strong> — specifies which Commerce Cloud platform version to use (e.g. \"2211.11\"). This pins your project to a specific platform release. <strong>extensions</strong> — lists all extensions to include in the build, both SAP-provided and custom. Only extensions listed here are included — unlisted extensions are excluded even if they exist in the repository. <strong>useConfig</strong> — specifies external configuration files (properties files, localextensions.xml alternative) to include.</p><p><strong>aspects</strong> — defines the application topology. CCV2 uses the concept of \"aspects\" to separate different workload types: the <strong>accstorefront</strong> aspect (or <strong>api</strong> aspect for headless) handles web traffic, the <strong>backgroundProcessing</strong> aspect handles CronJobs and batch operations, and the <strong>admin</strong> aspect provides HAC and Backoffice access. Each aspect can have different properties, memory allocation, and scaling settings.</p><p><strong>properties</strong> — environment-specific and aspect-specific properties that override default configuration. Properties can be set per environment (dev, staging, production) and per aspect (storefront vs background). This is how you configure different behaviour in different environments without changing code.</p><p><strong>tests</strong> — optional configuration for running automated tests during the build. <strong>webTests</strong> — optional configuration for web-based tests.</p><p>The manifest is version-controlled alongside your code, providing a single source of truth for the project's build and deployment configuration. Changes to the manifest take effect on the <strong>next build</strong> — they don't affect existing build artifacts.</p>"
+    },
+    {
+      "title": "Deployments & Environment Management",
+      "content": "<p>Once a build artifact exists, it can be <strong>deployed</strong> to any environment. Deployment replaces the application code on the target environment with the contents of the build artifact, runs initialisation or update tasks, and starts the application.</p><p>Deployment types: <strong>Initialize</strong> — drops and recreates the database schema, runs all essential and project data ImpEx scripts. Used for first-time environment setup or complete resets. This <strong>destroys all existing data</strong>. <strong>Update</strong> — applies schema changes (new types, new attributes) without dropping existing data, and runs update ImpEx scripts. This is the standard deployment for ongoing changes. <strong>Rolling update</strong> — deploys the new build with zero downtime by gradually replacing application pods (Kubernetes rolling deployment). Available for production environments.</p><p>Deployment is triggered through the <strong>Cloud Portal</strong> UI or the <strong>Cloud Portal API</strong> (for CI/CD automation). You select the build artifact and the target environment, choose the deployment mode (initialize/update), and confirm. The deployment engine handles the rest: stopping the current application, running the database migration, starting the new application, and verifying health checks.</p><p><strong>Deployment strategy best practice:</strong> deploy to dev first → validate → deploy to staging → run regression tests → deploy to production. Never deploy a build to production that hasn't been validated in at least one non-production environment. The immutable build artifact guarantees that what you tested is what you deploy.</p><p>Each environment has <strong>independent data</strong> — deploying code doesn't copy data between environments. Data migration between environments (e.g. copying production data to staging for testing) is handled separately through database export/import or data migration tools.</p>"
+    },
+    {
+      "title": "Scaling, High Availability & Operational Concerns",
+      "content": "<p>CCV2 provides built-in capabilities for <strong>scaling</strong> and <strong>high availability</strong> that were previously the customer's responsibility in on-premise deployments.</p><p><strong>Horizontal scaling.</strong> Application aspects (storefront, API) can be scaled horizontally by adding more <strong>pods</strong> (container instances). Traffic is distributed across pods by the load balancer. Scaling can be configured in the Cloud Portal — you specify the minimum and maximum number of pods per aspect. <strong>Auto-scaling</strong> is available: the platform monitors CPU and memory utilisation and adds or removes pods based on configurable thresholds.</p><p><strong>Cluster awareness.</strong> When multiple application pods run simultaneously, they form a <strong>cluster</strong>. Commerce Cloud's built-in cluster mechanisms handle cache invalidation across nodes (using ClusterAwareEvent from the events topic), session affinity, and CronJob coordination (ensuring a scheduled job runs on only one node). Understanding cluster behaviour is important for custom development — code that works on a single node may behave differently in a multi-node cluster.</p><p><strong>Media storage.</strong> In CCV2, media files (product images, documents, CMS assets) are stored in <strong>Azure Blob Storage</strong>, not on the local file system. This ensures media is shared across all application nodes and persists across deployments. The <code>mediaconversion</code> and <code>cloudhotfolders</code> extensions handle the Azure integration transparently.</p><p><strong>Backups.</strong> SAP performs regular automated backups of the database and media storage. Point-in-time recovery is available for disaster recovery scenarios. However, application configuration (properties, manifest) is your responsibility — it should be version-controlled in Git.</p><p><strong>Monitoring.</strong> CCV2 provides built-in monitoring through the Cloud Portal: application logs (accessible via Kibana/Dynatrace), performance metrics, deployment history, and health dashboards. Custom monitoring can be integrated through the platform's logging and metrics APIs.</p>"
+    },
+    {
+      "title": "CCV2 Best Practices & Exam Tips",
+      "content": "<p>CCV2 changes how you think about Commerce Cloud operations. Here are the key practices and exam points:</p><p><strong>Everything in Git.</strong> Code, manifest.json, properties, ImpEx scripts — everything must be version-controlled. The build engine only has access to what's in the repository. Manual changes on servers are impossible (and would be overwritten on the next deployment anyway).</p><p><strong>Immutable builds.</strong> Build artifacts cannot be modified after creation. This is a feature: it guarantees consistency between testing and production. If you need a change, create a new build.</p><p><strong>No SSH access.</strong> CCV2 does not provide SSH access to application servers. You cannot log into a server to modify files, restart services, or inspect the file system directly. All operations go through the Cloud Portal, Cloud Portal API, HAC, or Backoffice. This is intentional — it enforces the managed-service model.</p><p><strong>Environment-specific properties.</strong> Use the manifest's properties section (or external property files referenced via useConfig) to set environment-specific values: database connection strings, external service URLs, feature flags, logging levels. Never hard-code environment-specific values in Java code.</p><p><strong>Key exam points:</strong> CCV2 runs on Azure (managed by SAP). Builds produce immutable Docker images from manifest.json + code repository. The manifest specifies: platform version, extensions, aspects, properties. Aspects separate workload types (storefront/api, backgroundProcessing, admin). Deployment modes: initialize (drops data), update (preserves data), rolling update (zero downtime). Media is stored in Azure Blob Storage. Scaling is horizontal (add pods) with auto-scaling support. No SSH access to servers. Everything must be in Git. Cluster behaviour matters for multi-node deployments.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-ccv2-overview-q1",
+      "type": "multiple-choice",
+      "text": "Which cloud infrastructure does SAP Commerce Cloud v2 (CCV2) run on?",
+      "options": [
+        "Amazon Web Services (AWS)",
+        "Google Cloud Platform (GCP)",
+        "Microsoft Azure",
+        "SAP's own private cloud data centres"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>CCV2 runs on <strong>Microsoft Azure</strong> infrastructure, managed by SAP. Commerce Cloud instances are deployed as containerised applications on Kubernetes within the Azure environment.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q2",
+      "type": "true-false",
+      "text": "Build artifacts in CCV2 are immutable — once created, they cannot be modified.",
+      "correctAnswer": true,
+      "explanation": "<p>Builds are <strong>immutable</strong>. Once a build artifact is created, it cannot be changed. This guarantees that what you test in staging is exactly what you deploy to production. Modifications require creating a new build.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q3",
+      "type": "multiple-choice",
+      "text": "What is the purpose of the manifest.json file in a CCV2 project?",
+      "options": [
+        "It stores database connection strings for each environment",
+        "It defines the build configuration: platform version, extensions, aspects, and properties",
+        "It lists all customers and their access credentials",
+        "It configures the CDN and SSL certificates"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <strong>manifest.json</strong> is the central build configuration document. It specifies the Commerce Cloud platform version, which extensions to include, aspect definitions (storefront/background/admin), and environment-specific properties.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q4",
+      "type": "true-false",
+      "text": "CCV2 provides SSH access to application servers for debugging and manual configuration changes.",
+      "correctAnswer": false,
+      "explanation": "<p>CCV2 does <strong>not</strong> provide SSH access. All operations go through the Cloud Portal, Cloud Portal API, HAC, or Backoffice. This enforces the managed-service model and prevents configuration drift from manual server changes.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q5",
+      "type": "multiple-choice",
+      "text": "What are 'aspects' in the CCV2 manifest?",
+      "options": [
+        "Different visual themes for the storefront",
+        "Workload type definitions that separate storefront, background processing, and admin functions",
+        "Database schemas for different data domains",
+        "API versioning levels"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Aspects</strong> separate different workload types: <strong>accstorefront/api</strong> (web traffic), <strong>backgroundProcessing</strong> (CronJobs, batch operations), and <strong>admin</strong> (HAC, Backoffice). Each aspect can have different properties, memory, and scaling configuration.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q6",
+      "type": "true-false",
+      "text": "The 'initialize' deployment mode in CCV2 preserves all existing data in the database while applying schema changes.",
+      "correctAnswer": false,
+      "explanation": "<p>Initialize <strong>drops and recreates</strong> the database schema, destroying all existing data. The mode that preserves data while applying schema changes is <strong>update</strong>. Initialize is used for first-time setup or complete resets only.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q7",
+      "type": "multiple-choice",
+      "text": "Where are media files (product images, documents) stored in CCV2?",
+      "options": [
+        "On the local file system of each application pod",
+        "In the Commerce Cloud database as BLOB columns",
+        "In Azure Blob Storage",
+        "On a shared NFS mount within the Kubernetes cluster"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Media is stored in <strong>Azure Blob Storage</strong>, not on local file systems. This ensures media is shared across all application pods and persists across deployments. The cloudhotfolders and mediaconversion extensions handle the Azure integration.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q8",
+      "type": "true-false",
+      "text": "Only extensions explicitly listed in the manifest.json are included in a CCV2 build — unlisted extensions are excluded.",
+      "correctAnswer": true,
+      "explanation": "<p>The manifest's extensions list is <strong>explicit</strong>. Only listed extensions are included in the build. If an extension exists in the repository but is not listed in the manifest, it is excluded. This gives precise control over the build contents.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q9",
+      "type": "multiple-choice",
+      "text": "What is the recommended deployment path for a new build artifact in CCV2?",
+      "options": [
+        "Deploy directly to production for fastest time-to-market",
+        "Deploy to dev → validate → deploy to staging → regression test → deploy to production",
+        "Deploy to staging only — dev and production share the same environment",
+        "Deploy to production first, then replicate to dev and staging"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The recommended path is: <strong>dev → staging → production</strong>, with validation and testing at each stage. The immutable build artifact guarantees consistency. Never deploy untested builds to production.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q10",
+      "type": "true-false",
+      "text": "CCV2 supports auto-scaling — the platform can automatically add or remove application pods based on CPU and memory thresholds.",
+      "correctAnswer": true,
+      "explanation": "<p>CCV2 supports <strong>auto-scaling</strong>. The platform monitors utilisation metrics and adjusts the number of pods within the configured min/max range. This handles traffic spikes (e.g. flash sales) without manual intervention.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q11",
+      "type": "multiple-choice",
+      "text": "A CCV2 build is triggered and the build engine needs the Commerce Cloud platform. Where does it get the platform version?",
+      "options": [
+        "It downloads the latest version automatically regardless of configuration",
+        "It reads the commerceSuiteVersion from the manifest.json",
+        "It uses whichever version is currently running in the production environment",
+        "The developer must upload the platform ZIP file manually"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The build engine reads the <strong>commerceSuiteVersion</strong> from the manifest.json. This pins the build to a specific platform release, ensuring consistency. Changing the version requires updating the manifest and creating a new build.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q12",
+      "type": "true-false",
+      "text": "Deploying code to a CCV2 environment automatically copies data from one environment to another.",
+      "correctAnswer": false,
+      "explanation": "<p>Each environment has <strong>independent data</strong>. Deploying code does not copy data between environments. Data migration (e.g. copying production data to staging) is handled separately through database export/import tools — it is not part of the code deployment process.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q13",
+      "type": "multiple-choice",
+      "text": "Which deployment mode provides zero-downtime deployment by gradually replacing application pods?",
+      "options": [
+        "Initialize",
+        "Update",
+        "Rolling update",
+        "Hot deploy"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Rolling update</strong> deploys the new build with zero downtime by gradually replacing application pods (Kubernetes rolling deployment). Old pods continue serving traffic while new pods start up and pass health checks.</p>"
+    },
+    {
+      "id": "cc-ccv2-overview-q14",
+      "type": "true-false",
+      "text": "In CCV2, environment-specific configuration (like external service URLs and feature flags) should be set through the manifest's properties section, not hard-coded in Java.",
+      "correctAnswer": true,
+      "explanation": "<p>The manifest's properties section supports <strong>environment-specific and aspect-specific</strong> values. This is the correct place for external URLs, feature flags, and logging levels. Hard-coding environment-specific values in Java code makes the same build artifact behave differently in ways that are hard to track and test.</p>"
+    }
+  ]
+}

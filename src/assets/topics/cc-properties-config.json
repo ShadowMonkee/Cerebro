@@ -1,0 +1,176 @@
+{
+  "id": "cc-properties-config",
+  "title": "Properties & Configuration — Hierarchy, Aspects & Overrides",
+  "description": "Master the Commerce Cloud properties system — file hierarchy, override precedence, environment-specific config, and CCV2 manifest properties.",
+  "icon": "⚙️",
+  "category": "cc-tier-6",
+  "tags": ["properties", "configuration", "local-properties", "manifest", "aspects", "override", "environment-config", "project-properties"],
+  "sections": [
+    {
+      "title": "The Properties System Overview",
+      "content": "<p>SAP Commerce Cloud uses a <strong>key-value properties system</strong> to control virtually every aspect of platform behaviour: database connections, caching settings, Solr endpoints, CronJob schedules, feature flags, logging levels, session timeouts, and thousands of other parameters. Understanding how properties work — and especially how they <strong>override</strong> each other — is essential for both development and operations.</p><p>Properties are plain text <strong>key=value</strong> pairs. They are loaded at startup from multiple sources and merged into a single in-memory configuration map. When the same key appears in multiple sources, the <strong>last one loaded wins</strong> — this is the override mechanism. The loading order defines a precedence hierarchy from least specific (platform defaults) to most specific (environment overrides).</p><p>At runtime, properties are accessed via the <code>ConfigurationService</code> (or the static <code>Config</code> class). Services, controllers, and CronJobs read properties to determine their behaviour. For example: <code>Config.getParameter(\"db.url\")</code> retrieves the database URL, <code>Config.getBoolean(\"myfeature.enabled\", false)</code> checks a feature flag with a default of false.</p><p>Properties are <strong>read at startup</strong> — most properties are not hot-reloadable. Changing a property value requires a <strong>server restart</strong> (or service restart in CCV2) to take effect. Some specific properties support hot-reload via HAC's Configuration tab, but this is the exception, not the rule, and changes made via HAC are <strong>not persisted</strong> across restarts.</p>"
+    },
+    {
+      "title": "The Property Override Hierarchy",
+      "content": "<p>Properties are loaded in a specific order, with later sources overriding earlier ones. Understanding this hierarchy is critical — a misconfigured override can cause hard-to-debug behaviour where a property doesn't have the value you expect.</p><p>The loading order (from <strong>lowest to highest precedence</strong>): <strong>1. Platform defaults</strong> — built-in defaults defined in the Commerce Cloud platform source. These are the baseline values. <strong>2. Extension project.properties</strong> — each extension can define a <code>project.properties</code> file in its root directory. These set extension-specific defaults (database table prefixes, default feature settings). Loaded in extension dependency order. <strong>3. local.properties</strong> — a single file (typically at <code>hybris/config/local.properties</code>) that contains environment-specific overrides. This is where developers and administrators set database URLs, Solr endpoints, and other deployment-specific values. <strong>4. Environment variables / system properties</strong> — Java system properties (<code>-D</code> flags) and environment variables. These have the highest precedence and can override anything.</p><p>In <strong>CCV2</strong>, the hierarchy extends further: the <strong>manifest.json properties section</strong> generates property files that are injected into the build and deployment. Manifest properties effectively replace local.properties for cloud deployments — you define them per environment and per aspect in the manifest.</p><p>The key mental model: <strong>platform defaults → extension defaults → deployment overrides → environment-specific overrides</strong>. Each layer narrows the scope and increases the specificity. A property set in local.properties overrides the same property in an extension's project.properties, which overrides the platform default.</p>"
+    },
+    {
+      "title": "Extension Properties — project.properties",
+      "content": "<p>Every extension can include a <code>project.properties</code> file in its root directory. This file defines <strong>default configuration values</strong> that the extension needs to function. When the extension is included in a build, its project.properties is loaded into the properties hierarchy.</p><p>Common uses for project.properties: <strong>extension-specific settings</strong> (e.g. a cache region size for the extension's data, a default batch size for the extension's CronJobs), <strong>type system settings</strong> (deployment table prefix for the extension's types), <strong>Spring bean configuration flags</strong> (enabling or disabling optional features within the extension), and <strong>ImpEx import paths</strong> (which data files to load during system initialization or update).</p><p>Properties in project.properties serve as <strong>sensible defaults</strong> that can be overridden by local.properties or manifest properties. For example, an extension might define <code>my.extension.cache.size=1000</code> as a default, but a production deployment overrides it to <code>my.extension.cache.size=10000</code> in the manifest.</p><p>When multiple extensions define the same property key, <strong>extension loading order matters</strong>. Extensions are loaded in dependency order (defined in extensioninfo.xml's requires-extension declarations). An extension loaded later overrides properties set by an extension loaded earlier. This can cause subtle issues when extension dependencies change — always be explicit about which extension owns which property.</p><p>Best practice: <strong>prefix all custom properties</strong> with your extension name or project name (e.g. <code>myproject.feature.enabled</code>) to avoid collisions with platform or other extension properties. Never use generic property names that might clash.</p>"
+    },
+    {
+      "title": "CCV2 Manifest Properties — Environment & Aspect Config",
+      "content": "<p>In CCV2, <strong>local.properties does not exist</strong> in the traditional sense — you cannot SSH into a server and edit a file. Instead, environment-specific and aspect-specific properties are defined in the <strong>manifest.json</strong> and injected during the build and deployment process.</p><p>The manifest's <code>properties</code> section supports multiple scoping levels. <strong>Global properties</strong> — apply to all environments and all aspects (equivalent to a shared local.properties). <strong>Environment-specific properties</strong> — apply only to a named environment (e.g. <code>d1</code>, <code>s1</code>, <code>p1</code>). Use these for database endpoints, external service URLs, logging levels, and feature flags that differ between dev/staging/production. <strong>Aspect-specific properties</strong> — apply only to a named aspect (e.g. <code>accstorefront</code>, <code>backgroundProcessing</code>). Use these for memory settings, thread pool sizes, or CronJob schedules that differ between storefront and background nodes.</p><p>Environment and aspect scoping can be <strong>combined</strong>: a property that applies only to the backgroundProcessing aspect in the production environment. This granularity enables precise configuration without maintaining separate property files.</p><p>Example manifest properties section:</p><pre><code>\"properties\": [\n  { \"key\": \"log4j2.logger.my.extension.level\", \"value\": \"INFO\" },\n  { \"key\": \"log4j2.logger.my.extension.level\", \"value\": \"DEBUG\",\n    \"persona\": \"development\" },\n  { \"key\": \"cronjob.timertask.loadonstartup\", \"value\": \"false\",\n    \"persona\": \"accstorefront\" }\n]</code></pre><p>The <code>persona</code> field in the manifest maps to environment names or aspect names. Properties without a persona apply globally; properties with a persona apply only to the matching environment or aspect.</p><p>Alternatively, you can use the <code>useConfig</code> section in the manifest to reference <strong>external property files</strong> in your repository. This is useful when you have many properties to manage — keeping them in dedicated files (e.g. <code>config/dev.properties</code>, <code>config/prod.properties</code>) rather than inlining them all in the manifest JSON.</p>"
+    },
+    {
+      "title": "Common Configuration Areas",
+      "content": "<p>Hundreds of properties exist in Commerce Cloud. Here are the categories most relevant for the certification exam and day-to-day work:</p><p><strong>Database configuration.</strong> <code>db.url</code>, <code>db.driver</code>, <code>db.username</code>, <code>db.password</code>, <code>db.tableprefix</code>. In CCV2 these are managed by SAP and injected automatically — you rarely set them manually. In development environments they point to a local HSQLDB, MySQL, or SQL Server.</p><p><strong>Solr configuration.</strong> <code>solrserver.instances.default.autostart</code>, <code>solrserver.instances.default.mode</code> (standalone/cloud), Solr endpoint URLs. In CCV2, Solr is provisioned by SAP; properties configure how Commerce Cloud connects to it.</p><p><strong>Caching.</strong> <code>cache.main</code> (overall cache size), region-specific sizes, TTL values, invalidation settings. Tuning cache properties is one of the most impactful performance optimisations.</p><p><strong>Session & security.</strong> <code>default.session.timeout</code>, <code>csrf.enabled</code>, CORS settings (for OCC), OAuth token lifetimes, SSL enforcement. Security properties should be reviewed and hardened for production.</p><p><strong>CronJobs.</strong> <code>cronjob.timertask.loadonstartup</code> (whether CronJobs auto-start — typically false on storefront aspects), individual CronJob trigger expressions for scheduling.</p><p><strong>Logging.</strong> <code>log4j2.logger.{package}.level</code> controls per-package logging verbosity. Set to DEBUG in development, INFO or WARN in production. Verbose logging in production degrades performance and fills storage.</p><p><strong>Feature flags.</strong> Many Commerce Cloud features are toggled by boolean properties (e.g. <code>backoffice.fill.typefacade.cache.on.startup=true</code>). Release notes document new flags with each platform version.</p>"
+    },
+    {
+      "title": "Configuration Best Practices & Exam Tips",
+      "content": "<p>Configuration management is an area where small mistakes cause disproportionate impact. Follow these practices:</p><p><strong>Never hard-code environment-specific values in Java.</strong> Database URLs, external service endpoints, API keys, and feature flags belong in properties — not in Java source code. Properties can be overridden per environment; Java code cannot.</p><p><strong>Use the manifest for CCV2, not local.properties.</strong> In cloud deployments, the manifest.json (or useConfig files) replaces local.properties. Properties defined in the manifest are injected at build/deploy time. Trying to use local.properties in CCV2 doesn't work because there is no persistent file system to store it.</p><p><strong>Know the override order.</strong> When debugging a property issue, check values in reverse precedence: environment variables / manifest properties first (highest precedence), then local.properties / useConfig files, then extension project.properties, then platform defaults. The most common mistake is setting a property in project.properties that is overridden by a higher-precedence source.</p><p><strong>Prefix custom properties.</strong> Always use a project or extension prefix (e.g. <code>myproject.feature.x</code>) to avoid clashing with platform properties. Unprefixed property names risk colliding with current or future platform properties.</p><p><strong>Document all custom properties.</strong> Maintain a properties reference document listing every custom property, its purpose, default value, and which environments override it. This is invaluable for onboarding new team members and troubleshooting.</p><p><strong>Key exam points:</strong> Properties follow a key=value format. Override hierarchy: platform defaults → extension project.properties (in dependency order) → local.properties / manifest properties → environment variables. Later sources override earlier ones. In CCV2, manifest.json properties replace local.properties. Manifest supports global, environment-specific, and aspect-specific scoping via the persona field. Properties are read at startup — most require restart to take effect. HAC Config changes are not persisted. ConfigurationService or Config.getParameter() for runtime access. Always prefix custom properties.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-properties-config-q1",
+      "type": "multiple-choice",
+      "text": "In the Commerce Cloud property override hierarchy, which source has the HIGHEST precedence?",
+      "options": [
+        "Platform defaults",
+        "Extension project.properties",
+        "local.properties / manifest properties",
+        "Environment variables / Java system properties"
+      ],
+      "correctIndex": 3,
+      "explanation": "<p><strong>Environment variables / Java system properties</strong> have the highest precedence. They override everything: local.properties, extension project.properties, and platform defaults. The hierarchy runs from least specific (platform defaults) to most specific (environment variables).</p>"
+    },
+    {
+      "id": "cc-properties-config-q2",
+      "type": "true-false",
+      "text": "In CCV2, environment-specific properties are defined in a local.properties file placed on the server's file system.",
+      "correctAnswer": false,
+      "explanation": "<p>CCV2 has no persistent file system for local.properties (and no SSH access). Environment-specific properties are defined in the <strong>manifest.json properties section</strong> (or via useConfig files in the repository) and injected during the build/deploy process.</p>"
+    },
+    {
+      "id": "cc-properties-config-q3",
+      "type": "multiple-choice",
+      "text": "What happens when the same property key is defined in both an extension's project.properties and the manifest.json?",
+      "options": [
+        "The platform throws a duplicate property error",
+        "The project.properties value wins because extensions load first",
+        "The manifest.json value wins because it has higher precedence",
+        "Both values are stored and randomly selected at runtime"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>The <strong>manifest.json value wins</strong> because manifest properties have higher precedence than extension project.properties. The override hierarchy ensures that more specific sources (manifest/local.properties) override less specific ones (extension defaults).</p>"
+    },
+    {
+      "id": "cc-properties-config-q4",
+      "type": "true-false",
+      "text": "Most Commerce Cloud properties are hot-reloadable and take effect immediately without a server restart.",
+      "correctAnswer": false,
+      "explanation": "<p>Most properties are <strong>read at startup</strong> and require a server restart to take effect. Some properties can be changed via HAC's Configuration tab for testing, but those changes are <strong>not persisted</strong> across restarts. Hot-reload is the exception, not the rule.</p>"
+    },
+    {
+      "id": "cc-properties-config-q5",
+      "type": "multiple-choice",
+      "text": "In the CCV2 manifest.json, how do you scope a property to apply only to the backgroundProcessing aspect?",
+      "options": [
+        "Place it in a separate file named background.properties",
+        "Set the 'persona' field to 'backgroundProcessing' on the property entry",
+        "Add a [backgroundProcessing] section header in the properties array",
+        "Prefix the property key with 'bg.'"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <code>persona</code> field on a property entry scopes it to a specific environment or aspect. Setting <code>\"persona\": \"backgroundProcessing\"</code> ensures the property applies only to background processing nodes, not storefront or admin.</p>"
+    },
+    {
+      "id": "cc-properties-config-q6",
+      "type": "true-false",
+      "text": "When multiple extensions define the same property key, the extension loaded last (based on dependency order) wins.",
+      "correctAnswer": true,
+      "explanation": "<p>Extensions are loaded in <strong>dependency order</strong>. Later extensions override properties set by earlier extensions. The last one to define a key wins. This makes extension dependency declarations important for property resolution.</p>"
+    },
+    {
+      "id": "cc-properties-config-q7",
+      "type": "multiple-choice",
+      "text": "Which API is used to read property values at runtime in Commerce Cloud?",
+      "options": [
+        "PropertyService.getValue()",
+        "ConfigurationService (or the static Config class)",
+        "PropertiesDAO.read()",
+        "SystemManager.getConfig()"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Properties are accessed via the <strong>ConfigurationService</strong> (Spring bean) or the static <strong>Config</strong> class. Common methods: <code>Config.getParameter(key)</code>, <code>Config.getBoolean(key, default)</code>, <code>Config.getInt(key, default)</code>.</p>"
+    },
+    {
+      "id": "cc-properties-config-q8",
+      "type": "true-false",
+      "text": "Property changes made through HAC's Configuration tab are persisted and survive server restarts.",
+      "correctAnswer": false,
+      "explanation": "<p>HAC Configuration changes are <strong>not persisted</strong>. They apply to the current running instance only and are lost on restart. To make permanent changes, update the property in the appropriate file (project.properties, manifest.json, or useConfig files) and restart.</p>"
+    },
+    {
+      "id": "cc-properties-config-q9",
+      "type": "multiple-choice",
+      "text": "What is the recommended practice for naming custom properties?",
+      "options": [
+        "Use short, generic names for brevity (e.g. 'timeout', 'enabled')",
+        "Prefix with the extension or project name to avoid collisions (e.g. 'myproject.feature.enabled')",
+        "Use the SAP namespace prefix 'sap.' for all custom properties",
+        "Start with an underscore to distinguish from platform properties"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Always <strong>prefix custom properties</strong> with the extension or project name (e.g. <code>myproject.feature.enabled</code>). Unprefixed names risk colliding with current or future platform properties. The <code>sap.</code> prefix is reserved for SAP's own properties.</p>"
+    },
+    {
+      "id": "cc-properties-config-q10",
+      "type": "true-false",
+      "text": "The manifest.json's useConfig section allows referencing external property files in the repository instead of inlining all properties in the manifest JSON.",
+      "correctAnswer": true,
+      "explanation": "<p>The <code>useConfig</code> section references <strong>external property files</strong> in the repository (e.g. <code>config/dev.properties</code>). This is useful when you have many properties — keeping them in dedicated files is cleaner than inlining everything in the manifest JSON.</p>"
+    },
+    {
+      "id": "cc-properties-config-q11",
+      "type": "multiple-choice",
+      "text": "Which property controls whether CronJobs automatically start when the application boots?",
+      "options": [
+        "cronjob.autostart=true",
+        "cronjob.timertask.loadonstartup",
+        "scheduler.enabled",
+        "background.cronjobs.boot"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><code>cronjob.timertask.loadonstartup</code> controls whether CronJobs auto-start at boot. It is typically set to <strong>false on storefront aspects</strong> (which shouldn't run CronJobs) and true on backgroundProcessing aspects — a classic example of aspect-specific configuration.</p>"
+    },
+    {
+      "id": "cc-properties-config-q12",
+      "type": "true-false",
+      "text": "In CCV2, database connection properties (db.url, db.username, etc.) are typically managed by SAP and injected automatically — customers rarely set them manually.",
+      "correctAnswer": true,
+      "explanation": "<p>In CCV2, the database is <strong>provisioned and managed by SAP</strong>. Connection properties are injected automatically into the application. Customers don't need to (and typically cannot) set database properties manually — SAP handles the infrastructure layer.</p>"
+    },
+    {
+      "id": "cc-properties-config-q13",
+      "type": "multiple-choice",
+      "text": "You set a logging property to DEBUG in the manifest for the development environment, but the production environment should use WARN. How do you achieve this?",
+      "options": [
+        "Create two separate manifest.json files — one per environment",
+        "Define the property twice in the manifest: once with persona 'development' (DEBUG) and once with persona 'production' (WARN)",
+        "Hard-code an if-else check in Java based on the hostname",
+        "Use HAC to change the logging level in production after deployment"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Define the property twice with different <strong>persona</strong> values: <code>\"persona\": \"development\"</code> with DEBUG and <code>\"persona\": \"production\"</code> with WARN. The manifest supports environment-specific properties through the persona field, all in a single manifest file.</p>"
+    },
+    {
+      "id": "cc-properties-config-q14",
+      "type": "true-false",
+      "text": "Setting verbose DEBUG logging in production is recommended for maximum observability.",
+      "correctAnswer": false,
+      "explanation": "<p>DEBUG logging in production <strong>degrades performance</strong> and fills storage rapidly. Production should use <strong>INFO or WARN</strong> level logging. DEBUG should be reserved for development and targeted troubleshooting (temporarily enabled for specific packages, then reverted).</p>"
+    }
+  ]
+}

@@ -1,0 +1,169 @@
+{
+  "id": "cc-backoffice",
+  "title": "Backoffice Framework — Widgets, Cockpits & Customisation",
+  "description": "Navigate the Backoffice application, understand widget architecture, and customise the admin UI through configuration and extensions.",
+  "icon": "🔲",
+  "category": "cc-tier-4",
+  "tags": ["backoffice", "widgets", "cockpit", "backoffice-config", "ZK-framework", "administration", "customisation"],
+  "sections": [
+    {
+      "title": "What is Backoffice?",
+      "content": "<p><strong>Backoffice</strong> is the web-based administration application for SAP Commerce Cloud. It is the primary tool for business users, merchandisers, product managers, and administrators to manage day-to-day operations: products, catalogs, orders, promotions, prices, users, CMS content, and system configuration.</p><p>Backoffice is built on the <strong>ZK framework</strong> — a Java-based web application framework that renders rich UI components on the server side and sends HTML/JavaScript to the browser. This means Backoffice is a <strong>server-rendered</strong> application, not a single-page app — every user interaction triggers a server round-trip. Understanding this architecture helps explain why Backoffice feels different from modern JavaScript-based UIs.</p><p>The application is packaged as the <code>backoffice</code> extension and is deployed as part of the Commerce Cloud platform. It runs on the same server as the commerce services and has direct access to all platform APIs (ModelService, FlexibleSearch, services, etc.).</p><p>Backoffice replaces the older <strong>HMC (Hybris Management Console)</strong> that existed in earlier versions. HMC was a Swing-based desktop-style application; Backoffice is fully web-based. Some legacy documentation still references HMC — on the exam, Backoffice is the current admin UI.</p><p>Access to Backoffice is controlled by <strong>roles and access rights</strong>. Different user roles see different parts of the application — a merchandiser sees product and catalog management, while an administrator sees system configuration and user management. This role-based UI filtering is configured through Backoffice cockpit configurations.</p>"
+    },
+    {
+      "title": "Architecture — Cockpits, Widgets & the Widget Tree",
+      "content": "<p>Backoffice is built around three architectural concepts: <strong>cockpits</strong>, <strong>widgets</strong>, and the <strong>widget tree</strong>.</p><p>A <strong>cockpit</strong> is a functional module within Backoffice that serves a specific domain. The platform ships with several cockpits: the <strong>Product Cockpit</strong> (product and catalog management), the <strong>CMS Cockpit</strong> (content management), the <strong>Order Cockpit</strong> (order management), the <strong>Admin Cockpit</strong> (system configuration), and others. Each cockpit is essentially a pre-configured arrangement of widgets tailored to a specific user workflow.</p><p>A <strong>widget</strong> is the fundamental UI building block. Every element in the Backoffice interface — the navigation tree, the search area, the item editor, the list view, the detail panels — is a widget. Widgets are reusable, configurable, and composable. They can contain child widgets, forming a <strong>widget tree</strong> that defines the entire page layout.</p><p>The widget tree is hierarchical: a root widget (typically the application shell) contains layout widgets (header, navigation, content area), which contain functional widgets (search, list, editor), which may contain further child widgets (individual field editors, tabs, buttons). This tree structure is defined in <strong>configuration files</strong> and can be customised without modifying Java code.</p><p>Each widget has a <strong>widget definition</strong> (declared in a <code>definition.xml</code> file within the widget's folder) that specifies its ID, settings, input/output sockets (for inter-widget communication), and the ZUL template (the ZK markup that defines the widget's visual layout). Widgets communicate with each other through a <strong>socket-based event model</strong> — one widget's output socket connects to another widget's input socket, enabling data flow without tight coupling.</p>"
+    },
+    {
+      "title": "Backoffice Configuration — backoffice-config.xml",
+      "content": "<p>The primary mechanism for customising Backoffice is the <strong>backoffice-config.xml</strong> file located in your extension's <code>resources</code> folder. This XML file lets you modify the Backoffice UI without writing Java code — it is a <strong>declarative configuration</strong> approach.</p><p>What you can configure through backoffice-config.xml: <strong>Editor area customisation</strong> — control which attributes appear when editing an item type, in what order, grouped into which tabs, and with what labels. For example, you can hide internal fields from merchandisers, reorder tabs, add new attribute groups, or make certain fields read-only. <strong>List view columns</strong> — define which columns appear in search result lists for each type. <strong>Advanced search fields</strong> — control which fields are available as search filters. <strong>Actions</strong> — add, remove, or reorder action buttons on the toolbar for specific types.</p><p>The configuration uses a <strong>context-based merge</strong> mechanism. The platform loads a base configuration, and each extension can provide its own backoffice-config.xml that overlays or overrides specific settings. Configurations are merged in extension dependency order — your custom extension's config overrides the platform defaults for the sections you define, while leaving everything else intact.</p><p>A common customisation example: when you add a new attribute to the Product type in <code>items.xml</code>, it doesn't automatically appear in Backoffice. You must add a field definition for it in backoffice-config.xml to make it visible in the product editor, specify which tab it belongs to, and set its position.</p><p>Configuration changes in backoffice-config.xml are picked up on <strong>server restart</strong> (or via a Backoffice reset in development mode). No build is required for configuration-only changes — but a restart is.</p>"
+    },
+    {
+      "title": "Custom Widgets",
+      "content": "<p>When configuration alone isn't enough, you can create <strong>custom widgets</strong> with their own UI and logic. A custom widget is a self-contained module with a definition, a ZUL template, and an optional Java controller.</p><p>A widget consists of: <strong>definition.xml</strong> — declares the widget's ID, title, description, settings, and input/output sockets. <strong>The ZUL file</strong> — a ZK markup template that defines the visual layout using ZK components (labels, textboxes, buttons, grids, trees). <strong>The controller class</strong> (optional) — a Java class that extends <code>DefaultWidgetController</code> and handles user interactions, data loading, and business logic. The controller connects to Commerce Cloud services (via Spring injection) to read and write data.</p><p>Custom widgets are placed in a specific folder structure within your extension: <code>backoffice/resources/widgets/{widgetId}/</code>. The widget definition and ZUL file go here, and the controller class goes in the extension's Java source.</p><p>Common custom widget scenarios: a <strong>dashboard widget</strong> showing order KPIs (total orders today, revenue, top products), a <strong>bulk action widget</strong> for mass-updating product attributes, a <strong>visualisation widget</strong> for catalog tree health or stock levels, or a <strong>wizard widget</strong> that guides users through a multi-step data entry process.</p><p>Widgets communicate through <strong>sockets</strong>. An output socket on one widget emits data (e.g. a selected product), and an input socket on another widget receives it (e.g. loading the product details). This socket model keeps widgets decoupled — you can rearrange or replace widgets without breaking data flow, as long as the socket contracts are maintained.</p>"
+    },
+    {
+      "title": "Backoffice Roles & Access Rights",
+      "content": "<p>Backoffice uses a <strong>role-based access control</strong> model that determines what each user can see and do. Access is controlled at multiple levels: which <strong>cockpits</strong> (modules) are visible, which <strong>types</strong> can be viewed/edited, which <strong>attributes</strong> are visible or editable, and which <strong>actions</strong> can be performed.</p><p>Roles are defined as <strong>user groups</strong> in the type system (e.g. <code>backofficeworkflowadmingroup</code>, <code>backofficecmsmanagergroup</code>, <code>backofficeproductmanagergroup</code>). Assigning a user (specifically an Employee) to one of these groups grants them access to the corresponding Backoffice functionality. A user can belong to multiple groups, accumulating permissions.</p><p>Access rights are configured through the <strong>Access Rights Management</strong> area in Backoffice (available to administrators). Here you can configure per-type permissions for each role: <strong>read</strong>, <strong>create</strong>, <strong>change</strong>, <strong>remove</strong>, and <strong>search</strong>. You can also set <strong>attribute-level permissions</strong> — making specific fields read-only or hidden for certain roles. For example, the product manager role might have full access to product descriptions but read-only access to pricing fields, which are managed by the pricing team.</p><p>The <strong>principle of least privilege</strong> applies: start with minimal access per role and add permissions as needed. Over-permissioned roles are a security risk — a merchandiser who can access system configuration or user management can cause unintended damage.</p><p>Backoffice also supports <strong>workflow-based access</strong> — certain actions or fields can be restricted based on the item's workflow status (e.g. a product in \"Approved\" status becomes read-only for the editor who submitted it, editable only by the reviewer).</p>"
+    },
+    {
+      "title": "Backoffice Best Practices & Exam Tips",
+      "content": "<p>Backoffice is the interface that business users interact with daily. Getting it right affects adoption, productivity, and data quality.</p><p><strong>Configuration before code.</strong> Always try to achieve your customisation through backoffice-config.xml before building custom widgets. Configuration is declarative, faster to implement, and easier to maintain across upgrades. Custom widgets introduce code that must be tested and maintained.</p><p><strong>Test with the right role.</strong> Many Backoffice issues during development are caused by testing with an admin account that has full access, then deploying to users with restricted roles who can't see the same fields or actions. Always test with the target role's permissions.</p><p><strong>Performance.</strong> Backoffice performance depends on the number of items loaded, the complexity of the editor configuration, and the number of widgets on screen. For types with many attributes, use tabs and collapsible sections to avoid loading everything at once. For list views, configure sensible default search filters to prevent full-table scans.</p><p><strong>Key exam points:</strong> Backoffice is built on the ZK framework (server-rendered). Cockpits are domain-specific modules; widgets are the fundamental UI building blocks arranged in a tree. backoffice-config.xml is the primary customisation mechanism (declarative, no Java code). Custom attributes added in items.xml must be explicitly added to backoffice-config.xml to appear in the editor. Custom widgets have definition.xml + ZUL template + optional controller. Widgets communicate via sockets. Roles are user groups controlling cockpit, type, attribute, and action access. Backoffice replaced HMC.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-backoffice-q1",
+      "type": "multiple-choice",
+      "text": "What web framework is the SAP Commerce Cloud Backoffice built on?",
+      "options": [
+        "Angular",
+        "React",
+        "ZK framework",
+        "Vaadin"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Backoffice is built on the <strong>ZK framework</strong>, a Java-based web application framework that renders rich UI components on the server side. This makes Backoffice a server-rendered application, not a single-page app.</p>"
+    },
+    {
+      "id": "cc-backoffice-q2",
+      "type": "true-false",
+      "text": "A new attribute added to a type in items.xml automatically appears in the Backoffice editor without any additional configuration.",
+      "correctAnswer": false,
+      "explanation": "<p>New attributes do <strong>not</strong> automatically appear in Backoffice. You must add a field definition in <strong>backoffice-config.xml</strong> to make the attribute visible — specifying which tab, position, and display settings it should have.</p>"
+    },
+    {
+      "id": "cc-backoffice-q3",
+      "type": "multiple-choice",
+      "text": "What is the primary declarative mechanism for customising the Backoffice UI without writing Java code?",
+      "options": [
+        "backoffice-spring.xml",
+        "backoffice-config.xml",
+        "cockpit-config.properties",
+        "widgets.json"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>backoffice-config.xml</strong> is the primary customisation mechanism. It controls editor layouts, list view columns, search fields, action buttons, and attribute grouping — all declaratively, without Java code.</p>"
+    },
+    {
+      "id": "cc-backoffice-q4",
+      "type": "true-false",
+      "text": "Widgets in Backoffice communicate with each other through a socket-based event model.",
+      "correctAnswer": true,
+      "explanation": "<p>Widgets use <strong>input and output sockets</strong> for communication. One widget's output socket emits data (e.g. a selected item), and another widget's input socket receives it. This decoupled model allows widgets to be rearranged without breaking data flow.</p>"
+    },
+    {
+      "id": "cc-backoffice-q5",
+      "type": "multiple-choice",
+      "text": "A custom Backoffice widget consists of which components?",
+      "options": [
+        "A JSP page and a Spring MVC controller",
+        "A definition.xml, a ZUL template, and an optional Java controller",
+        "A React component and a REST API endpoint",
+        "An ImpEx script and a CronJob"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>A custom widget has: <strong>definition.xml</strong> (declares ID, settings, sockets), a <strong>ZUL file</strong> (ZK markup template for the visual layout), and an optional <strong>Java controller</strong> (extends DefaultWidgetController for interaction logic and data access).</p>"
+    },
+    {
+      "id": "cc-backoffice-q6",
+      "type": "true-false",
+      "text": "Backoffice cockpits are domain-specific modules — for example, the Product Cockpit handles product management while the CMS Cockpit handles content management.",
+      "correctAnswer": true,
+      "explanation": "<p>A <strong>cockpit</strong> is a functional module serving a specific domain. The platform ships with Product Cockpit, CMS Cockpit, Order Cockpit, Admin Cockpit, and others — each a pre-configured arrangement of widgets tailored to a particular workflow.</p>"
+    },
+    {
+      "id": "cc-backoffice-q7",
+      "type": "multiple-choice",
+      "text": "How are Backoffice access rights typically assigned to users?",
+      "options": [
+        "By setting permissions directly on each user record",
+        "By assigning users (Employees) to Backoffice-specific user groups that define role-based access",
+        "By configuring access in the storefront's CMS components",
+        "By editing the backoffice-config.xml to list allowed users per section"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Roles are defined as <strong>user groups</strong> (e.g. backofficeproductmanagergroup). Assigning an Employee to these groups grants the corresponding Backoffice access. A user can belong to multiple groups, accumulating permissions.</p>"
+    },
+    {
+      "id": "cc-backoffice-q8",
+      "type": "true-false",
+      "text": "Backoffice replaced the older HMC (Hybris Management Console) as the primary administration interface.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>Backoffice</strong> replaced the older HMC, which was a Swing-based desktop-style application. Backoffice is fully web-based and is the current standard admin UI for SAP Commerce Cloud.</p>"
+    },
+    {
+      "id": "cc-backoffice-q9",
+      "type": "multiple-choice",
+      "text": "When multiple extensions provide backoffice-config.xml files, how are they merged?",
+      "options": [
+        "Only the last extension's configuration is used — earlier ones are ignored",
+        "They are merged in extension dependency order — later extensions override earlier ones for the sections they define",
+        "All configurations are combined with no override — duplicate definitions cause errors",
+        "A manual merge tool must be run during the build process"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Configurations are merged in <strong>extension dependency order</strong>. Your custom extension's config overrides the platform defaults for the specific sections you define, while leaving everything else intact. This is a context-based merge mechanism.</p>"
+    },
+    {
+      "id": "cc-backoffice-q10",
+      "type": "true-false",
+      "text": "Attribute-level permissions in Backoffice can make specific fields read-only or hidden for certain roles.",
+      "correctAnswer": true,
+      "explanation": "<p>The Access Rights Management area allows <strong>attribute-level permissions</strong> per role. You can make specific fields read-only or hidden for certain user groups — for example, pricing fields read-only for merchandisers but editable for the pricing team.</p>"
+    },
+    {
+      "id": "cc-backoffice-q11",
+      "type": "multiple-choice",
+      "text": "What is the recommended approach when you need to customise how a type's editor looks in Backoffice?",
+      "options": [
+        "Build a custom widget with Java code as the first approach",
+        "Modify the ZK framework source code",
+        "Use backoffice-config.xml to declaratively configure tabs, fields, and ordering",
+        "Create a new cockpit from scratch for the type"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>The recommended approach is <strong>configuration before code</strong>. Use backoffice-config.xml to declaratively control which fields appear, their order, grouping into tabs, and display settings. Custom widgets should only be built when configuration alone is insufficient.</p>"
+    },
+    {
+      "id": "cc-backoffice-q12",
+      "type": "true-false",
+      "text": "Changes to backoffice-config.xml require a full platform build to take effect.",
+      "correctAnswer": false,
+      "explanation": "<p>Configuration changes require a <strong>server restart</strong> (or a Backoffice reset in development mode), but <strong>not a full build</strong>. This makes configuration-only changes faster to iterate on compared to code changes that require compilation.</p>"
+    },
+    {
+      "id": "cc-backoffice-q13",
+      "type": "multiple-choice",
+      "text": "Which Backoffice access right levels can be configured per type for each role?",
+      "options": [
+        "View and Edit only",
+        "Read, Create, Change, Remove, and Search",
+        "Full Access or No Access only",
+        "Read, Write, Execute, and Admin"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Per-type permissions include five levels: <strong>Read</strong> (view items), <strong>Create</strong> (add new items), <strong>Change</strong> (modify existing items), <strong>Remove</strong> (delete items), and <strong>Search</strong> (find items via search). Each can be independently enabled or disabled per role.</p>"
+    }
+  ]
+}

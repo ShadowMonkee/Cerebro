@@ -1,0 +1,176 @@
+{
+  "id": "cc-wcms",
+  "title": "WCMS — Pages, Components & Content Slots",
+  "description": "Master the Web Content Management System — page structure, content slots, CMS components, templates, and content catalogs.",
+  "icon": "📝",
+  "category": "cc-tier-4",
+  "tags": ["wcms", "cms", "pages", "components", "content-slots", "templates", "content-catalog", "cms-components"],
+  "sections": [
+    {
+      "title": "WCMS Architecture Overview",
+      "content": "<p>The <strong>Web Content Management System (WCMS)</strong> in SAP Commerce Cloud manages all the content that makes up the storefront — pages, banners, navigation menus, text blocks, images, and any other content that merchandisers need to control without developer involvement.</p><p>WCMS is built around a layered architecture with four core concepts: <strong>Page Templates</strong> (define the structural layout), <strong>Pages</strong> (individual pages served to customers), <strong>Content Slots</strong> (named placeholders within a page layout), and <strong>CMS Components</strong> (the actual content elements placed into slots). This separation of structure from content is the fundamental design principle — it allows merchandisers to update content (swap a banner image, change promotional text) without touching the page structure or code.</p><p>All CMS data is <strong>catalog-version-aware</strong>. CMS content lives in a <strong>Content Catalog</strong> (separate from the Product Catalog) with its own Staged and Online versions. Merchandisers edit content in Staged, and it is published to Online via catalog synchronisation — the same mechanism used for product data. This provides the same editorial workflow benefits: preview before publish, no half-finished content on the storefront, and implicit audit trail.</p><p>CMS content is managed through <strong>Backoffice</strong> (CMS Cockpit area) and <strong>SmartEdit</strong> (in-context visual editor, covered in the next topic). The platform provides a rich set of built-in component types, and custom component types can be created by extending the type system.</p>"
+    },
+    {
+      "title": "Page Templates & Pages",
+      "content": "<p>A <strong>Page Template</strong> (<code>PageTemplate</code>) defines the structural skeleton of a page — which content slots exist and where they are positioned. Think of it as a wireframe: header slot at the top, navigation slot on the left, body slot in the centre, footer slot at the bottom. The template does not contain actual content — it defines the <strong>available slots</strong> that content can be placed into.</p><p>Page templates are linked to a <strong>frontend template</strong> (a JSP, Freemarker, or — in Spartacus — an Angular layout configuration) that renders the HTML structure. The CMS template tells the storefront renderer which slots to look up and where to render them on the page.</p><p>A <strong>Page</strong> (<code>AbstractPage</code> and its subtypes) is the CMS item that represents an actual page served to the customer. Pages have a <strong>type</strong> that determines their behaviour: <strong>ContentPage</strong> (generic pages like homepage, about us, landing pages — identified by a URL path or label), <strong>ProductPage</strong> (product detail pages — resolved by product), <strong>CategoryPage</strong> (category listing pages — resolved by category), and <strong>CatalogPage</strong> (catalog overview pages).</p><p>Each page references a page template and contains <strong>content slot assignments</strong> — the binding between the template's named slots and the actual content slot instances that hold components for this specific page. This indirection allows the same template to be used by many pages, each with different content in the same structural slots.</p><p>Pages also carry metadata: <strong>title</strong> (browser tab title and SEO), <strong>description</strong> (meta description), <strong>keywords</strong> (meta keywords), and <strong>robots tag</strong> (index/noindex directives). These are managed in Backoffice or SmartEdit and are essential for SEO.</p>"
+    },
+    {
+      "title": "Content Slots & CMS Components",
+      "content": "<p>A <strong>Content Slot</strong> (<code>ContentSlot</code>) is a named container that holds one or more CMS components. Slots are the bridge between the page structure (defined by templates) and the actual content (defined by components). Each slot has a unique ID and a position name that the frontend renderer uses to place it in the correct location on the page.</p><p>Slots can be <strong>page-specific</strong> (unique content for one page) or <strong>shared</strong> (the same content appears on multiple pages — e.g. a header slot or footer slot shared across the entire site). Shared slots are powerful for global content like navigation menus, site-wide banners, or cookie consent notices — update the shared slot once and it changes everywhere.</p><p>A <strong>CMS Component</strong> is the atomic unit of content. Commerce Cloud ships with a rich library of built-in component types: <strong>BannerComponent</strong> (image with optional link), <strong>CMSParagraphComponent</strong> (rich text), <strong>CMSLinkComponent</strong> (navigation links), <strong>NavigationBarComponent</strong> (menu structures), <strong>ProductCarouselComponent</strong> (dynamic product listings), <strong>CategoryFeatureComponent</strong> (category highlights), <strong>MiniCartComponent</strong>, <strong>SearchBoxComponent</strong>, <strong>BreadcrumbComponent</strong>, and many more.</p><p>Each component type is defined in the <strong>type system</strong> (items.xml) and has specific attributes. For example, BannerComponent has <code>media</code> (the image), <code>headline</code>, <code>content</code> (HTML text), and <code>urlLink</code>. Components are placed into content slots — the order of components within a slot determines their display order on the page.</p><p>Components within a slot are rendered sequentially by the storefront. The frontend renderer iterates over the slot's components and renders each one using its corresponding <strong>component renderer</strong> (a JSP tag, Freemarker template, or Angular component in Spartacus). This means adding a component to a slot in Backoffice makes it appear on the storefront immediately after sync — no code deployment needed.</p>"
+    },
+    {
+      "title": "Content Catalogs & Multi-Site CMS",
+      "content": "<p>CMS data lives in <strong>Content Catalogs</strong>, which follow the same Staged/Online versioning model as Product Catalogs. A typical setup has one content catalog per storefront site, enabling completely independent CMS content for each site.</p><p>In a <strong>multi-site deployment</strong> (e.g. different brands or countries on the same Commerce Cloud instance), each site has its own content catalog with its own pages, slots, and components. This ensures that updating the banner on the German site doesn't affect the French site. Shared content (like a global footer) can be achieved through shared slots or by creating components in a shared catalog that other catalogs reference.</p><p>Content catalogs support <strong>localisation</strong>. CMS components have localised attributes — a BannerComponent's headline and media can have different values per language. The storefront resolves the correct localised content based on the user's session language. This is managed in Backoffice by switching the language context when editing components.</p><p>The <strong>synchronisation process</strong> for content catalogs works identically to product catalogs: a SyncItemJob copies Staged content to Online. Merchandisers can sync the entire content catalog or individual items. In multi-site setups, each site's content catalog syncs independently.</p><p><strong>CMS site configuration</strong> (<code>CMSSite</code>) ties everything together. A CMSSite defines which content catalog, which product catalog, which stores, which URL patterns, and which theme apply to a particular storefront. When a customer visits a URL, the CMS site resolver determines which CMSSite (and therefore which content catalog) serves the request.</p>"
+    },
+    {
+      "title": "Custom CMS Components",
+      "content": "<p>While the built-in component library covers most common scenarios, implementations frequently need <strong>custom CMS component types</strong> for business-specific content blocks.</p><p>Creating a custom component involves four steps. <strong>1. Define the type</strong> — add a new item type in <code>items.xml</code> that extends <code>SimpleCMSComponent</code> (or another base component type). Add custom attributes for the data the component needs. For example, a <code>StoreLocatorBannerComponent</code> might have attributes for <code>searchRadius</code>, <code>defaultCity</code>, and <code>backgroundMedia</code>.</p><p><strong>2. Create the renderer</strong> — for JSP-based storefronts, create a JSP tag that renders the component's HTML. For Spartacus (Angular), create an Angular component and map it to the CMS component type via the CMS component mapping configuration. The renderer reads the component's attributes and generates the appropriate frontend markup.</p><p><strong>3. Configure Backoffice</strong> — add the new component type to <code>backoffice-config.xml</code> so that merchandisers can create and edit instances in the CMS area. Define which attributes are editable, their display order, and any validation rules.</p><p><strong>4. Register in the component type group</strong> — add the custom component to a component type group so it appears in the \"Add Component\" dropdown when merchandisers edit content slots. Without this registration, the component type exists but isn't available for placement.</p><p>Custom components follow the same lifecycle as built-in ones: they are catalog-version-aware (Staged/Online), manageable in Backoffice and SmartEdit, syncable, and rendered by the storefront. The type system extension + renderer + Backoffice config pattern is the standard approach for any CMS extension.</p>"
+    },
+    {
+      "title": "WCMS Best Practices & Exam Tips",
+      "content": "<p>CMS architecture decisions made early in a project have long-lasting effects on merchandiser productivity and storefront maintainability.</p><p><strong>Shared vs page-specific slots.</strong> Use shared slots for content that appears on every page (header, footer, navigation). Use page-specific slots for content unique to one page (hero banner on the homepage, promotional block on a campaign page). Over-sharing slots makes it hard to customise individual pages; under-sharing creates maintenance burden when global content needs updating.</p><p><strong>Template design.</strong> Create a small number of well-designed templates rather than a template per page. A good template set might include: homepage template (hero area + content grid), standard content page template (breadcrumb + body + sidebar), product page template (product detail + recommendations), category page template (filters + product list + category banner), and a landing page template (full-width sections for campaigns). Most sites need 5–8 templates.</p><p><strong>Naming conventions.</strong> Use clear, consistent naming for pages, slots, and components. Include the site prefix for multi-site setups (e.g. <code>electronics-homepage-hero-banner</code>). Poor naming makes Backoffice management painful for merchandisers.</p><p><strong>Key exam points:</strong> WCMS uses Page Templates → Pages → Content Slots → CMS Components. Content lives in Content Catalogs with Staged/Online versions. Content is catalog-version-aware and synced like products. Pages have types: ContentPage, ProductPage, CategoryPage, CatalogPage. Content slots can be page-specific or shared. Custom components require: items.xml type + renderer + backoffice-config + component type group registration. CMSSite ties content catalog, product catalog, stores, and URLs together. Localisation is supported through localised component attributes.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-wcms-q1",
+      "type": "multiple-choice",
+      "text": "What are the four core concepts of the WCMS architecture in SAP Commerce Cloud?",
+      "options": [
+        "Themes, Layouts, Widgets, Snippets",
+        "Page Templates, Pages, Content Slots, CMS Components",
+        "HTML Templates, CSS Styles, JavaScript Modules, Images",
+        "Catalogs, Categories, Products, Media"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The four core concepts are: <strong>Page Templates</strong> (structural layout), <strong>Pages</strong> (individual pages), <strong>Content Slots</strong> (named placeholders), and <strong>CMS Components</strong> (actual content elements). This layered architecture separates structure from content.</p>"
+    },
+    {
+      "id": "cc-wcms-q2",
+      "type": "true-false",
+      "text": "CMS content in SAP Commerce Cloud is catalog-version-aware and follows the same Staged/Online versioning model as product data.",
+      "correctAnswer": true,
+      "explanation": "<p>CMS content lives in <strong>Content Catalogs</strong> with Staged and Online versions. Merchandisers edit in Staged and publish to Online via synchronisation — the same mechanism and workflow used for product catalog data.</p>"
+    },
+    {
+      "id": "cc-wcms-q3",
+      "type": "multiple-choice",
+      "text": "Which page type is used for product detail pages that are resolved dynamically by product?",
+      "options": [
+        "ContentPage",
+        "ProductPage",
+        "CategoryPage",
+        "CatalogPage"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>ProductPage</strong> is the page type for product detail pages. It is resolved dynamically based on the product being viewed. ContentPage is for generic pages (homepage, landing pages), and CategoryPage is for category listings.</p>"
+    },
+    {
+      "id": "cc-wcms-q4",
+      "type": "true-false",
+      "text": "A Page Template contains the actual content (banners, text, images) that appears on the storefront.",
+      "correctAnswer": false,
+      "explanation": "<p>A Page Template defines the <strong>structural skeleton</strong> — which content slots exist and where they are positioned. It does <strong>not</strong> contain actual content. Content is placed into slots as CMS Components on individual pages that reference the template.</p>"
+    },
+    {
+      "id": "cc-wcms-q5",
+      "type": "multiple-choice",
+      "text": "What is the purpose of a shared content slot?",
+      "options": [
+        "To display different content on every page that uses it",
+        "To hold content that appears on multiple pages — update once, change everywhere",
+        "To share content between Staged and Online catalog versions",
+        "To allow multiple merchandisers to edit the same component simultaneously"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>A <strong>shared slot</strong> holds content that appears on multiple pages. Updating the shared slot (e.g. the site header or footer) changes it <strong>everywhere</strong> it appears. This avoids duplicating global content across every page.</p>"
+    },
+    {
+      "id": "cc-wcms-q6",
+      "type": "true-false",
+      "text": "Adding a CMS component to a content slot in Backoffice makes it appear on the storefront immediately after catalog synchronisation — no code deployment is needed.",
+      "correctAnswer": true,
+      "explanation": "<p>CMS components are data, not code. Adding a component to a slot in Backoffice (Staged) and syncing to Online makes it appear on the storefront <strong>without any code deployment</strong>. The storefront renderer dynamically reads slot contents and renders components.</p>"
+    },
+    {
+      "id": "cc-wcms-q7",
+      "type": "multiple-choice",
+      "text": "When creating a custom CMS component type, which base type should it typically extend?",
+      "options": [
+        "AbstractOrder",
+        "GenericItem",
+        "SimpleCMSComponent",
+        "Category"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Custom CMS component types should extend <strong>SimpleCMSComponent</strong> (or another CMS component base type). This ensures the component inherits CMS-specific behaviour: catalog-version awareness, slot placement, Backoffice/SmartEdit management, and storefront rendering.</p>"
+    },
+    {
+      "id": "cc-wcms-q8",
+      "type": "true-false",
+      "text": "In a multi-site deployment, each site typically has its own content catalog so CMS changes on one site don't affect another.",
+      "correctAnswer": true,
+      "explanation": "<p>Each site has its own <strong>content catalog</strong> with independent Staged and Online versions. This ensures CMS changes (banners, pages, navigation) on one site are completely isolated from other sites on the same Commerce Cloud instance.</p>"
+    },
+    {
+      "id": "cc-wcms-q9",
+      "type": "multiple-choice",
+      "text": "What are the four steps to create a custom CMS component in SAP Commerce Cloud?",
+      "options": [
+        "Write HTML → Upload CSS → Configure JavaScript → Deploy",
+        "Define the type in items.xml → Create the renderer → Configure Backoffice → Register in component type group",
+        "Create a CronJob → Write an ImpEx → Build the extension → Run system update",
+        "Design in SmartEdit → Export as template → Import to Backoffice → Sync to Online"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The four steps are: <strong>1.</strong> Define the type in items.xml (extending SimpleCMSComponent). <strong>2.</strong> Create the renderer (JSP/Angular). <strong>3.</strong> Configure Backoffice (backoffice-config.xml). <strong>4.</strong> Register in a component type group (for the Add Component dropdown).</p>"
+    },
+    {
+      "id": "cc-wcms-q10",
+      "type": "true-false",
+      "text": "CMS components support localisation — attributes like headline and media can have different values per language.",
+      "correctAnswer": true,
+      "explanation": "<p>CMS components have <strong>localised attributes</strong>. A BannerComponent's headline and media can have different values per language. The storefront resolves the correct localised content based on the user's session language.</p>"
+    },
+    {
+      "id": "cc-wcms-q11",
+      "type": "multiple-choice",
+      "text": "Which CMS configuration item ties together the content catalog, product catalog, stores, URL patterns, and theme for a storefront?",
+      "options": [
+        "PageTemplate",
+        "ContentSlot",
+        "CMSSite",
+        "BaseStore"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>CMSSite</strong> is the configuration that ties everything together: which content catalog, product catalog, stores, URL patterns, and theme apply to a storefront. The CMS site resolver uses this to determine which content serves each request.</p>"
+    },
+    {
+      "id": "cc-wcms-q12",
+      "type": "true-false",
+      "text": "A custom CMS component will appear in the 'Add Component' dropdown in Backoffice without any additional registration beyond defining it in items.xml.",
+      "correctAnswer": false,
+      "explanation": "<p>The component must be <strong>registered in a component type group</strong> to appear in the Add Component dropdown. Without this registration, the type exists in the system but is not available for merchandisers to place into content slots.</p>"
+    },
+    {
+      "id": "cc-wcms-q13",
+      "type": "multiple-choice",
+      "text": "The order of CMS components within a content slot determines:",
+      "options": [
+        "Their priority for caching",
+        "Their display order on the storefront page",
+        "Their synchronisation sequence",
+        "Which component is visible to which user group"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Components within a slot are rendered <strong>sequentially</strong> — their order in the slot determines their <strong>display order</strong> on the page. The storefront renderer iterates over the slot's components and renders each one in sequence.</p>"
+    },
+    {
+      "id": "cc-wcms-q14",
+      "type": "true-false",
+      "text": "Page metadata such as title, description, and robots tag is managed on the CMS Page object and is important for SEO.",
+      "correctAnswer": true,
+      "explanation": "<p>Pages carry <strong>SEO metadata</strong>: title (browser tab), description (meta description), keywords (meta keywords), and robots tag (index/noindex). These are managed on the page object in Backoffice or SmartEdit and are essential for search engine optimisation.</p>"
+    }
+  ]
+}

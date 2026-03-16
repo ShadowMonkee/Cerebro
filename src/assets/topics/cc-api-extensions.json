@@ -1,0 +1,169 @@
+{
+  "id": "cc-api-extensions",
+  "title": "API Extensions — Custom Endpoints & Controllers",
+  "description": "Build custom OCC endpoints with Spring MVC controllers, WsDTOs, populators, converters, and Swagger documentation.",
+  "icon": "🧩",
+  "category": "cc-tier-5",
+  "tags": ["custom-api", "controllers", "populators", "converters", "wsdto", "swagger", "occ-extension", "spring-mvc"],
+  "sections": [
+    {
+      "title": "Why Extend OCC?",
+      "content": "<p>The standard OCC API covers the most common commerce scenarios, but real-world implementations almost always need <strong>custom endpoints</strong>. If Spartacus or a mobile app needs data or functionality that no existing OCC endpoint provides, you must create one — there is no alternative when the frontend is decoupled.</p><p>Common reasons to extend OCC include: exposing <strong>custom type data</strong> (a custom item type added in items.xml that has no standard endpoint), adding <strong>custom business logic</strong> (a loyalty points calculation, a warranty registration service, a complex eligibility check), combining data from <strong>multiple services</strong> into a single response (a dashboard endpoint that aggregates order stats, wishlist count, and loyalty tier), extending existing endpoints with <strong>additional fields</strong> (adding a custom product attribute to the product detail response), and exposing <strong>integration touchpoints</strong> (an endpoint that external systems call to push or pull data).</p><p>The extension mechanism follows the same patterns as the standard OCC implementation: <strong>Spring MVC controllers</strong> for request handling, <strong>WsDTOs</strong> for response objects, <strong>Populators/Converters</strong> for model-to-DTO mapping, and <strong>Spring bean configuration</strong> for wiring. If you know how the standard OCC endpoints work (previous topic), building custom ones is a natural extension of the same skills.</p><p>Custom endpoints are typically built in a dedicated extension (e.g. <code>myprojectoccaddon</code> or <code>customwebservices</code>) that depends on <code>commercewebservices</code>. This keeps custom API code separate from the standard API and makes upgrades cleaner.</p>"
+    },
+    {
+      "title": "Building a Custom Controller",
+      "content": "<p>A custom OCC controller is a <strong>Spring MVC @RestController</strong> that handles HTTP requests at a specific URL path. The implementation follows a standard pattern.</p><p><strong>Step 1 — Create the controller class.</strong> Annotate it with <code>@RestController</code> and <code>@RequestMapping</code> to define the base path. Convention: custom endpoints sit under the same <code>/occ/v2/{baseSiteId}/</code> namespace as standard endpoints, with a custom resource name. For example: <code>/occ/v2/{baseSiteId}/loyalty/points</code> for a loyalty points endpoint.</p><p><strong>Step 2 — Define handler methods.</strong> Each method handles a specific HTTP method + path combination. Annotate with <code>@GetMapping</code>, <code>@PostMapping</code>, <code>@PutMapping</code>, or <code>@DeleteMapping</code>. Use <code>@PathVariable</code> for URL parameters, <code>@RequestParam</code> for query parameters, and <code>@RequestBody</code> for JSON request bodies. Return a WsDTO object — Spring automatically serialises it to JSON.</p><p><strong>Step 3 — Inject services.</strong> The controller should be a <strong>thin layer</strong> — it validates input, calls a service (or facade) for business logic, maps the result to a DTO, and returns it. Never put business logic in the controller. Inject Commerce Cloud services (or your custom services) via <code>@Resource</code> or constructor injection.</p><p>Example skeleton:</p><pre><code>@RestController\n@RequestMapping(\"/occ/v2/{baseSiteId}/loyalty\")\npublic class LoyaltyController {\n    @Resource\n    private LoyaltyFacade loyaltyFacade;\n    @Resource\n    private DataMapper dataMapper;\n\n    @GetMapping(\"/points\")\n    public LoyaltyPointsWsDTO getPoints(\n            @RequestParam(defaultValue = DEFAULT_FIELD_SET) String fields) {\n        LoyaltyData data = loyaltyFacade.getCurrentPoints();\n        return dataMapper.map(data, LoyaltyPointsWsDTO.class, fields);\n    }\n}</code></pre><p>The controller delegates to a facade, which calls services, which access the database. This <strong>layered architecture</strong> (Controller → Facade → Service → DAO) is the standard Commerce Cloud pattern and should be followed for custom endpoints too.</p>"
+    },
+    {
+      "title": "Custom WsDTOs, Populators & Converters",
+      "content": "<p>Every custom endpoint needs a <strong>response DTO</strong> to define the data contract with the client. Custom WsDTOs are plain Java classes with fields, getters, and setters — no special base class is required, though extending an existing WsDTO is common when adding fields to a standard response.</p><p>The <strong>Data Mapper</strong> (or manual Populator/Converter approach) transforms internal data objects into WsDTOs. The Commerce Cloud pattern uses two components: a <strong>Converter</strong> (orchestrates the transformation, creates the target object) and one or more <strong>Populators</strong> (each populates a subset of fields on the target). This separation allows multiple populators to contribute to the same DTO — and custom extensions can add their own populators without modifying existing ones.</p><p>For example, to add a custom <code>loyaltyTier</code> field to the standard <code>UserWsDTO</code>: <strong>1.</strong> Extend UserWsDTO with a <code>CustomUserWsDTO</code> that adds the loyaltyTier field. <strong>2.</strong> Create a <code>LoyaltyTierPopulator</code> that reads the user's loyalty tier from a service and sets it on the DTO. <strong>3.</strong> Register the populator in Spring configuration so it is included in the user converter's populator list. The existing populators continue to work unchanged — your custom populator simply adds the extra field.</p><p>This <strong>additive populator</strong> pattern is the recommended way to extend existing OCC responses. It avoids modifying standard code, survives platform upgrades, and allows multiple extensions to contribute fields independently.</p><p>For entirely new DTOs (not extending existing ones), create the DTO class, create one or more populators that map from your data model, configure a converter bean that wires the populators, and use the DataMapper in your controller to handle the <code>fields</code> parameter automatically.</p>"
+    },
+    {
+      "title": "Supporting the Fields Parameter",
+      "content": "<p>One of OCC's most valuable features is <strong>field-level response control</strong> via the <code>fields</code> query parameter. Custom endpoints should support this too — it is expected behaviour for any OCC endpoint and Spartacus relies on it for performance optimisation.</p><p>Supporting the fields parameter requires two things. First, use the <strong>DataMapper</strong> service to map your data to the WsDTO. DataMapper applies the field filtering automatically based on the <code>fields</code> parameter value. In your controller, accept the <code>fields</code> parameter and pass it to DataMapper:</p><pre><code>return dataMapper.map(data, MyWsDTO.class, fields);</code></pre><p>Second, define <strong>field set level mappings</strong> for your custom DTO. These mappings specify which fields are included at each level (BASIC, DEFAULT, FULL). They are configured in Spring XML or through the <code>fieldSetLevelMapping</code> bean configuration. For example:</p><pre><code>&lt;bean parent=\"fieldSetLevelMapping\"&gt;\n    &lt;property name=\"dtoClass\" value=\"com.myproject.dto.LoyaltyPointsWsDTO\"/&gt;\n    &lt;property name=\"levelMapping\"&gt;\n        &lt;map&gt;\n            &lt;entry key=\"BASIC\" value=\"points,tier\"/&gt;\n            &lt;entry key=\"DEFAULT\" value=\"points,tier,expiryDate\"/&gt;\n            &lt;entry key=\"FULL\" value=\"points,tier,expiryDate,history,nextTierThreshold\"/&gt;\n        &lt;/map&gt;\n    &lt;/property&gt;\n&lt;/bean&gt;</code></pre><p>Without field set level mappings, the <code>fields</code> parameter still works for explicit field names but the BASIC/DEFAULT/FULL shorthands will not behave correctly — they'll either return nothing or everything. Always define these mappings for production-quality custom endpoints.</p>"
+    },
+    {
+      "title": "Swagger / OpenAPI Documentation",
+      "content": "<p>OCC uses <strong>Swagger (OpenAPI)</strong> to generate interactive API documentation. When properly annotated, custom endpoints appear in the Swagger UI alongside standard ones — making them discoverable and testable by frontend developers.</p><p>To document a custom endpoint, add <strong>Swagger annotations</strong> to your controller: <code>@Api</code> (on the class — provides a tag/group name and description), <code>@ApiOperation</code> (on each method — describes what the endpoint does), <code>@ApiParam</code> (on parameters — describes each input), and <code>@ApiResponse</code> (describes possible response codes and their meaning).</p><p>Example:</p><pre><code>@Api(tags = \"Loyalty\")\n@GetMapping(\"/points\")\n@ApiOperation(value = \"Get loyalty points\",\n    notes = \"Returns the current user's loyalty points and tier.\")\n@ApiResponse(code = 200, message = \"Loyalty points retrieved successfully\")\npublic LoyaltyPointsWsDTO getPoints(\n        @ApiParam(value = \"Response fields\") \n        @RequestParam(defaultValue = DEFAULT_FIELD_SET) String fields) {\n    ...\n}</code></pre><p>The Swagger UI is accessible at <code>/occ/v2/swagger-ui.html</code> (or similar, depending on configuration). It renders all documented endpoints with their parameters, request/response schemas, and a \"Try it out\" feature for live testing. This is invaluable during development — frontend developers can explore and test custom endpoints without reading source code.</p><p>Best practice: <strong>always annotate custom endpoints</strong>. Undocumented endpoints are invisible to the team and create knowledge silos. Swagger documentation is the API's user manual and should be treated as a first-class deliverable.</p>"
+    },
+    {
+      "title": "API Extension Best Practices & Exam Tips",
+      "content": "<p>Building custom API endpoints is one of the most common developer tasks in composable commerce. Here are the patterns and exam-relevant points:</p><p><strong>Thin controllers, fat services.</strong> Controllers handle HTTP concerns (request parsing, response formatting, status codes). Business logic lives in services or facades. Never put database queries, calculations, or complex logic in a controller — it makes the code untestable and non-reusable.</p><p><strong>Follow the existing patterns.</strong> Look at how standard OCC endpoints are implemented in commercewebservices. They follow Controller → Facade → Service → DAO with Populators/Converters for DTO mapping. Custom endpoints that follow the same pattern are easier for the team to understand and maintain.</p><p><strong>Use facades, not services directly.</strong> The facade layer aggregates multiple service calls and prepares data for the controller. Controllers should inject facades, not low-level services. This keeps the controller clean and the business logic reusable across different channels (OCC, Backoffice, CronJobs).</p><p><strong>Error handling.</strong> Custom endpoints should return appropriate HTTP status codes: 200 for success, 201 for created, 400 for validation errors, 401 for authentication failures, 403 for authorisation failures, 404 for not found, 500 for server errors. Use <code>@ExceptionHandler</code> or a global exception resolver to map business exceptions to HTTP responses consistently.</p><p><strong>Versioning and backward compatibility.</strong> Once a custom endpoint is consumed by a frontend, changing its response structure is a breaking change. Add new fields to DTOs (additive changes are safe), but never rename or remove existing fields without a deprecation period and frontend coordination.</p><p><strong>Key exam points:</strong> Custom endpoints use @RestController with Spring MVC annotations. Controllers should be thin — delegate to facades/services. WsDTOs are the response format (not models). Populators/Converters map models to DTOs. The additive populator pattern extends existing responses without modifying standard code. The fields parameter should be supported via DataMapper + field set level mappings. Swagger annotations make endpoints discoverable. Custom endpoints live in dedicated extensions depending on commercewebservices. The layered architecture is Controller → Facade → Service → DAO.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-api-extensions-q1",
+      "type": "multiple-choice",
+      "text": "What is the primary reason for creating custom OCC endpoints?",
+      "options": [
+        "To replace the standard OCC API entirely with a proprietary API",
+        "To expose custom data, business logic, or aggregated responses that standard OCC endpoints don't provide",
+        "To improve the security of standard endpoints by wrapping them",
+        "To convert OCC from REST to SOAP"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Custom endpoints are needed when the frontend requires data or functionality that <strong>no standard OCC endpoint provides</strong> — custom types, custom business logic, aggregated responses, or integration touchpoints. Spartacus has no other way to access backend functionality.</p>"
+    },
+    {
+      "id": "cc-api-extensions-q2",
+      "type": "true-false",
+      "text": "Business logic such as database queries and complex calculations should be placed directly in the OCC controller class.",
+      "correctAnswer": false,
+      "explanation": "<p>Controllers should be <strong>thin</strong> — handling only HTTP concerns (request parsing, response formatting). Business logic belongs in <strong>services or facades</strong>. This keeps controllers testable and business logic reusable across channels.</p>"
+    },
+    {
+      "id": "cc-api-extensions-q3",
+      "type": "multiple-choice",
+      "text": "What is the recommended way to add a custom field to the standard UserWsDTO response without modifying the existing code?",
+      "options": [
+        "Edit the UserWsDTO source file directly",
+        "Create a custom populator that adds the field and register it in the user converter's populator list",
+        "Create a separate endpoint that returns only the custom field",
+        "Override the entire user controller with a custom implementation"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <strong>additive populator pattern</strong> is the recommended approach. Create a custom populator that reads the extra data and sets it on the DTO, then register it alongside existing populators. The standard code remains unchanged, and the custom field appears in the response.</p>"
+    },
+    {
+      "id": "cc-api-extensions-q4",
+      "type": "true-false",
+      "text": "Custom OCC endpoints can support the 'fields' query parameter by using the DataMapper service and defining field set level mappings.",
+      "correctAnswer": true,
+      "explanation": "<p>Supporting the fields parameter requires using the <strong>DataMapper</strong> (which applies field filtering automatically) and defining <strong>field set level mappings</strong> for your custom DTO (specifying which fields each BASIC/DEFAULT/FULL level includes).</p>"
+    },
+    {
+      "id": "cc-api-extensions-q5",
+      "type": "multiple-choice",
+      "text": "What is the standard layered architecture for OCC endpoints in SAP Commerce Cloud?",
+      "options": [
+        "Controller → Database → View → Client",
+        "Controller → Facade → Service → DAO",
+        "Controller → Repository → Entity → Response",
+        "Controller → Converter → Model → Database"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The standard pattern is <strong>Controller → Facade → Service → DAO</strong>. The controller handles HTTP, the facade aggregates service calls and prepares data, services contain business logic, and DAOs handle database access. Custom endpoints should follow this same layered architecture.</p>"
+    },
+    {
+      "id": "cc-api-extensions-q6",
+      "type": "true-false",
+      "text": "Custom OCC endpoints should be placed in the commercewebservices extension alongside the standard endpoints.",
+      "correctAnswer": false,
+      "explanation": "<p>Custom endpoints should be placed in a <strong>dedicated extension</strong> (e.g. myprojectoccaddon or customwebservices) that depends on commercewebservices. This keeps custom code separate from the standard API and makes platform upgrades cleaner.</p>"
+    },
+    {
+      "id": "cc-api-extensions-q7",
+      "type": "multiple-choice",
+      "text": "Which annotations are used to document a custom OCC endpoint for Swagger/OpenAPI?",
+      "options": [
+        "@Documented, @Inherited, @Target",
+        "@Api, @ApiOperation, @ApiParam, @ApiResponse",
+        "@RestDoc, @EndpointDoc, @ParamDoc",
+        "@OpenAPI, @Schema, @Content"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Swagger annotations include: <strong>@Api</strong> (class-level tag/group), <strong>@ApiOperation</strong> (method description), <strong>@ApiParam</strong> (parameter description), and <strong>@ApiResponse</strong> (response codes and messages). These make custom endpoints appear in the Swagger UI.</p>"
+    },
+    {
+      "id": "cc-api-extensions-q8",
+      "type": "true-false",
+      "text": "The additive populator pattern allows multiple extensions to independently contribute fields to the same WsDTO without modifying each other's code.",
+      "correctAnswer": true,
+      "explanation": "<p>Each extension registers its own populator in the converter's populator list. Multiple populators contribute fields <strong>independently</strong> — one adds loyalty tier, another adds personalisation data — without any populator knowing about or modifying the others.</p>"
+    },
+    {
+      "id": "cc-api-extensions-q9",
+      "type": "multiple-choice",
+      "text": "A custom endpoint returns a 200 status code for all responses, including errors. What is wrong with this approach?",
+      "options": [
+        "Nothing — 200 is the correct status code for all API responses",
+        "The endpoint should return appropriate HTTP status codes: 400 for validation errors, 401 for auth failures, 404 for not found, etc.",
+        "Custom endpoints should always return 204 No Content",
+        "Only 500 should be used for error responses"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>RESTful APIs should return <strong>appropriate HTTP status codes</strong>: 200 for success, 201 for created, 400 for validation errors, 401 for authentication failures, 403 for authorisation, 404 for not found, 500 for server errors. Using 200 for everything makes it impossible for clients to handle errors correctly.</p>"
+    },
+    {
+      "id": "cc-api-extensions-q10",
+      "type": "true-false",
+      "text": "Without field set level mappings defined for a custom WsDTO, the BASIC/DEFAULT/FULL shorthand values for the 'fields' parameter will not function correctly.",
+      "correctAnswer": true,
+      "explanation": "<p>Field set level mappings define which fields each shorthand includes. Without them, BASIC/DEFAULT/FULL <strong>won't behave correctly</strong> — they may return nothing or everything. Explicit field names still work, but the shorthands require proper mapping configuration.</p>"
+    },
+    {
+      "id": "cc-api-extensions-q11",
+      "type": "multiple-choice",
+      "text": "Which Spring MVC annotation is used to define a REST controller for a custom OCC endpoint?",
+      "options": [
+        "@Controller",
+        "@Service",
+        "@RestController",
+        "@Component"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>@RestController</strong> combines @Controller and @ResponseBody — it marks the class as a request handler where every method's return value is serialised directly to the response body (JSON). Standard @Controller would require @ResponseBody on each method individually.</p>"
+    },
+    {
+      "id": "cc-api-extensions-q12",
+      "type": "true-false",
+      "text": "Renaming or removing fields from a WsDTO that is already consumed by a frontend is considered a safe, non-breaking change.",
+      "correctAnswer": false,
+      "explanation": "<p>Renaming or removing DTO fields is a <strong>breaking change</strong> — the frontend code that reads those fields will fail. Only <strong>additive changes</strong> (adding new fields) are safe. Removals require a deprecation period and coordinated frontend updates.</p>"
+    },
+    {
+      "id": "cc-api-extensions-q13",
+      "type": "multiple-choice",
+      "text": "Why should custom OCC controllers inject facades rather than low-level services directly?",
+      "options": [
+        "Facades are faster than services",
+        "Facades aggregate multiple service calls and prepare data, keeping controllers clean and business logic reusable across channels",
+        "Services cannot be injected into controllers due to Spring restrictions",
+        "Facades automatically handle OAuth authentication"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Facades <strong>aggregate service calls and prepare data</strong> for the controller. Injecting facades keeps controllers thin and makes business logic <strong>reusable</strong> — the same facade can be called from OCC, Backoffice, CronJobs, or other channels without duplicating logic.</p>"
+    }
+  ]
+}

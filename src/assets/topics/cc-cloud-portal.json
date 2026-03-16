@@ -1,0 +1,169 @@
+{
+  "id": "cc-cloud-portal",
+  "title": "Cloud Portal — Deployments, Monitoring & Endpoints",
+  "description": "Navigate the CCV2 Cloud Portal to manage builds, deployments, endpoints, monitoring, data backups, and service access.",
+  "icon": "🖥️",
+  "category": "cc-tier-6",
+  "tags": ["cloud-portal", "deployments", "monitoring", "endpoints", "logging", "backups", "data-management", "service-access"],
+  "sections": [
+    {
+      "title": "Cloud Portal Overview",
+      "content": "<p>The <strong>Cloud Portal</strong> is the web-based management console for CCV2. It is the single pane of glass for all operational tasks: triggering builds, deploying artifacts, managing environments, configuring endpoints, monitoring application health, accessing logs, and managing data backups.</p><p>The Cloud Portal is accessed at <strong>portal.commerce.ondemand.com</strong> (or the equivalent for your SAP region). Access is controlled by <strong>SAP Cloud Identity</strong> — users must be provisioned in the SAP Identity Authentication Service (IAS) and assigned appropriate Cloud Portal roles. Not every developer or business user gets Cloud Portal access — it is typically limited to DevOps engineers, technical leads, and administrators.</p><p>The portal is organised into several key areas accessible from the left navigation: <strong>Builds</strong> (create and manage build artifacts), <strong>Environments</strong> (view and manage environments — each with its own deployments, endpoints, and services), <strong>Repository</strong> (Git repository configuration), and <strong>Settings</strong> (subscription details, user management, API tokens). Each environment has sub-sections for deployments, services, endpoints, backups, and monitoring.</p><p>The Cloud Portal also exposes a <strong>REST API</strong> (Cloud Portal API / CCV2 API) that enables automation of all portal operations. CI/CD pipelines use this API to trigger builds and deployments programmatically, eliminating the need for manual portal clicks in production workflows.</p>"
+    },
+    {
+      "title": "Build & Deployment Management",
+      "content": "<p>The <strong>Builds</strong> section is where you create, view, and manage build artifacts. Creating a new build involves selecting the <strong>branch</strong> (from your connected Git repository) and the <strong>build name</strong> (for identification). The portal triggers the build engine, and you can monitor progress in real-time — the build log streams showing compilation, extension loading, and packaging steps.</p><p>Each build is identified by a <strong>build code</strong> and has a status: <strong>Building</strong> (in progress), <strong>Success</strong> (ready to deploy), or <strong>Fail</strong> (compilation or packaging error). Failed builds include a log that shows exactly where the error occurred — the first place to look when a build breaks.</p><p>The <strong>Deployments</strong> section (within each environment) shows the deployment history: which build artifact was deployed, when, by whom, the deployment mode (initialize/update), and the result (success/failure). To create a new deployment, you select a build artifact and the deployment mode. The portal validates the selection (e.g. warning if you choose initialize on a production environment) and lets you confirm.</p><p><strong>Deployment scheduling</strong> allows you to schedule a deployment for a future time — useful for coordinating releases with business teams (e.g. deploy at 2 AM when traffic is lowest). The scheduled deployment executes automatically at the specified time.</p><p><strong>Rollback</strong> in CCV2 means deploying a previous build artifact — not an automatic undo. If a deployment causes issues, you identify the last known good build artifact and deploy it. Since builds are immutable, this gives you a reliable rollback mechanism, but you must plan for database compatibility (a newer build may have added database columns that the older build doesn't know about).</p>"
+    },
+    {
+      "title": "Endpoints & Service Access",
+      "content": "<p><strong>Endpoints</strong> are the URLs through which users and systems access the Commerce Cloud application. The Cloud Portal's Endpoints section shows all configured endpoints for each environment and lets you manage their settings.</p><p>Standard endpoint types include: <strong>Storefront</strong> (the customer-facing website URL — e.g. <code>electronics.mycommerce.com</code>), <strong>Backoffice</strong> (the admin UI — e.g. <code>backoffice.mycommerce.com</code>), <strong>API</strong> (the OCC REST API — e.g. <code>api.mycommerce.com</code>), <strong>JS Storefront</strong> (the Spartacus/composable storefront — can be on a separate domain or the same as the storefront), and <strong>SmartEdit</strong> (the in-context editor).</p><p>Each endpoint has configuration options: <strong>custom domain name</strong> (map your own domain via CNAME and SSL certificate — SAP provides managed SSL certificates or you can upload your own), <strong>IP filter rules</strong> (restrict access by IP address — critical for non-production environments and admin endpoints), <strong>basic auth</strong> (add HTTP basic authentication as an additional access control layer), and <strong>redirect rules</strong> (HTTP to HTTPS redirect, custom redirects).</p><p><strong>IP filtering</strong> is a security best practice for non-production endpoints. Staging and development environments should only be accessible from your company's network. Production admin endpoints (Backoffice, HAC) should be restricted to internal IPs. Only customer-facing storefront and API endpoints should be publicly accessible.</p><p>The <strong>Services</strong> section shows running application services (web servers, Solr, background processing) with their status, restart controls, and resource allocation. You can restart individual services without a full deployment — useful for applying property changes or recovering from transient issues.</p>"
+    },
+    {
+      "title": "Monitoring, Logging & Alerting",
+      "content": "<p>The Cloud Portal provides built-in <strong>monitoring and logging</strong> capabilities that are essential for operating Commerce Cloud in production.</p><p><strong>Application logs</strong> are aggregated from all pods and services into a centralised logging system. In CCV2, logs are accessible via <strong>OpenSearch Dashboards</strong> (Kibana-compatible) or integrated with <strong>SAP Cloud ALM</strong> and <strong>Dynatrace</strong> (depending on your subscription and configuration). You can search logs by time range, severity level, service name, and keywords. Log access is available from the Cloud Portal's monitoring section.</p><p>Common log searches during troubleshooting: <strong>ERROR</strong> and <strong>WARN</strong> level entries around the time of an incident, <strong>deployment logs</strong> to verify what happened during a deployment, <strong>CronJob logs</strong> to check whether scheduled tasks completed successfully, <strong>OCC request logs</strong> to trace API performance issues, and <strong>Solr indexing logs</strong> to verify search index updates.</p><p><strong>Performance monitoring</strong> tracks key metrics: response times per endpoint, request throughput, error rates, JVM heap usage, CPU utilisation, and database connection pool status. Dynatrace integration (available in CCV2) provides deeper APM (Application Performance Monitoring) with transaction tracing, service-level analysis, and anomaly detection.</p><p><strong>Alerting</strong> can be configured to notify the operations team when metrics exceed thresholds — high error rate, elevated response times, memory pressure, or failed deployments. Alerts can be routed to email, Slack, or incident management systems. Proactive monitoring prevents small issues from becoming customer-facing outages.</p><p>The <strong>deployment history</strong> and <strong>audit log</strong> in the Cloud Portal track who performed which operation and when — essential for change management governance and incident investigation.</p>"
+    },
+    {
+      "title": "Data Management — Backups, Restore & Migration",
+      "content": "<p>The Cloud Portal provides <strong>data management</strong> capabilities for database backups, restores, and environment-to-environment data operations.</p><p><strong>Automated backups.</strong> SAP performs regular automated database backups for all environments. The backup frequency and retention period depend on the environment type — production environments have more frequent backups and longer retention than development environments. These backups are managed by SAP and are available for disaster recovery.</p><p><strong>On-demand backups.</strong> You can trigger manual backups through the Cloud Portal before risky operations (e.g. before a major data migration, before running an ImpEx that modifies many records). On-demand backups provide a known-good restore point that you control.</p><p><strong>Database restore.</strong> If something goes wrong (a bad ImpEx destroys data, an initialize deployment wipes the wrong environment), you can request a database restore from a backup. Restore replaces the current database content with the backup state. Note: this rolls back <strong>all data</strong>, not just the affected records — it is a full database restore, not a selective undo.</p><p><strong>Data cloning.</strong> The Cloud Portal supports cloning data from one environment to another — for example, cloning production data to staging for realistic testing. This copies the database and media storage. Cloning is useful for reproducing production issues in a non-production environment and for performance testing with realistic data volumes.</p><p>Data management is one of the most critical operational areas. Best practice: always take an on-demand backup before major operations, document which backup corresponds to which known-good state, and periodically test the restore process to verify backup integrity.</p>"
+    },
+    {
+      "title": "Cloud Portal API & CI/CD Automation",
+      "content": "<p>The <strong>Cloud Portal API</strong> (also called the CCV2 API) exposes all portal operations as REST endpoints, enabling <strong>CI/CD automation</strong>. Instead of manually clicking through the portal for every build and deployment, your pipeline scripts call the API.</p><p>Key API operations: <strong>trigger a build</strong> (specify branch and build name), <strong>check build status</strong> (poll until success or failure), <strong>trigger a deployment</strong> (specify build code, environment, deployment mode), <strong>check deployment status</strong>, <strong>get environment details</strong> (endpoints, services, status), and <strong>manage data backups</strong>.</p><p>A typical CI/CD pipeline: <strong>1.</strong> Developer pushes code to Git. <strong>2.</strong> CI server (Jenkins, GitLab CI, Azure DevOps) detects the push. <strong>3.</strong> Pipeline calls the Cloud Portal API to trigger a build from the pushed branch. <strong>4.</strong> Pipeline polls build status until complete. <strong>5.</strong> On success, pipeline triggers deployment to the dev environment. <strong>6.</strong> Pipeline runs automated tests against the dev environment. <strong>7.</strong> On test success, pipeline triggers deployment to staging. <strong>8.</strong> Manual approval gate before production deployment. <strong>9.</strong> Pipeline deploys to production.</p><p>API authentication uses an <strong>API token</strong> generated in the Cloud Portal's Settings section. The token is passed as a Bearer token in the Authorization header. Tokens should be stored securely in the CI/CD platform's secret management (not in source code) and rotated periodically.</p><p><strong>Key exam points:</strong> The Cloud Portal is the management console for CCV2 (builds, deployments, endpoints, monitoring, backups). Endpoints are configurable with custom domains, IP filtering, and SSL. Logs are centralised and searchable (OpenSearch/Dynatrace). Deployment scheduling and rollback (via deploying a previous build) are supported. Data cloning copies data between environments. The Cloud Portal API enables CI/CD automation. API tokens authenticate pipeline calls. Always take backups before major operations.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-cloud-portal-q1",
+      "type": "multiple-choice",
+      "text": "What is the Cloud Portal in the context of CCV2?",
+      "options": [
+        "The customer-facing storefront management tool",
+        "The web-based management console for builds, deployments, endpoints, monitoring, and data management",
+        "The Backoffice application for product management",
+        "The Git repository hosting service"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The Cloud Portal is the <strong>management console</strong> for all CCV2 operational tasks: triggering builds, deploying artifacts, configuring endpoints, monitoring health, accessing logs, and managing backups.</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q2",
+      "type": "true-false",
+      "text": "Rollback in CCV2 is an automatic undo operation that reverses the last deployment.",
+      "correctAnswer": false,
+      "explanation": "<p>CCV2 does not have an automatic undo. Rollback means <strong>deploying a previous build artifact</strong> — you identify the last known good build and deploy it. Since builds are immutable, this is reliable, but you must consider database schema compatibility between builds.</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q3",
+      "type": "multiple-choice",
+      "text": "Which security measure should be applied to non-production and admin endpoints in CCV2?",
+      "options": [
+        "No restrictions — all endpoints should be publicly accessible",
+        "IP filter rules to restrict access to company network IPs",
+        "Password-protect the entire CCV2 subscription",
+        "Deploy admin endpoints only on weekdays"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>IP filtering</strong> is a best practice for non-production and admin endpoints. Staging/dev should only be accessible from your company's network. Production admin endpoints (Backoffice, HAC) should be restricted to internal IPs. Only storefront and API endpoints should be public.</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q4",
+      "type": "true-false",
+      "text": "The Cloud Portal allows scheduling deployments for a future time.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>Deployment scheduling</strong> allows you to set a deployment for a future time — useful for coordinating with business teams or deploying during low-traffic windows. The deployment executes automatically at the scheduled time.</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q5",
+      "type": "multiple-choice",
+      "text": "Which logging and APM tool is commonly integrated with CCV2 for deep application performance monitoring?",
+      "options": [
+        "Splunk",
+        "Dynatrace",
+        "New Relic",
+        "Prometheus"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Dynatrace</strong> integration is available in CCV2, providing deep APM with transaction tracing, service-level analysis, and anomaly detection. Application logs are also accessible via OpenSearch Dashboards (Kibana-compatible).</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q6",
+      "type": "true-false",
+      "text": "A database restore from a backup selectively rolls back only the affected records, leaving other data unchanged.",
+      "correctAnswer": false,
+      "explanation": "<p>A database restore is a <strong>full database replacement</strong> — it rolls back all data to the backup state, not just affected records. There is no selective undo. This is why on-demand backups before risky operations are essential.</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q7",
+      "type": "multiple-choice",
+      "text": "What is data cloning in the Cloud Portal used for?",
+      "options": [
+        "Duplicating build artifacts across environments",
+        "Copying database and media data from one environment to another (e.g. production to staging)",
+        "Creating a backup of the Cloud Portal configuration",
+        "Replicating Git repository branches"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Data cloning <strong>copies database and media storage</strong> from one environment to another. The most common use: cloning production data to staging for realistic testing, reproducing production issues, or performance testing with production-scale data.</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q8",
+      "type": "true-false",
+      "text": "Individual services (web server, Solr, background processing) can be restarted from the Cloud Portal without a full deployment.",
+      "correctAnswer": true,
+      "explanation": "<p>The Services section allows <strong>individual service restarts</strong> without triggering a full deployment. This is useful for applying property changes or recovering from transient issues — faster and less disruptive than redeploying.</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q9",
+      "type": "multiple-choice",
+      "text": "How does the Cloud Portal API authenticate CI/CD pipeline requests?",
+      "options": [
+        "Username and password of a Cloud Portal user",
+        "SAP S-user credentials",
+        "API token passed as a Bearer token in the Authorization header",
+        "OAuth Client Credentials grant with the Commerce Cloud OAuth server"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>The Cloud Portal API uses <strong>API tokens</strong> generated in the portal's Settings section. Tokens are passed as Bearer tokens in the Authorization header. They should be stored in the CI/CD platform's secret management and rotated periodically.</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q10",
+      "type": "true-false",
+      "text": "Custom domain names can be mapped to CCV2 endpoints via CNAME configuration and SSL certificate management.",
+      "correctAnswer": true,
+      "explanation": "<p>Each endpoint supports <strong>custom domain mapping</strong> via CNAME DNS records. SAP provides managed SSL certificates, or you can upload your own. This allows customer-facing URLs like <code>shop.mybrand.com</code> instead of SAP-generated hostnames.</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q11",
+      "type": "multiple-choice",
+      "text": "In a CI/CD pipeline for CCV2, what is the typical sequence after a developer pushes code to Git?",
+      "options": [
+        "Deploy directly to production → run tests → rollback if tests fail",
+        "Trigger build via API → poll status → deploy to dev → test → deploy to staging → approve → deploy to production",
+        "Email the operations team to manually build and deploy",
+        "Wait for the nightly automated build to pick up the change"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The standard CI/CD flow: <strong>trigger build</strong> via Cloud Portal API → <strong>poll</strong> until complete → <strong>deploy to dev</strong> → <strong>automated tests</strong> → <strong>deploy to staging</strong> → <strong>manual approval gate</strong> → <strong>deploy to production</strong>. This automated pipeline ensures quality gates at each stage.</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q12",
+      "type": "true-false",
+      "text": "SAP performs regular automated database backups for CCV2 environments, with production environments receiving more frequent backups than development environments.",
+      "correctAnswer": true,
+      "explanation": "<p>SAP performs <strong>automated backups</strong> for all environments. Production environments have <strong>more frequent backups and longer retention</strong> than development environments, reflecting their higher criticality and data value.</p>"
+    },
+    {
+      "id": "cc-cloud-portal-q13",
+      "type": "multiple-choice",
+      "text": "A build in the Cloud Portal has failed. Where should you look first to diagnose the issue?",
+      "options": [
+        "The application logs in OpenSearch Dashboards",
+        "The build log showing compilation and packaging output",
+        "The deployment history for the target environment",
+        "The Solr indexing log"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <strong>build log</strong> shows exactly where the error occurred during compilation or packaging. It streams in real-time during the build and is retained for review after completion. Application logs (OpenSearch) are for runtime issues, not build failures.</p>"
+    }
+  ]
+}

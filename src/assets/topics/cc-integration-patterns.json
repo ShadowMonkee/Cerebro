@@ -1,0 +1,169 @@
+{
+  "id": "cc-integration-patterns",
+  "title": "Integration Patterns — ImpEx, APIs, Hot Folders & Middleware",
+  "description": "Understand the integration approaches for connecting SAP Commerce Cloud to ERP, PIM, and external systems.",
+  "icon": "🔀",
+  "category": "cc-tier-5",
+  "tags": ["integration", "impex", "hot-folders", "data-hub", "CPI", "middleware", "batch", "real-time", "sap-integration-suite"],
+  "sections": [
+    {
+      "title": "Integration Landscape Overview",
+      "content": "<p>SAP Commerce Cloud rarely operates in isolation. It connects to <strong>ERP systems</strong> (S/4HANA, ECC) for product master data, pricing, inventory, and order handoff. It connects to <strong>PIM systems</strong> for enriched product content. It connects to <strong>payment gateways</strong>, <strong>tax engines</strong>, <strong>shipping providers</strong>, <strong>marketing platforms</strong>, and <strong>CRM systems</strong>. Each integration has different data volumes, latency requirements, and complexity.</p><p>Commerce Cloud provides multiple integration mechanisms, each suited to different scenarios. The choice depends on four factors: <strong>data volume</strong> (thousands of products vs a single order), <strong>latency requirement</strong> (real-time stock check vs nightly catalog sync), <strong>direction</strong> (inbound to Commerce Cloud, outbound from Commerce Cloud, or bidirectional), and <strong>transformation complexity</strong> (simple field mapping vs complex business logic).</p><p>The main integration approaches are: <strong>ImpEx-based batch import</strong> (file-based, high volume, inbound), <strong>Hot Folders</strong> (automated file-based import triggered by file drops), <strong>OCC/REST APIs</strong> (real-time, bidirectional, programmatic), <strong>SAP Integration Suite (CPI)</strong> (middleware-orchestrated, any pattern), and <strong>outbound webhooks via events/scripts</strong> (push-based, event-driven). Legacy approaches include <strong>Data Hub</strong> (deprecated but may appear on exams) and <strong>direct JDBC</strong> (never recommended).</p><p>Understanding when to use which approach — and being able to recommend the right pattern for a client's requirements — is a core consultant skill and a frequent exam topic.</p>"
+    },
+    {
+      "title": "ImpEx-Based Batch Integration",
+      "content": "<p><strong>ImpEx</strong> (Import/Export) is Commerce Cloud's native data language (covered in depth in the ImpEx topic). Beyond manual data management, ImpEx is a primary <strong>batch integration mechanism</strong> — external systems generate ImpEx files that Commerce Cloud imports to synchronise data.</p><p>The typical pattern: an external system (ERP, PIM) exports data on a schedule → a transformation layer converts it into ImpEx format → the ImpEx files are placed on a file system or transferred to Commerce Cloud → Commerce Cloud imports them. This can handle <strong>massive volumes</strong> — millions of product updates, price changes, or stock level refreshes in a single batch run.</p><p>ImpEx batch imports are commonly used for: <strong>product master data</strong> (material descriptions, dimensions, weights from ERP), <strong>pricing</strong> (condition records transformed to PriceRow ImpEx), <strong>stock levels</strong> (warehouse inventory snapshots), <strong>customer data</strong> (B2B customer hierarchies and addresses), <strong>classification data</strong> (product features and specifications from PIM), and <strong>CMS content</strong> (bulk content loading during migrations).</p><p>The main advantage is simplicity and volume capacity. The main limitation is <strong>latency</strong> — batch imports are periodic (hourly, nightly) rather than real-time. For data that changes frequently and must be current (e.g. live stock levels), batch ImpEx may not be sufficient.</p><p>ImpEx imports can be triggered programmatically via the <code>ImportService</code> or via the HAC (Hybris Administration Console). For automated scheduled imports, Hot Folders provide a file-drop mechanism covered next.</p>"
+    },
+    {
+      "title": "Hot Folders — Automated File-Based Integration",
+      "content": "<p><strong>Hot Folders</strong> are a Commerce Cloud mechanism that monitors a designated directory for new files and automatically imports them when detected. They turn file-based integration into an automated, hands-off process.</p><p>The Hot Folder architecture consists of: a <strong>watched directory</strong> on the file system (or cloud storage in CCV2), a <strong>file sorter</strong> that routes incoming files based on naming conventions or file type, a <strong>transformer</strong> that converts the file content (CSV, XML, or raw ImpEx) into ImpEx format if needed, and an <strong>importer</strong> that executes the ImpEx import. The entire pipeline is configurable via Spring Integration channels.</p><p>The typical flow: an external system drops a file (e.g. <code>products_20260316.csv</code>) into the hot folder directory → the file sorter detects it → the transformer converts CSV to ImpEx (using a mapping configuration) → the importer runs the ImpEx → the file is moved to an archive or error directory based on the result.</p><p>Hot Folders support multiple <strong>file formats</strong>: raw ImpEx files (imported directly), CSV files (transformed to ImpEx via header/value mapping), and XML files (transformed via XSLT or custom converters). CSV is the most common format for ERP integrations because most ERP systems can export CSV easily.</p><p>In <strong>CCV2 (cloud deployments)</strong>, hot folders typically watch an <strong>Azure Blob Storage</strong> container or an <strong>NFS mount</strong> rather than a local file system. The external system uploads files to cloud storage, and Commerce Cloud's hot folder mechanism picks them up. This is the standard pattern for cloud-based batch integrations.</p><p>Hot Folders are ideal for <strong>scheduled batch loads</strong>: nightly product updates, hourly stock refreshes, periodic price changes. They are not suitable for real-time, transactional integrations — use OCC APIs or CPI for those.</p>"
+    },
+    {
+      "title": "SAP Integration Suite (CPI) & Middleware Patterns",
+      "content": "<p><strong>SAP Integration Suite</strong> (formerly Cloud Platform Integration / CPI) is SAP's recommended middleware for connecting Commerce Cloud to other SAP and non-SAP systems. It is a cloud-based integration platform that provides pre-built content, visual flow design, monitoring, and error handling.</p><p>CPI sits <strong>between</strong> Commerce Cloud and external systems, handling: <strong>protocol mediation</strong> (e.g. converting an ERP IDoc to a REST API call), <strong>data transformation</strong> (mapping ERP fields to Commerce Cloud fields, format conversion, value translation), <strong>orchestration</strong> (calling multiple systems in sequence or parallel), <strong>error handling</strong> (retry logic, dead-letter queues, alerting), and <strong>monitoring</strong> (message tracing, performance dashboards).</p><p>Common CPI integration flows for Commerce Cloud include: <strong>Product Replication</strong> (S/4HANA material master → CPI transformation → Commerce Cloud ImpEx or API), <strong>Price Replication</strong> (S/4HANA pricing conditions → CPI → Commerce Cloud PriceRows), <strong>Stock Level Sync</strong> (S/4HANA inventory → CPI → Commerce Cloud stock API), <strong>Order Export</strong> (Commerce Cloud order → CPI → S/4HANA sales order), and <strong>Customer Sync</strong> (bidirectional customer data between CRM and Commerce Cloud).</p><p>SAP provides <strong>pre-built integration content</strong> (iFlows) on the SAP Business Accelerator Hub for common Commerce Cloud integration scenarios. These iFlows can be used as-is or customised. Using pre-built content accelerates implementation and follows SAP best practices.</p><p>When to use CPI vs direct integration: use CPI when <strong>multiple systems</strong> are involved, when <strong>complex transformation</strong> is needed, when you need <strong>monitoring and retry</strong> capabilities, or when the integration is <strong>business-critical</strong> (order handoff). Use direct API calls for simple, point-to-point integrations with minimal transformation (e.g. a single external service call from a script).</p>"
+    },
+    {
+      "title": "Real-Time vs Batch — Choosing the Right Pattern",
+      "content": "<p>Every integration design starts with the question: <strong>does this data need to be real-time or is batch acceptable?</strong> The answer drives the technology choice.</p><p><strong>Real-time (synchronous)</strong> integrations execute during a user's session and must respond within milliseconds to seconds. Examples: stock availability check during add-to-cart, payment authorisation during checkout, address validation, real-time pricing from ERP, tax calculation. Technology: OCC API calls (inbound) or outbound HTTP calls from Commerce Cloud services/scripts. Middleware (CPI) can orchestrate real-time flows but adds latency.</p><p><strong>Near-real-time (asynchronous event-driven)</strong> integrations are triggered by events but don't block the user. Examples: order export to ERP after placement, shipment notification to the customer, inventory update after a stock movement. Technology: Commerce Cloud events trigger CPI flows, or outbound API calls in asynchronous handlers. The event system and business process engine are the primary mechanisms.</p><p><strong>Batch (scheduled)</strong> integrations process bulk data on a schedule. Examples: nightly product catalog sync, hourly stock level refresh, weekly price updates, customer data migration. Technology: ImpEx imports via Hot Folders, CPI-orchestrated batch jobs, or scheduled CronJobs that call external APIs.</p><p>A common mistake is making everything real-time. Real-time integrations are more complex, more fragile (external system downtime blocks user operations), and more expensive to maintain. The rule of thumb: <strong>real-time only when the business requires it</strong> (user-blocking operations like stock and payment). Everything else should be near-real-time or batch.</p><p>Many integrations use a <strong>hybrid approach</strong>: stock levels are synced in batch (hourly) for catalog display, but a real-time stock check is performed at add-to-cart to catch changes since the last batch. This combines the efficiency of batch with the accuracy of real-time at the critical moment.</p>"
+    },
+    {
+      "title": "Legacy Patterns, Data Hub & Exam Tips",
+      "content": "<p><strong>Data Hub</strong> was Commerce Cloud's original integration middleware — a built-in staging and transformation engine for inbound data. External systems pushed raw data into Data Hub, which transformed and loaded it into Commerce Cloud. Data Hub has been <strong>deprecated</strong> in favour of SAP Integration Suite (CPI). It may still appear on the exam as a legacy concept — know what it was but recommend CPI for new implementations.</p><p><strong>Direct database access</strong> (JDBC to Commerce Cloud's database) is technically possible but <strong>never recommended</strong>. It bypasses the type system, interceptors, cache, and business logic. It creates upgrade risks and data integrity issues. Always use the platform's native mechanisms (ImpEx, APIs, services) for data access.</p><p><strong>Outbound integration from Commerce Cloud</strong> typically uses: the <strong>event system</strong> (publish an event when something happens, a listener sends data outbound), <strong>business process actions</strong> (a step in the order process calls an external system), or <strong>CronJobs</strong> (scheduled jobs that query Commerce Cloud data and push it externally). CPI can also poll Commerce Cloud APIs on a schedule.</p><p><strong>Key exam points:</strong> ImpEx + Hot Folders for high-volume batch imports. Hot Folders watch directories and auto-import (CSV/XML/ImpEx). CPI is SAP's recommended middleware — provides pre-built iFlows, transformation, orchestration, monitoring. OCC APIs for real-time integration. Real-time only for user-blocking operations; batch for everything else. Data Hub is deprecated — CPI replaces it. Never use direct JDBC. Integration pattern choice depends on volume, latency, direction, and transformation complexity. CCV2 hot folders use cloud storage (Azure Blob). The event system and business process engine drive outbound async integration.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-integration-patterns-q1",
+      "type": "multiple-choice",
+      "text": "Which four factors determine the choice of integration pattern for SAP Commerce Cloud?",
+      "options": [
+        "Cost, team size, timeline, and technology preference",
+        "Data volume, latency requirement, direction, and transformation complexity",
+        "Number of endpoints, authentication method, protocol, and caching",
+        "Source system, target system, data format, and error rate"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Integration pattern selection depends on: <strong>data volume</strong> (bulk vs single records), <strong>latency</strong> (real-time vs batch), <strong>direction</strong> (inbound/outbound/bidirectional), and <strong>transformation complexity</strong> (simple mapping vs complex logic). These four factors drive the technology choice.</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q2",
+      "type": "true-false",
+      "text": "Hot Folders in SAP Commerce Cloud can automatically import CSV files by transforming them to ImpEx using a mapping configuration.",
+      "correctAnswer": true,
+      "explanation": "<p>Hot Folders support multiple file formats including <strong>CSV</strong>. A transformer converts CSV to ImpEx using header/value mapping configurations. The importer then executes the generated ImpEx. CSV is the most common format for ERP integrations.</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q3",
+      "type": "multiple-choice",
+      "text": "In CCV2 (cloud deployments), hot folders typically watch which storage mechanism?",
+      "options": [
+        "The local server file system at /opt/hybris/data",
+        "An FTP server managed by the customer",
+        "Azure Blob Storage or NFS mount",
+        "The Commerce Cloud database BLOB column"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>In CCV2, hot folders watch <strong>Azure Blob Storage</strong> or an <strong>NFS mount</strong> rather than a local file system. External systems upload files to cloud storage, and Commerce Cloud's hot folder mechanism picks them up automatically.</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q4",
+      "type": "true-false",
+      "text": "SAP Data Hub is the current recommended middleware for Commerce Cloud integrations.",
+      "correctAnswer": false,
+      "explanation": "<p>Data Hub has been <strong>deprecated</strong>. <strong>SAP Integration Suite (CPI)</strong> is the current recommended middleware. Data Hub may appear on exams as a legacy concept, but CPI should be recommended for all new implementations.</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q5",
+      "type": "multiple-choice",
+      "text": "Which integration approach is best suited for a nightly sync of 500,000 product records from S/4HANA to Commerce Cloud?",
+      "options": [
+        "Real-time OCC API calls for each product individually",
+        "ImpEx batch import via Hot Folders, orchestrated by CPI",
+        "Direct JDBC connection from S/4HANA to Commerce Cloud's database",
+        "Manual Backoffice entry by the product management team"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>High-volume, periodic data loads are best handled by <strong>ImpEx batch imports via Hot Folders</strong>. CPI transforms ERP data to ImpEx format and drops files into the hot folder. This handles 500K+ records efficiently. Real-time API calls would be impractical at this volume; JDBC is never recommended.</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q6",
+      "type": "true-false",
+      "text": "Real-time integrations should be used for all data synchronisation scenarios to ensure Commerce Cloud always has the latest data.",
+      "correctAnswer": false,
+      "explanation": "<p>Making everything real-time is a common mistake. Real-time integrations are more complex, fragile, and expensive. The rule: <strong>real-time only for user-blocking operations</strong> (stock check, payment). Everything else (catalog, prices, customer data) should be near-real-time or batch.</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q7",
+      "type": "multiple-choice",
+      "text": "What are the key capabilities that SAP Integration Suite (CPI) provides for Commerce Cloud integrations?",
+      "options": [
+        "Database replication and JDBC connection pooling",
+        "Protocol mediation, data transformation, orchestration, error handling, and monitoring",
+        "Direct ImpEx execution and Hot Folder management",
+        "Frontend component rendering and CMS management"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>CPI provides: <strong>protocol mediation</strong> (converting between formats/protocols), <strong>data transformation</strong> (field mapping), <strong>orchestration</strong> (multi-system flows), <strong>error handling</strong> (retries, dead-letter queues), and <strong>monitoring</strong> (message tracing, dashboards).</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q8",
+      "type": "true-false",
+      "text": "Direct JDBC access to Commerce Cloud's database is a recommended approach for high-performance data loading.",
+      "correctAnswer": false,
+      "explanation": "<p>Direct JDBC access is <strong>never recommended</strong>. It bypasses the type system, interceptors, cache, and business logic — creating data integrity issues and upgrade risks. Always use native mechanisms: ImpEx, APIs, or services.</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q9",
+      "type": "multiple-choice",
+      "text": "A customer requires real-time stock availability checks during add-to-cart, but nightly bulk stock updates for catalog display. What pattern is this?",
+      "options": [
+        "Full real-time integration",
+        "Full batch integration",
+        "Hybrid approach — batch for display, real-time for critical moments",
+        "Event-driven integration"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>This is a <strong>hybrid approach</strong>: batch sync (nightly) provides stock data for catalog display, while a real-time check at add-to-cart catches changes since the last batch. This combines efficiency with accuracy at the critical moment.</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q10",
+      "type": "true-false",
+      "text": "SAP provides pre-built integration content (iFlows) on the SAP Business Accelerator Hub for common Commerce Cloud integration scenarios.",
+      "correctAnswer": true,
+      "explanation": "<p>SAP provides <strong>pre-built iFlows</strong> for common scenarios: product replication, price sync, stock levels, order export, and customer data. These can be used as-is or customised, accelerating implementation and following SAP best practices.</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q11",
+      "type": "multiple-choice",
+      "text": "Which Commerce Cloud mechanisms are used for outbound asynchronous integration (pushing data to external systems)?",
+      "options": [
+        "Hot Folders and ImpEx exports only",
+        "The event system, business process actions, and CronJobs",
+        "Backoffice export wizards",
+        "OCC GET endpoints polled by external systems"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Outbound async integration uses: the <strong>event system</strong> (listeners send data on events), <strong>business process actions</strong> (order process steps call external systems), and <strong>CronJobs</strong> (scheduled jobs push data). These mechanisms decouple the outbound call from the user's request thread.</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q12",
+      "type": "true-false",
+      "text": "When a Hot Folder import fails, the file is typically moved to an error directory rather than silently discarded.",
+      "correctAnswer": true,
+      "explanation": "<p>Hot Folders move processed files to an <strong>archive directory</strong> on success or an <strong>error directory</strong> on failure. This provides traceability — failed files can be inspected, corrected, and resubmitted. Files are never silently discarded.</p>"
+    },
+    {
+      "id": "cc-integration-patterns-q13",
+      "type": "multiple-choice",
+      "text": "When should you choose CPI middleware over a direct API call from a Commerce Cloud script?",
+      "options": [
+        "Always — direct API calls should never be used",
+        "When multiple systems are involved, complex transformation is needed, or monitoring and retry capabilities are required",
+        "Only when integrating with SAP systems — non-SAP integrations should always use direct calls",
+        "Only for batch integrations — real-time flows should use direct calls"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Use CPI when <strong>multiple systems</strong> are involved, when <strong>complex transformation</strong> is needed, or when <strong>monitoring and retry</strong> are required. Direct API calls are fine for simple, point-to-point integrations with minimal transformation. The choice depends on complexity, not the system vendor or timing.</p>"
+    }
+  ]
+}
