@@ -1,0 +1,176 @@
+{
+  "id": "cc-spartacus-b2b",
+  "title": "Spartacus B2B — Organisations, Permissions & Checkout",
+  "description": "Implement B2B commerce in Spartacus — organisation management, units, budgets, cost centres, approval workflows, and the B2B checkout flow.",
+  "icon": "🏢",
+  "category": "cc-tier-7",
+  "tags": ["b2b", "organisations", "units", "budgets", "cost-centres", "approvals", "purchase-orders", "b2b-checkout", "spartacus"],
+  "sections": [
+    {
+      "title": "B2B Commerce in SAP Commerce Cloud",
+      "content": "<p><strong>B2B (Business-to-Business) commerce</strong> has fundamentally different requirements from B2C. In B2C, an individual customer browses, buys, and pays. In B2B, a <strong>buying organisation</strong> with internal hierarchies, budgets, approval chains, and procurement processes places orders — often with negotiated pricing, purchase order references, and complex delivery requirements.</p><p>SAP Commerce Cloud supports B2B through a dedicated set of extensions (the <strong>B2B Commerce</strong> module) that add organisational structures, permission models, approval workflows, and B2B-specific checkout steps on top of the core commerce platform. Spartacus exposes these capabilities through the <strong>@spartacus/organization</strong> library and B2B-specific checkout and cart modules.</p><p>The B2B model centres on the concept of an <strong>Organisation</strong> — a company that buys from your storefront. Within an organisation, there are <strong>units</strong> (departments or divisions), <strong>users</strong> (employees who place orders), <strong>budgets</strong> (spending limits), <strong>cost centres</strong> (accounting codes for expense allocation), and <strong>permissions</strong> (rules governing who can buy what and how much). These structures mirror how real procurement departments operate.</p><p>For the exam, understand that B2B is not a separate product — it is a set of extensions and configurations that <strong>build on top of</strong> the standard B2C commerce platform. Everything from the B2C topics (cart, checkout, orders, pricing, promotions) still applies in B2B, with additional layers for organisational governance.</p>"
+    },
+    {
+      "title": "Organisation Structure — Units, Users & Roles",
+      "content": "<p>The <strong>organisational hierarchy</strong> is the foundation of B2B commerce. It models the buying company's internal structure.</p><p>An <strong>Organisation</strong> (<code>B2BUnit</code>) represents the top-level company. Under it, <strong>Units</strong> (also <code>B2BUnit</code>) represent departments, divisions, regions, or any sub-grouping the company uses. Units form a <strong>tree hierarchy</strong> — a parent unit can have child units (e.g. ACME Corp → EMEA Division → Germany Office → Engineering Department). The hierarchy can be as deep as the business requires.</p><p><strong>B2B Users</strong> (<code>B2BCustomer</code>) are employees of the organisation who log into the storefront. Each user belongs to a <strong>unit</strong> and is assigned one or more <strong>B2B roles</strong>: <strong>Buyer</strong> (can create and submit orders), <strong>Approver</strong> (can approve or reject orders from their unit), <strong>Administrator</strong> (can manage the organisation's units, users, budgets, and permissions), and <strong>Manager</strong> (can view reports and organisation data).</p><p>A user's unit determines their <strong>scope</strong>: they can see and interact with data relevant to their unit and its child units. An approver in the EMEA Division can approve orders from Germany Office and its sub-units, but not orders from the APAC Division.</p><p>In Spartacus, the <strong>@spartacus/organization</strong> library provides the <strong>My Company</strong> area — a self-service administration interface where B2B administrators manage their own organisation's units, users, budgets, cost centres, and permissions without needing Backoffice access. This is a major B2B differentiator: the buying organisation manages itself.</p>"
+    },
+    {
+      "title": "Budgets & Cost Centres",
+      "content": "<p><strong>Budgets</strong> enforce spending limits within the organisation. Each budget has a <strong>code</strong>, an <strong>amount</strong> (in a specific currency), a <strong>time period</strong> (start and end date — typically monthly, quarterly, or annual), and is assigned to one or more <strong>units</strong>. When a buyer places an order, the system checks whether the order total exceeds the available budget. If it does, the order is routed for approval.</p><p>Budgets can be <strong>nested</strong> — a parent unit's budget can serve as a ceiling for all child units. This enables hierarchical spending control: the EMEA Division has a €1M annual budget, the Germany Office has a €300K budget within that, and the Engineering Department has a €100K budget within that.</p><p><strong>Cost Centres</strong> are accounting codes that buyers assign to orders during checkout. They determine how the expense is categorised in the company's financial system. A cost centre is linked to a <strong>unit</strong> and has a <strong>budget</strong> — spending against a cost centre draws down the associated budget.</p><p>During B2B checkout, the buyer <strong>selects a cost centre</strong> for the order (or for individual line items in advanced scenarios). This selection determines which budget is checked and which accounting code is sent to the ERP with the order. If no cost centre is selected, the order cannot proceed — it is a required field in B2B checkout.</p><p>In Spartacus, cost centres are presented as a dropdown during checkout (populated from the buyer's unit's available cost centres). The budget check happens server-side when the order is submitted — if the budget is exceeded, the order triggers the approval workflow rather than being placed directly.</p>"
+    },
+    {
+      "title": "Permissions & Approval Workflows",
+      "content": "<p>B2B <strong>permissions</strong> define the rules that determine whether an order can be placed directly or must be approved. They are the governance layer that ensures procurement policies are enforced.</p><p>Permission types include: <strong>Order Threshold Permission</strong> (per-order spending limit — e.g. a buyer can place orders up to €5,000 without approval; anything above requires approver sign-off), <strong>Order Threshold per Timespan</strong> (cumulative spending limit over a time period — e.g. a buyer can spend up to €20,000 per month), and <strong>Allowed Order Types</strong> (restrict which types of orders a user can place).</p><p>Permissions are assigned to <strong>users</strong> or <strong>user groups</strong> and are evaluated at order submission time. When a permission threshold is exceeded, the order enters the <strong>approval workflow</strong> instead of being placed immediately.</p><p>The <strong>B2B approval workflow</strong> works as follows: <strong>1.</strong> Buyer submits an order that exceeds their permission threshold. <strong>2.</strong> The order status becomes <strong>Pending Approval</strong>. <strong>3.</strong> The designated <strong>Approver</strong> (determined by the unit hierarchy — the approver in the buyer's unit or a parent unit) receives a notification. <strong>4.</strong> The approver reviews the order in Spartacus and either <strong>approves</strong> (order is placed) or <strong>rejects</strong> (order is cancelled with a reason). <strong>5.</strong> The buyer is notified of the decision.</p><p>Approvals can be <strong>multi-level</strong>: if the order exceeds the first approver's threshold too, it escalates to the next approver up the unit hierarchy. This mirrors real-world procurement chains where larger purchases require higher-level sign-off.</p><p>In Spartacus, the approval UI shows pending orders in a dedicated <strong>Order Approval</strong> area. Approvers can view order details, line items, totals, and the reason the order was flagged, then approve or reject with comments.</p>"
+    },
+    {
+      "title": "B2B Checkout Flow",
+      "content": "<p>The B2B checkout flow extends the standard B2C checkout with additional steps specific to business procurement.</p><p>Standard B2B checkout sequence: <strong>1. Payment Type</strong> — the buyer selects the payment method. B2B typically uses <strong>Account Payment</strong> (invoice / purchase order — the most common B2B method) rather than credit card. When Account Payment is selected, the buyer enters a <strong>Purchase Order (PO) Number</strong> — a reference from their internal procurement system that appears on the invoice for matching. <strong>2. Delivery Address</strong> — selected from the organisation's approved addresses (not free-form entry). <strong>3. Delivery Method</strong> — standard delivery mode selection. <strong>4. Review & Submit</strong> — the buyer reviews the order including cost centre assignment and PO number.</p><p>Key differences from B2C checkout: <strong>cost centre selection</strong> is mandatory (it may appear as a separate step or within the review step), <strong>purchase order number</strong> is a required field for account payment, <strong>address selection</strong> is restricted to addresses approved for the buyer's unit (not arbitrary addresses), and <strong>payment</strong> is typically invoice-based rather than card-based.</p><p>After submission, the order either <strong>places directly</strong> (if within the buyer's permission thresholds) or <strong>enters the approval workflow</strong> (if thresholds are exceeded). This is transparent to the buyer — they see a confirmation that the order was submitted, with a status indicating whether it was placed or is pending approval.</p><p>The B2B checkout flow is configurable in Spartacus through the <strong>CheckoutConfig</strong>. Steps can be added, removed, or reordered. Custom steps (e.g. project reference, delivery instructions, compliance attestation) can be added as Angular components registered in the checkout flow configuration.</p>"
+    },
+    {
+      "title": "B2B Features in Spartacus & Exam Tips",
+      "content": "<p>Spartacus's B2B capabilities are delivered through several libraries working together:</p><p><strong>@spartacus/organization</strong> — the My Company self-service area: unit management (create, edit, assign users), user management (create, assign roles, assign approvers), budget management (create, assign to units), cost centre management, and permission management. This is where B2B administrators manage their organisational structure.</p><p><strong>@spartacus/checkout/b2b</strong> — the B2B checkout module providing the extended checkout flow with payment type selection, PO number entry, cost centre assignment, and account payment support.</p><p><strong>@spartacus/order</strong> — includes the <strong>Order Approval</strong> feature where approvers review and act on pending orders. Also includes B2B order history with approval status visibility.</p><p>All B2B features consume <strong>OCC B2B endpoints</strong> — dedicated REST APIs for organisations, units, budgets, cost centres, permissions, and approval actions. These endpoints are provided by Commerce Cloud's B2B extensions (b2bcommerce, b2bapprovalprocess, etc.).</p><p><strong>Key exam points:</strong> B2B builds on top of B2C — not a separate platform. B2BUnit is the organisation/unit type forming a tree hierarchy. B2BCustomer is the buyer type with roles (Buyer, Approver, Administrator, Manager). Budgets enforce spending limits per unit per time period. Cost centres link orders to accounting codes and budgets. Permissions define thresholds that trigger approval. Approval routes up the unit hierarchy. B2B checkout adds: payment type (account/PO), cost centre, PO number, restricted addresses. @spartacus/organization provides self-service My Company management. Orders either place directly or enter Pending Approval based on permission thresholds.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-spartacus-b2b-q1",
+      "type": "multiple-choice",
+      "text": "What is the core organisational building block in SAP Commerce Cloud's B2B model?",
+      "options": [
+        "B2BCustomer",
+        "B2BUnit",
+        "B2BBudget",
+        "B2BCostCentre"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>B2BUnit</strong> represents both the top-level organisation and its internal divisions/departments. Units form a tree hierarchy that models the company's structure. Users, budgets, and cost centres are all assigned to units.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q2",
+      "type": "true-false",
+      "text": "B2B commerce in SAP Commerce Cloud is a completely separate product from the B2C platform.",
+      "correctAnswer": false,
+      "explanation": "<p>B2B is <strong>not a separate product</strong>. It is a set of extensions and configurations that build on top of the standard B2C commerce platform. Everything from B2C (cart, checkout, orders, pricing, promotions) still applies, with additional B2B governance layers.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q3",
+      "type": "multiple-choice",
+      "text": "Which B2B role allows a user to approve or reject orders from their unit?",
+      "options": [
+        "Buyer",
+        "Administrator",
+        "Approver",
+        "Manager"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>The <strong>Approver</strong> role enables a user to approve or reject orders submitted by buyers in their unit (and child units). Buyers create orders, Administrators manage the organisation, and Managers view reports.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q4",
+      "type": "true-false",
+      "text": "A B2B budget can enforce spending limits over a time period — for example, a monthly or quarterly cap.",
+      "correctAnswer": true,
+      "explanation": "<p>Budgets have a <strong>time period</strong> (start and end date) and an amount. They enforce cumulative spending limits — when spending against a budget exceeds the amount within the time period, further orders trigger the approval workflow.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q5",
+      "type": "multiple-choice",
+      "text": "During B2B checkout, what does the buyer enter when selecting Account Payment as the payment type?",
+      "options": [
+        "Credit card details",
+        "A bank transfer reference number",
+        "A Purchase Order (PO) Number from their internal procurement system",
+        "A cryptocurrency wallet address"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>With Account Payment (invoice), the buyer enters a <strong>Purchase Order (PO) Number</strong> — a reference from their internal procurement system. This number appears on the invoice for matching and reconciliation in their financial system.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q6",
+      "type": "true-false",
+      "text": "Cost centre selection is optional in B2B checkout — buyers can skip it if they don't have a relevant cost centre.",
+      "correctAnswer": false,
+      "explanation": "<p>Cost centre selection is typically <strong>mandatory</strong> in B2B checkout. The cost centre determines which budget is checked and which accounting code is sent to ERP. Without it, the system cannot allocate the expense correctly.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q7",
+      "type": "multiple-choice",
+      "text": "What happens when a B2B buyer submits an order that exceeds their permission threshold?",
+      "options": [
+        "The order is rejected automatically and the buyer is notified",
+        "The order is placed anyway but flagged for audit",
+        "The order enters Pending Approval status and routes to the designated Approver",
+        "The system increases the buyer's threshold automatically"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>When a threshold is exceeded, the order enters <strong>Pending Approval</strong> and routes to the designated approver (determined by the unit hierarchy). The approver reviews the order and either approves (order is placed) or rejects (order is cancelled).</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q8",
+      "type": "true-false",
+      "text": "B2B approvals can escalate through multiple levels of the unit hierarchy when the order exceeds multiple approvers' thresholds.",
+      "correctAnswer": true,
+      "explanation": "<p>Approvals can be <strong>multi-level</strong>. If an order exceeds the first approver's threshold too, it escalates to the next approver up the hierarchy. This mirrors real-world procurement chains where larger purchases require higher-level approval.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q9",
+      "type": "multiple-choice",
+      "text": "Which Spartacus library provides the 'My Company' self-service area for B2B organisation management?",
+      "options": [
+        "@spartacus/checkout",
+        "@spartacus/user",
+        "@spartacus/organization",
+        "@spartacus/asm"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>@spartacus/organization</strong> provides the My Company area where B2B administrators manage units, users, budgets, cost centres, and permissions — all self-service, without needing Backoffice access.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q10",
+      "type": "true-false",
+      "text": "In B2B checkout, delivery addresses are restricted to addresses approved for the buyer's organisational unit.",
+      "correctAnswer": true,
+      "explanation": "<p>B2B buyers cannot enter arbitrary addresses. Delivery addresses are <strong>restricted to those approved</strong> for their unit in the organisation. This enforces procurement policies and ensures deliveries go to approved company locations.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q11",
+      "type": "multiple-choice",
+      "text": "What is the relationship between a cost centre and a budget in SAP Commerce Cloud's B2B model?",
+      "options": [
+        "They are the same concept with different names",
+        "A cost centre links to a unit and has a budget — spending against the cost centre draws down the associated budget",
+        "A budget contains multiple cost centres that share the same accounting code",
+        "Cost centres replace budgets in modern B2B implementations"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>A cost centre is linked to a <strong>unit</strong> and has an associated <strong>budget</strong>. When a buyer assigns a cost centre to an order, spending draws down from that budget. The cost centre provides the accounting code; the budget provides the spending limit.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q12",
+      "type": "true-false",
+      "text": "An approver's scope is limited to their own unit and its child units — they cannot approve orders from sibling or parent units.",
+      "correctAnswer": true,
+      "explanation": "<p>An approver's scope follows the <strong>unit hierarchy</strong>. They can approve orders from their own unit and child units below them. Orders from sibling or parent units require an approver assigned to those respective units.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q13",
+      "type": "multiple-choice",
+      "text": "Which permission type enforces a cumulative spending limit over a time period (e.g. €20,000 per month)?",
+      "options": [
+        "Order Threshold Permission",
+        "Order Threshold per Timespan",
+        "Allowed Order Types",
+        "Budget Cap Permission"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Order Threshold per Timespan</strong> enforces a cumulative spending limit over a defined time period. Unlike the per-order threshold (which checks each individual order), this checks total spending across all orders within the timespan.</p>"
+    },
+    {
+      "id": "cc-spartacus-b2b-q14",
+      "type": "true-false",
+      "text": "The B2B checkout flow in Spartacus is configurable — steps can be added, removed, or reordered through CheckoutConfig.",
+      "correctAnswer": true,
+      "explanation": "<p>The B2B checkout flow is <strong>configurable via CheckoutConfig</strong>. Standard steps can be reordered, and custom steps (project reference, compliance attestation, delivery instructions) can be added as Angular components registered in the flow configuration.</p>"
+    }
+  ]
+}

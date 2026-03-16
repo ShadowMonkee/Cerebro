@@ -66,12 +66,18 @@ import { Topic } from '../../models/topic.model';
           </button>
 
           <button
-            *ngIf="isLastSection"
-            class="btn btn-primary btn-start-test"
+            *ngIf="isLastSection && topic!.questions.length > 0"            class="btn btn-primary btn-start-test"
             (click)="startTest()"
           >
             Start Test →
           </button>
+          <a   
+            *ngIf="isLastSection && topic!.questions.length === 0"
+            routerLink="/"
+            class="btn btn-primary"
+          >
+            Back to Topics
+        </a>
         </div>
       </div>
     </div>

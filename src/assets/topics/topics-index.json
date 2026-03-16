@@ -41,6 +41,7 @@
     "cc-properties-config",
     "cc-spartacus-architecture",
     "cc-spartacus-customization",
+    "cc-spartacus-b2b",
 
 
     "cpq-overview",
@@ -57,6 +58,10 @@
     "cpq-sap-integrations",
     "cpq-apis",
     "cpq-external-integrations",
-    "cpq-architecture"
+    "cpq-architecture",
+    "cpq-exercises-phase1",
+    "cpq-exercises-phase2",
+    "cpq-exercises-phase3",
+    "cpq-exercises-phase4"
   ]
 }
