@@ -1,0 +1,189 @@
+{
+  "id": "cpq-architecture",
+  "title": "Solution Architecture, Performance & Security",
+  "description": "Design scalable CPQ architectures — tenant strategy, deployment, release management, performance tuning, and the security model.",
+  "icon": "🏛️",
+  "category": "cpq-phase-4",
+  "tags": ["architecture", "tenant", "deployment", "releases", "performance", "security", "application-parameters", "governance"],
+  "sections": [
+    {
+      "title": "Tenant Strategy & Environment Management",
+      "content": "<p>Every SAP CPQ deployment starts with a <strong>tenant strategy</strong> — deciding how many environments to maintain and how configuration moves between them. A tenant is a fully isolated CPQ instance with its own data, configuration, users, and URL.</p><p>The standard setup uses <strong>three tenants</strong>: <strong>Development</strong> (where consultants and developers build configuration, rules, scripts, and templates), <strong>Test / QA</strong> (where business users validate the configuration against requirements), and <strong>Production</strong> (the live environment used by sales reps and customers). Some organisations add a <strong>Sandbox</strong> tenant for experimentation and training, or a <strong>Pre-Production</strong> tenant for final regression testing before go-live.</p><p>Tenants are <strong>completely independent</strong> — there is no automatic synchronisation between them. Products, rules, scripts, pricebooks, users, workflows, and templates must be explicitly moved from one tenant to another. This isolation is a feature, not a limitation: it prevents untested changes from reaching production.</p><p>The key discipline is a strict <strong>promotion path</strong>: changes are built in Dev → validated in Test → deployed to Production. Never build or modify configuration directly in Production — even \"small\" changes. A broken script or misconfigured rule in Production affects every user immediately, and CPQ has no built-in undo for configuration changes.</p><p>Each tenant has its own <strong>Setup Home</strong> page that displays the current CPQ version, tenant ID, and environment details. This is useful for verifying which environment you are working in — a simple check that prevents the common mistake of making changes in the wrong tenant.</p>"
+    },
+    {
+      "title": "Deployment Packages — Moving Configuration Between Tenants",
+      "content": "<p><strong>Deployment packages</strong> (also called snapshots or migrations) are the mechanism for moving configuration from one tenant to another. They export selected objects from the source tenant into a transportable package that can be imported into the target tenant.</p><p>A deployment package can include: <strong>products</strong> (with attributes, values, rules, scripts, and layout), <strong>pricing configuration</strong> (pricebooks, discount rules, promotions), <strong>workflow</strong> (statuses, actions, approval rules, notifications), <strong>document templates</strong>, <strong>custom fields</strong> (QCFs, QICFs), <strong>custom tables</strong> (structure — data is typically loaded separately), <strong>quote tables</strong>, and <strong>global scripts</strong>. You select which objects to include — a package can be as small as a single product or as comprehensive as the entire tenant configuration.</p><p>Import behaviour is <strong>overwrite-based</strong>: objects in the target tenant that match objects in the package (by ID or name) are overwritten. New objects are created. This means a misconfigured deployment package can <strong>overwrite production data</strong> — always review the package contents carefully and test the import in a non-production tenant first.</p><p>Best practices for deployment: <strong>document every package</strong> (what was included, why, and which ticket or requirement it addresses), maintain a <strong>deployment log</strong> that tracks what was deployed to which tenant on which date, perform imports during <strong>off-peak hours</strong> to minimise impact on active users, and always have a <strong>rollback plan</strong> (export the current production state before importing the new package, so you can restore if something breaks).</p><p>There is <strong>no built-in versioning</strong> for deployment packages — once imported, the previous configuration is gone unless you exported a backup first.</p>"
+    },
+    {
+      "title": "Release Management — CPQ Quarterly Updates",
+      "content": "<p>SAP CPQ ships a <strong>new release every three months</strong>: <strong>February</strong>, <strong>May</strong>, <strong>August</strong>, and <strong>November</strong>. This quarterly cadence means the platform is constantly evolving — new features, UI improvements, API enhancements, and occasionally breaking changes.</p><p>Releases are deployed to <strong>non-productive environments first</strong> (Dev and Test tenants), followed by <strong>production environments two weeks later</strong>. This two-week window is your opportunity to test the new release against your configuration and identify any issues before production is affected.</p><p>For each release, you should: <strong>1.</strong> Review the <strong>release notes</strong> published by SAP (available on the SAP Help Portal and CPQ community). <strong>2.</strong> Identify <strong>new features</strong> that may benefit the implementation. <strong>3.</strong> Check for <strong>breaking changes</strong> — deprecated features, changed APIs, modified default behaviour. <strong>4.</strong> Run <strong>regression testing</strong> in the non-productive tenant to verify that existing functionality still works. <strong>5.</strong> Plan any required <strong>actions</strong> (configuration changes, script updates) before the release reaches production.</p><p>Common areas affected by releases: <strong>UI changes</strong> (layout shifts, renamed menu items), <strong>API changes</strong> (deprecated endpoints, new required fields), <strong>formula/tag changes</strong> (new tags available, changed behaviour of existing tags), and <strong>security updates</strong> (new authentication requirements, changed permission defaults).</p><p>The release notes are accessible from <strong>Setup → Home</strong> in the admin UI, which also displays the current CPQ version number. Subscribing to SAP CPQ release notes is a best practice for any team managing a CPQ implementation — surprises in production are always more expensive than preparation.</p>"
+    },
+    {
+      "title": "Application Parameters — System-Wide Configuration",
+      "content": "<p><strong>Application Parameters</strong> are system-wide settings that control CPQ behaviour at the tenant level. They are managed under <strong>Setup → General → Application Parameters</strong> and are organised into logical groups.</p><p>Application parameters act as <strong>feature toggles and global defaults</strong>. Some examples encountered throughout this curriculum: <strong>Enable Promotions</strong> (TRUE/FALSE — controls whether the Special Pricing feature is available; FALSE by default on Quote 2.0 tenants), <strong>Create Empty Quote First</strong> (controls whether users must create a quote before adding products or can add directly from the catalog), <strong>Shopping Cart and Quotes</strong> parameters (various settings controlling quote behaviour), and parameters that <strong>show or hide recurring price fields</strong> on products and quotes.</p><p>Parameters are powerful because they affect <strong>every user and every quote</strong> in the tenant. Changing a parameter in production has an immediate, global impact. This makes them both useful (one setting enables a feature for the entire organisation) and risky (one wrong setting can break the quoting process for everyone).</p><p>Best practices: <strong>document all parameter changes</strong> with the reason and expected impact, test parameter changes in a non-productive tenant before applying to production, review parameters during the <strong>blueprint phase</strong> of a project to ensure the tenant is configured correctly from the start, and include parameter settings in your deployment documentation so they can be replicated across tenants.</p><p>Parameters cannot be included in deployment packages — they must be set <strong>manually in each tenant</strong>. This is a common oversight: the development tenant has the correct parameters, but the tester or production admin forgets to set the same parameters in their tenant, leading to different behaviour across environments.</p>"
+    },
+    {
+      "title": "Performance Architecture",
+      "content": "<p>CPQ performance is experienced directly by sales reps and customers — a slow configurator or sluggish quote screen translates directly into lost productivity and frustrated users. Performance must be designed in, not fixed after go-live.</p><p><strong>Configuration performance.</strong> Covered in the advanced configuration topic: minimise rule count, enable \"Triggers Execution of Rules\" only where needed, keep container formulas simple, limit container row counts, and optimise script execution time. These are the most impactful levers because configuration happens interactively with the user waiting.</p><p><strong>Pricing performance.</strong> Pricebook lookups are fast for small-to-medium catalogs but can slow down with very large pricebooks (tens of thousands of entries). Keep pricebooks focused — use the parent/child hierarchy so that each leaf pricebook contains only its exception prices, with standard prices inherited from the parent. Avoid unnecessary pricebook entries by using custom pricing for products that don't need pricebook flexibility.</p><p><strong>Quote loading performance.</strong> Quotes with many line items (50+), numerous custom fields, and multiple quote tables load more slowly. QCF and QICF calculation formulas execute on every quote load — keep \"Always\" calculation types to a minimum and prefer \"On Modify\" where possible. Quote table scripts that load large datasets should paginate or limit results rather than loading everything at once.</p><p><strong>Integration performance.</strong> External API calls from scripts add latency to user-facing operations. Cache results where possible (e.g. store a customer's credit status in a custom field rather than re-checking on every quote save), use batch patterns for non-critical integrations, and set appropriate timeouts on outbound HTTP calls so a slow external system doesn't hang the CPQ UI.</p><p><strong>Testing at scale.</strong> Always test with production-like data volumes. A configurator that works perfectly with 5 products and 10 rules may struggle with 500 products and 200 rules. Load-test the system with realistic concurrent user counts before go-live.</p>"
+    },
+    {
+      "title": "Security Model & Governance",
+      "content": "<p>SAP CPQ's security model is built on <strong>role-based access control</strong> layered across multiple dimensions. Understanding how these layers interact is essential for designing a secure implementation.</p><p><strong>Layer 1 — Authentication.</strong> Users authenticate via SSO (SAML 2.0) or local credentials. SSO is the standard for enterprise deployments. Multi-factor authentication (MFA) is enforced at the Identity Provider level, not within CPQ itself. Password expiration policies can be set on local user accounts.</p><p><strong>Layer 2 — User Types.</strong> Every user is assigned one user type that defines their base permission set. User types control which menu areas are accessible (Products, Pricing, Scripts, Setup), which actions are available (create quote, apply discount, approve), and default UI settings. Fewer user types with broader permissions are easier to maintain than many granular user types.</p><p><strong>Layer 3 — Permission Groups.</strong> Permission groups add fine-grained access on top of user types. They control visibility of specific products, categories, markets, pricebooks, configuration options, and quote tabs. Permission groups have a many-to-many relationship with users — a user can belong to multiple groups. Use permission groups for regional or departmental segmentation (e.g. Belgium sales vs France sales).</p><p><strong>Layer 4 — Discount authority.</strong> Discount rules define maximum discount percentages per user, user type, product, and category. Exceeding the threshold triggers approval workflows (when approval rules are configured). This protects margins at the individual transaction level.</p><p><strong>Layer 5 — Field-level permissions.</strong> Custom fields (QCF, QICF) have per-user-type, per-status permissions (Editable, Read Only, Required, Hidden). This controls who can see and modify specific data at each stage of the quote lifecycle.</p><p><strong>Data segregation.</strong> Companies in CPQ provide organisational segregation — users see only data associated with their company (when permissions are configured correctly). In multi-company tenants, this prevents users from one business unit seeing another's quotes, products, or pricing. Sensitive pricing fields (cost, margin) can be hidden from sales reps via user type permissions.</p><p><strong>Governance recommendation:</strong> document the complete permission matrix (user types × permission groups × statuses × actions) during the blueprint phase. Review it with the client's security and compliance team. Audit permissions quarterly to ensure they still reflect organisational changes.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-architecture-q1",
+      "type": "multiple-choice",
+      "text": "What is the standard minimum number of tenants recommended for an SAP CPQ deployment?",
+      "options": [
+        "One (production only)",
+        "Two (development and production)",
+        "Three (development, test, and production)",
+        "Five (sandbox, development, test, pre-production, and production)"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>The standard setup uses <strong>three tenants</strong>: Development (build), Test/QA (validate), and Production (live). Some organisations add Sandbox or Pre-Production tenants, but three is the recommended minimum for a controlled promotion path.</p>"
+    },
+    {
+      "id": "cpq-architecture-q2",
+      "type": "true-false",
+      "text": "Configuration changes in a development tenant automatically synchronise to the production tenant in SAP CPQ.",
+      "correctAnswer": false,
+      "explanation": "<p>Tenants are <strong>completely independent</strong>. There is no automatic synchronisation. Configuration must be explicitly moved between tenants using deployment packages. This isolation prevents untested changes from reaching production.</p>"
+    },
+    {
+      "id": "cpq-architecture-q3",
+      "type": "multiple-choice",
+      "text": "What happens when a deployment package is imported into a target tenant and an object with the same ID already exists?",
+      "options": [
+        "The import fails with a duplicate error",
+        "The existing object is preserved and the new object is skipped",
+        "The existing object is overwritten by the package version",
+        "Both versions are kept and the user is prompted to choose"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Import behaviour is <strong>overwrite-based</strong>. Objects in the target tenant that match objects in the package are overwritten. This is why reviewing package contents and testing imports in non-production are essential — a misconfigured package can overwrite production data.</p>"
+    },
+    {
+      "id": "cpq-architecture-q4",
+      "type": "true-false",
+      "text": "SAP CPQ releases new versions quarterly — in February, May, August, and November.",
+      "correctAnswer": true,
+      "explanation": "<p>SAP CPQ ships a <strong>new release every three months</strong>: February, May, August, and November. Non-productive environments receive the update first, followed by production environments two weeks later.</p>"
+    },
+    {
+      "id": "cpq-architecture-q5",
+      "type": "multiple-choice",
+      "text": "How much time do you have between a CPQ release reaching non-productive environments and reaching production?",
+      "options": [
+        "24 hours",
+        "One week",
+        "Two weeks",
+        "One month"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Non-productive environments receive the release first, and production follows <strong>two weeks later</strong>. This window is your opportunity to review release notes, identify breaking changes, and run regression testing before production is affected.</p>"
+    },
+    {
+      "id": "cpq-architecture-q6",
+      "type": "true-false",
+      "text": "Application parameters can be included in deployment packages and automatically promoted between tenants.",
+      "correctAnswer": false,
+      "explanation": "<p>Application parameters <strong>cannot</strong> be included in deployment packages. They must be set <strong>manually in each tenant</strong>. This is a common oversight — forgetting to replicate parameter settings across tenants leads to different behaviour in different environments.</p>"
+    },
+    {
+      "id": "cpq-architecture-q7",
+      "type": "multiple-choice",
+      "text": "The 'Enable Promotions' application parameter is found under which path in the CPQ admin?",
+      "options": [
+        "Setup → Pricing/Calculations → Promotions",
+        "Setup → General → Application Parameters → General Parameters",
+        "Setup → Workflow/Approval → Promotion Settings",
+        "Setup → Product Catalog → Special Pricing"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Enable Promotions is found under <strong>Setup → General → Application Parameters → General Parameters</strong>. It is set to FALSE by default on Quote 2.0 tenants and must be explicitly enabled to use the Special Pricing / Promotions feature.</p>"
+    },
+    {
+      "id": "cpq-architecture-q8",
+      "type": "true-false",
+      "text": "Changing an application parameter in production has an immediate, global effect on every user and every quote in the tenant.",
+      "correctAnswer": true,
+      "explanation": "<p>Application parameters are <strong>system-wide</strong>. Changing one in production immediately affects every user and every quote. This makes them powerful but risky — always test parameter changes in a non-productive tenant first.</p>"
+    },
+    {
+      "id": "cpq-architecture-q9",
+      "type": "multiple-choice",
+      "text": "Which QCF calculation type should be minimised for optimal quote loading performance?",
+      "options": [
+        "None",
+        "Once",
+        "On Modify",
+        "Always"
+      ],
+      "correctIndex": 3,
+      "explanation": "<p><strong>Always</strong> recalculates the field every time the quote loads, adding processing time on every page view. Prefer <strong>On Modify</strong> (recalculates only when the quote changes) or <strong>Once</strong> (calculates only at creation) to reduce unnecessary computation.</p>"
+    },
+    {
+      "id": "cpq-architecture-q10",
+      "type": "true-false",
+      "text": "In SAP CPQ's security model, a user can be assigned to multiple permission groups but only one user type.",
+      "correctAnswer": true,
+      "explanation": "<p>A user is assigned <strong>one user type</strong> (defining base permissions) and can belong to <strong>multiple permission groups</strong> (adding fine-grained access). User types have a one-to-many relationship with users; permission groups have a many-to-many relationship.</p>"
+    },
+    {
+      "id": "cpq-architecture-q11",
+      "type": "multiple-choice",
+      "text": "Which security layer in SAP CPQ controls the maximum discount percentage a user can apply before triggering an approval workflow?",
+      "options": [
+        "User Types",
+        "Permission Groups",
+        "Discount Rules (discount authority)",
+        "Application Parameters"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Discount rules</strong> define maximum discount percentages per user, user type, product, and category. Exceeding the threshold can trigger approval workflows (when configured). This is a distinct layer from user types and permission groups, which control menu and action access.</p>"
+    },
+    {
+      "id": "cpq-architecture-q12",
+      "type": "true-false",
+      "text": "Before importing a deployment package into production, best practice is to export the current production configuration as a backup.",
+      "correctAnswer": true,
+      "explanation": "<p>Since there is no built-in versioning for deployment packages and imports overwrite existing objects, <strong>exporting a backup of production</strong> before importing provides a rollback option. If the new package breaks something, you can restore the previous state from the backup.</p>"
+    },
+    {
+      "id": "cpq-architecture-q13",
+      "type": "multiple-choice",
+      "text": "What is the best practice regarding the number of user types in SAP CPQ?",
+      "options": [
+        "Create one user type per individual user for maximum control",
+        "Use fewer user types with broader permissions, and add fine-grained control via permission groups",
+        "Create user types only for administrators — all other users share a single type",
+        "User types should mirror the ERP authorization roles exactly"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Best practice is to use <strong>fewer user types with broader permissions</strong> and add fine-grained control through <strong>permission groups</strong>. User types should represent permanent, distinct roles (Sales Rep, Sales Manager, Admin) — not individual users. This is easier to maintain than many narrow user types.</p>"
+    },
+    {
+      "id": "cpq-architecture-q14",
+      "type": "true-false",
+      "text": "Multi-factor authentication (MFA) for SAP CPQ users is configured within the CPQ admin interface.",
+      "correctAnswer": false,
+      "explanation": "<p>MFA is enforced at the <strong>Identity Provider level</strong> (Azure AD, Okta, SAP IAS), not within CPQ itself. When SSO is configured, the IdP handles authentication including MFA. CPQ receives a SAML assertion confirming that the user has been authenticated — it does not manage MFA directly.</p>"
+    },
+    {
+      "id": "cpq-architecture-q15",
+      "type": "multiple-choice",
+      "text": "Where can you verify the current CPQ version and access release notes in the admin interface?",
+      "options": [
+        "Setup → General → Application Parameters",
+        "Setup → Home",
+        "Setup → Workflow/Approval → Statuses",
+        "Setup → Develop → Global Scripts"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Setup → Home</strong> displays the current CPQ version number, tenant details, and provides access to release notes. Checking this page helps verify which environment you're working in and which release is currently deployed.</p>"
+    }
+  ]
+}

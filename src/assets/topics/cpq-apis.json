@@ -1,0 +1,169 @@
+{
+  "id": "cpq-apis",
+  "title": "REST APIs, Webhooks & Event-Driven Patterns",
+  "description": "Use SAP CPQ's REST APIs for data exchange, product loading, quote manipulation, and event-driven integration patterns.",
+  "icon": "🔌",
+  "category": "cpq-phase-4",
+  "tags": ["api", "rest", "webhooks", "events", "authentication", "integration", "data-loading", "automation"],
+  "sections": [
+    {
+      "title": "SAP CPQ API Overview",
+      "content": "<p>SAP CPQ exposes a comprehensive <strong>REST API</strong> that allows external systems to read and write data programmatically. The API is the primary mechanism for building custom integrations, automating data loads, and connecting CPQ to systems beyond the pre-built SAP connectors.</p><p>The API covers all major CPQ domains: <strong>Products</strong> (create, read, update simple and configurable products, attributes, and values — including the links between them that cannot be loaded via Excel), <strong>Pricing</strong> (manage pricebook entries, currencies, and markets), <strong>Quotes</strong> (create, read, update quotes, line items, custom fields, and trigger workflow actions), <strong>Users</strong> (manage user accounts, companies, user types), <strong>Custom Tables</strong> (read and write custom table data), and <strong>Configuration</strong> (interact with product configurators programmatically).</p><p>A critical advantage of the API over Excel import: the API can load <strong>configurable products together with their attribute-to-product links</strong> in a single operation. Recall from the products topic that Excel import can load simple products, attributes, and values separately, but cannot create the links between attributes and configurable products. The API removes this limitation, making it the preferred method for large-scale product catalog setup and migration.</p><p>The API documentation is available on the <strong>SAP Business Accelerator Hub</strong> (formerly SAP API Business Hub), which provides interactive documentation, request/response examples, and the ability to test API calls against sandbox environments.</p>"
+    },
+    {
+      "title": "Authentication & Authorization",
+      "content": "<p>Every API call to SAP CPQ must be <strong>authenticated</strong>. CPQ supports multiple authentication methods depending on the integration scenario.</p><p><strong>Basic Authentication</strong> uses a username and password encoded in Base64 and passed in the HTTP Authorization header. This is the simplest method and is commonly used for server-to-server integrations where a dedicated service account (technical user) makes API calls. The service account should have appropriate permissions — typically an administrator-level user type for full API access, or a restricted user type if the integration only needs access to specific domains.</p><p><strong>OAuth 2.0</strong> is the recommended approach for more secure, token-based authentication. The client application obtains an access token from CPQ's authorization endpoint and includes it in subsequent API requests. OAuth tokens have a limited lifetime, reducing the risk of credential exposure. This method is preferred for integrations that run in cloud environments or that need to act on behalf of specific users.</p><p>Authorization is controlled by the <strong>same role-based permission model</strong> as the UI. The API user's user type and permission groups determine which data they can access and which actions they can perform. A product admin API user can manage products but cannot modify workflow settings; a quote API user can create and read quotes but cannot change system configuration.</p><p>Best practices: use a <strong>dedicated service account</strong> for each integration (not a personal user account), apply the <strong>principle of least privilege</strong> (grant only the permissions the integration needs), rotate credentials periodically, and monitor API usage for unexpected patterns.</p>"
+    },
+    {
+      "title": "Key API Endpoints & Operations",
+      "content": "<p>The CPQ REST API follows standard HTTP conventions: <strong>GET</strong> for reading data, <strong>POST</strong> for creating records, <strong>PUT/PATCH</strong> for updating, and <strong>DELETE</strong> for removing. Responses are in JSON format. Here are the most commonly used endpoint areas:</p><p><strong>Product Catalog APIs</strong> — create and manage categories, products, attributes, attribute values, and attribute-to-product assignments. These are the workhorse endpoints for catalog migration and synchronisation. You can create a configurable product, add attributes to it, set which values are visible, and configure display settings — all programmatically. Product data loaded via API should follow the same <strong>top-down creation order</strong> as manual setup: categories → products → attributes with values → attribute assignments.</p><p><strong>Pricebook APIs</strong> — create pricebook entries, update prices, and manage pricebook hierarchies. These are commonly used for nightly price syncs from ERP — an integration job reads pricing conditions from S/4HANA, transforms them, and writes them to CPQ pricebooks via the API.</p><p><strong>Quote APIs</strong> — create quotes, add line items, set customer references, update custom fields, trigger workflow actions (like Submit for Approval), and read quote status. Quote APIs are used for automated quote generation, CRM-driven quote creation, and reporting extracts.</p><p><strong>Custom Table APIs</strong> — read and write rows in custom tables. Used for synchronising lookup data (compatibility matrices, regional tax rates, customer tiers) from external systems into CPQ's custom tables, which scripts then reference at runtime.</p><p><strong>User Management APIs</strong> — create and update user accounts, assign user types and companies. Used for automated user provisioning, often in combination with SSO/SCIM for enterprise deployments.</p>"
+    },
+    {
+      "title": "API-Based Data Loading & Migration",
+      "content": "<p>One of the most practical uses of the CPQ API is <strong>bulk data loading</strong> during implementation — migrating products, prices, customers, and configuration from legacy systems or ERP into CPQ.</p><p>A typical migration sequence: <strong>1.</strong> Load categories and subcategories. <strong>2.</strong> Load simple products with pricing (either custom prices or pricebook entries). <strong>3.</strong> Create attributes with all possible values. <strong>4.</strong> Create configurable products. <strong>5.</strong> Assign attributes to configurable products with visibility and display settings. <strong>6.</strong> Load pricebook entries for attribute-level pricing. <strong>7.</strong> Load custom table data for script-driven logic.</p><p>The API advantage over Excel is most visible in steps 4 and 5 — <strong>creating the links between attributes and configurable products</strong>. Excel cannot load these links; the API can. For implementations with dozens of configurable products and hundreds of attributes, API-based loading saves enormous manual effort.</p><p><strong>Data quality matters.</strong> Just like Excel imports, API loads are <strong>case-sensitive</strong> — a product name or attribute value that doesn't match exactly will create a duplicate rather than update the existing record. There is <strong>no built-in rollback</strong> for API operations. Build validation into your migration scripts: check that referenced objects exist before creating links, log every operation, and run the full migration in a development tenant before touching test or production.</p><p>For ongoing data synchronisation (not just one-time migration), API calls are typically orchestrated by <strong>SAP Integration Suite (CPI) iFlows</strong> or scheduled jobs in the middleware layer. A nightly iFlow might read changed materials from S/4HANA, transform them, and upsert them into CPQ via the product API.</p>"
+    },
+    {
+      "title": "Webhooks & Event-Driven Integration",
+      "content": "<p>While the REST API is primarily <strong>pull-based</strong> (external systems call CPQ to get or push data), SAP CPQ also supports <strong>push-based</strong> patterns where CPQ notifies external systems when events occur.</p><p><strong>Outbound API calls from scripts.</strong> IronPython scripts within CPQ can make <strong>HTTP requests to external APIs</strong>. This is the most common push mechanism: a post-action script on a workflow transition (e.g. quote approved) calls an external system's REST endpoint to trigger order creation, update a CRM record, or send data to a third-party service. The script constructs the HTTP request, sends it, and processes the response — all within the CPQ execution context.</p><p><strong>Webhook-style patterns.</strong> While CPQ does not have a native webhook subscription system like some SaaS platforms, the same effect is achieved through <strong>workflow post-action scripts</strong>. Whenever a specific event occurs (quote status changes, document generated, approval completed), a post-action script fires an HTTP POST to a registered external endpoint with the relevant data payload. The external system processes the payload and takes action.</p><p><strong>Real-time vs batch.</strong> Outbound API calls from scripts are real-time — they execute during the user's workflow action. For time-sensitive integrations (order creation, stock checks), this is appropriate. For non-critical integrations (analytics, reporting, secondary system updates), consider a <strong>batch pattern</strong>: the script writes data to a custom table or staging area, and a scheduled CPI iFlow picks up the data periodically and processes it. This reduces latency on the user's action and improves resilience against external system downtime.</p><p>Error handling is critical for outbound calls. External APIs can be slow, return errors, or be temporarily unavailable. Scripts should implement <strong>timeouts</strong>, <strong>retry logic</strong>, and <strong>error logging</strong>. If the external call fails, the script should decide whether to block the workflow action (for critical integrations like order creation) or log the failure and continue (for non-critical side effects).</p>"
+    },
+    {
+      "title": "API Best Practices & Exam Tips",
+      "content": "<p>APIs are the connective tissue of any CPQ implementation. Here are the practices and exam-relevant points:</p><p><strong>Rate limiting and performance.</strong> CPQ APIs have rate limits — exceeding them results in throttled or rejected requests. For bulk loading, implement <strong>batching</strong> (group multiple records into fewer API calls where possible) and <strong>throttling</strong> (add delays between calls to stay within limits). Monitor API response times and adjust batch sizes accordingly.</p><p><strong>Idempotency.</strong> Design integrations so that repeating the same API call produces the same result. Use <strong>upsert patterns</strong> (create-or-update based on a unique key like Part Number) rather than blind creates. This makes integrations resilient to retries and avoids duplicate records.</p><p><strong>API-first migration.</strong> For any implementation with more than a handful of configurable products, plan for API-based data loading from the start. Manual setup in the UI does not scale, and Excel import has the attribute-link limitation. Build migration scripts early and run them iteratively as the data model evolves.</p><p><strong>Security.</strong> Never embed credentials in client-side code. Use OAuth for production integrations. Store credentials in secure vaults (e.g. CPI credential store), not in script files or source code repositories. Audit API access logs regularly.</p><p><strong>Key exam points:</strong> the API uses REST with JSON. Authentication supports Basic and OAuth. The API can load attribute-to-product links that Excel cannot. Outbound calls are made from IronPython scripts. Workflow post-action scripts enable webhook-style push patterns. API loads are case-sensitive with no rollback. Data loading follows the same top-down sequence as manual creation.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-apis-q1",
+      "type": "multiple-choice",
+      "text": "What critical capability does the SAP CPQ API provide that Excel import does not?",
+      "options": [
+        "Loading simple products with prices",
+        "Creating attribute-to-configurable-product links",
+        "Importing attribute translations",
+        "Uploading product images"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The API can create the <strong>links between attributes and configurable products</strong> — including visibility settings and display configuration. Excel import can load products, attributes, and values separately, but <strong>cannot create these links</strong>. This makes the API essential for large-scale product catalog setup.</p>"
+    },
+    {
+      "id": "cpq-apis-q2",
+      "type": "true-false",
+      "text": "SAP CPQ's REST API returns responses in XML format by default.",
+      "correctAnswer": false,
+      "explanation": "<p>The CPQ REST API returns responses in <strong>JSON format</strong>, following modern REST conventions. Requests use standard HTTP methods (GET, POST, PUT/PATCH, DELETE) with JSON request bodies.</p>"
+    },
+    {
+      "id": "cpq-apis-q3",
+      "type": "multiple-choice",
+      "text": "Which authentication method is recommended for secure, token-based API access to SAP CPQ?",
+      "options": [
+        "API Key in the URL query string",
+        "Basic Authentication with a personal user account",
+        "OAuth 2.0 with time-limited access tokens",
+        "SAML assertion passed in the request body"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>OAuth 2.0</strong> is the recommended approach for production integrations. The client obtains a time-limited access token from CPQ's authorization endpoint. Tokens reduce the risk of credential exposure compared to Basic Authentication.</p>"
+    },
+    {
+      "id": "cpq-apis-q4",
+      "type": "true-false",
+      "text": "The API user's permissions in SAP CPQ are controlled by the same role-based model (user types and permission groups) used for UI access.",
+      "correctAnswer": true,
+      "explanation": "<p>API authorization uses the <strong>same permission model</strong> as the UI. The API user's user type and permission groups determine which data can be accessed and which actions can be performed. A restricted user type limits API access to specific domains.</p>"
+    },
+    {
+      "id": "cpq-apis-q5",
+      "type": "multiple-choice",
+      "text": "When loading data via the API during a migration, what is the correct order for creating objects?",
+      "options": [
+        "Products → Categories → Attributes → Values",
+        "Attributes → Products → Categories → Pricebooks",
+        "Categories → Products → Attributes (with values) → Attribute-to-product assignments",
+        "Pricebooks → Products → Categories → Attributes"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>API data loading follows the same <strong>top-down sequence</strong> as manual creation: categories first, then products, then attributes with values, and finally attribute-to-product assignments. Parent objects must exist before child objects can reference them.</p>"
+    },
+    {
+      "id": "cpq-apis-q6",
+      "type": "true-false",
+      "text": "SAP CPQ API operations include built-in rollback capabilities that automatically undo failed bulk loads.",
+      "correctAnswer": false,
+      "explanation": "<p>There is <strong>no built-in rollback</strong> for API operations — the same limitation as Excel imports. Migration scripts should include validation, logging, and error handling. Always run full migrations in a development tenant before touching production.</p>"
+    },
+    {
+      "id": "cpq-apis-q7",
+      "type": "multiple-choice",
+      "text": "How does SAP CPQ achieve webhook-style push notifications to external systems?",
+      "options": [
+        "Through a native webhook subscription management UI",
+        "By configuring webhook URLs in the application parameters",
+        "Through workflow post-action IronPython scripts that make outbound HTTP calls",
+        "By publishing events to SAP Event Mesh automatically"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>CPQ does not have a native webhook system. Instead, <strong>workflow post-action scripts</strong> make outbound HTTP calls to external endpoints when specific events occur (status changes, approvals, etc.). The script constructs the HTTP request with the relevant data payload.</p>"
+    },
+    {
+      "id": "cpq-apis-q8",
+      "type": "true-false",
+      "text": "IronPython scripts within SAP CPQ can make HTTP requests to external REST APIs.",
+      "correctAnswer": true,
+      "explanation": "<p>IronPython scripts can make <strong>outbound HTTP requests</strong> to external APIs. This is the primary mechanism for real-time push integrations — a script calls an external endpoint to trigger actions like order creation, CRM updates, or third-party notifications.</p>"
+    },
+    {
+      "id": "cpq-apis-q9",
+      "type": "multiple-choice",
+      "text": "For non-critical integrations where external API latency should not slow down the user's workflow action, which pattern is recommended?",
+      "options": [
+        "Make the API call synchronously in a pre-action script",
+        "Write data to a staging area and process it via a scheduled batch job",
+        "Disable the integration during business hours",
+        "Use Basic Authentication instead of OAuth for faster response times"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>For non-critical integrations, a <strong>batch pattern</strong> is recommended: the script writes data to a custom table or staging area, and a scheduled job (e.g. CPI iFlow) processes it periodically. This avoids adding external API latency to the user's workflow action.</p>"
+    },
+    {
+      "id": "cpq-apis-q10",
+      "type": "true-false",
+      "text": "API-based data loads in SAP CPQ are case-sensitive — a mismatched product name will create a duplicate rather than update the existing record.",
+      "correctAnswer": true,
+      "explanation": "<p>Just like Excel imports, API loads are <strong>case-sensitive</strong>. If a product name or attribute value doesn't match exactly, CPQ creates a new record rather than updating the existing one. Validation in migration scripts should check for exact matches before creating or updating.</p>"
+    },
+    {
+      "id": "cpq-apis-q11",
+      "type": "multiple-choice",
+      "text": "Which SAP resource provides interactive API documentation with request/response examples for SAP CPQ?",
+      "options": [
+        "SAP Learning Hub",
+        "SAP Community Wiki",
+        "SAP Business Accelerator Hub (API Business Hub)",
+        "SAP Support Portal (Launchpad)"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>The <strong>SAP Business Accelerator Hub</strong> (formerly SAP API Business Hub) provides interactive API documentation, request/response examples, and the ability to test API calls against sandbox environments for SAP CPQ and other SAP products.</p>"
+    },
+    {
+      "id": "cpq-apis-q12",
+      "type": "true-false",
+      "text": "Best practice is to use a shared personal user account for all API integrations to simplify credential management.",
+      "correctAnswer": false,
+      "explanation": "<p>Best practice is to use a <strong>dedicated service account per integration</strong>, not a shared personal account. Each service account should have only the permissions that integration needs (principle of least privilege). This improves auditability and limits the blast radius if credentials are compromised.</p>"
+    },
+    {
+      "id": "cpq-apis-q13",
+      "type": "multiple-choice",
+      "text": "An outbound API call from a CPQ post-action script fails because the external system is temporarily unavailable. What should the script do?",
+      "options": [
+        "Silently ignore the failure and continue",
+        "Immediately delete the quote to prevent data inconsistency",
+        "Log the error and either retry, block the action (if critical), or queue for later processing (if non-critical)",
+        "Automatically switch to a different external system"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Proper error handling depends on criticality. The script should <strong>log the error</strong> and then: for critical integrations (order creation), block the action and notify the user; for non-critical side effects, log and queue for later retry. Silently ignoring failures leads to data inconsistency.</p>"
+    }
+  ]
+}

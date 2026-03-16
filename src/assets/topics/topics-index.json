@@ -18,6 +18,8 @@
     "cc-caching",
     "cc-search-solr",
     "cc-events",
+
+    
     "cpq-overview",
     "cpq-platform-basics",
     "cpq-configurable-products",
@@ -27,6 +29,11 @@
     "cpq-advanced-config",
     "cpq-pricing",
     "cpq-quote-management",
-    "cpq-approvals"
+    "cpq-approvals",
+    "cpq-document-generation",
+    "cpq-sap-integrations",
+    "cpq-apis",
+    "cpq-external-integrations",
+    "cpq-architecture"
   ]
 }

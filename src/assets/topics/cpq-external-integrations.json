@@ -1,0 +1,169 @@
+{
+  "id": "cpq-external-integrations",
+  "title": "CRM, E-Signature & SSO Integration",
+  "description": "Connect SAP CPQ to non-SAP CRMs, e-signature platforms, and identity providers for a complete enterprise landscape.",
+  "icon": "🌐",
+  "category": "cpq-phase-4",
+  "tags": ["salesforce", "dynamics", "e-signature", "docusign", "adobe-sign", "sso", "saml", "oauth", "scim", "identity"],
+  "sections": [
+    {
+      "title": "Non-SAP CRM Integration — Salesforce & Microsoft Dynamics",
+      "content": "<p>While SAP CPQ's tightest CRM integration is with SAP Sales Cloud, many real-world landscapes involve <strong>non-SAP CRMs</strong> — particularly Salesforce and Microsoft Dynamics. SAP CPQ supports integration with these systems, though with more custom development than the native Sales Cloud connector.</p><p><strong>Salesforce CRM + SAP CPQ</strong> is a surprisingly common hybrid landscape. An organisation may have standardised on Salesforce for CRM but chosen SAP CPQ for its deep configuration engine and S/4HANA integration. The integration typically works via <strong>REST APIs</strong> on both sides: Salesforce sends opportunity and customer data to CPQ when a quote is initiated, and CPQ sends the completed quote back to Salesforce. The embedded experience (CPQ opening within the CRM) can be achieved via <strong>iframe embedding</strong> or by launching CPQ in a new window with context parameters passed in the URL.</p><p><strong>Microsoft Dynamics 365</strong> integration follows a similar pattern — REST APIs exchange opportunity, customer, and quote data. The integration is typically orchestrated through middleware (SAP Integration Suite or a third-party iPaaS like MuleSoft or Azure Integration Services) that handles data transformation, error handling, and retry logic.</p><p>Key challenges with non-SAP CRM integrations: <strong>data model mismatches</strong> (CRM opportunity fields may not map cleanly to CPQ quote fields), <strong>user identity synchronisation</strong> (users must exist in both systems — SSO simplifies this), and <strong>real-time vs batch sync</strong> decisions (should quote status changes sync instantly or periodically?). Unlike the Sales Cloud integration, there are no pre-built connectors — every field mapping must be designed and built.</p><p>As a consultant, honestly assessing whether SAP CPQ or a CRM-native CPQ (Salesforce CPQ for Salesforce, Dynamics CPQ for Dynamics) is the right choice for the client's landscape is a key advisory skill.</p>"
+    },
+    {
+      "title": "E-Signature Integration — DocuSign & Adobe Sign",
+      "content": "<p>E-signature integration closes the loop between quote generation and customer acceptance. Instead of emailing a PDF, printing it, signing it, and scanning it back, the customer receives a digital document, signs it electronically, and the signed status is reflected in CPQ automatically.</p><p><strong>DocuSign</strong> and <strong>Adobe Sign</strong> are the two most commonly integrated e-signature platforms with SAP CPQ. The integration flow follows a standard pattern: <strong>1.</strong> The sales rep generates a quote document in CPQ. <strong>2.</strong> Instead of (or in addition to) downloading the PDF, the rep triggers a \"Send for Signature\" action. <strong>3.</strong> CPQ sends the document to the e-signature platform via its API, specifying the signers, signing order, and signature placement. <strong>4.</strong> The customer receives an email with a link to review and sign. <strong>5.</strong> Once signed, the e-signature platform notifies CPQ (via webhook or polling). <strong>6.</strong> CPQ updates the quote status (e.g. to \"Customer Accepted\") and stores the signed document.</p><p>The integration is typically implemented using <strong>IronPython scripts</strong> that call the DocuSign or Adobe Sign REST APIs. A workflow post-action script on the \"Send for Signature\" action handles the outbound call. A scheduled script or inbound webhook handles the signature completion callback.</p><p>Key implementation considerations: <strong>document format</strong> (e-signature platforms work best with PDF), <strong>signer identification</strong> (email address matching between CPQ customer records and e-signature accounts), <strong>signature placement</strong> (tags or coordinates within the document that indicate where the signature goes), and <strong>audit trail</strong> (the signed document must be stored with the quote for compliance).</p>"
+    },
+    {
+      "title": "SSO — SAML, OAuth & Identity Providers",
+      "content": "<p><strong>Single Sign-On (SSO)</strong> allows users to authenticate once with their corporate identity provider and access SAP CPQ without entering separate credentials. This is standard practice for enterprise deployments — it improves security, simplifies user management, and provides a seamless experience especially when CPQ is embedded within a CRM.</p><p>SAP CPQ supports SSO via <strong>SAML 2.0</strong> (Security Assertion Markup Language). The flow works as follows: the user accesses CPQ, CPQ redirects to the corporate <strong>Identity Provider (IdP)</strong> — such as Azure AD, Okta, SAP Identity Authentication Service (IAS), or ADFS — the user authenticates there (possibly with MFA), the IdP sends a signed SAML assertion back to CPQ confirming the user's identity, and CPQ creates a session. The user never enters CPQ-specific credentials.</p><p><strong>OAuth 2.0</strong> is also supported, primarily for API-level authentication (as covered in the APIs topic) and for scenarios where CPQ needs to act on behalf of a user when calling external services.</p><p>For the SSO to work, users must <strong>exist in both systems</strong> — the IdP and CPQ. The IdP authenticates the user, but CPQ still needs a local user record to determine permissions (user type, company, permission groups, default market/pricebook). This is where <strong>SCIM</strong> (System for Cross-domain Identity Management) comes in: SCIM automates user provisioning by syncing user accounts from the IdP to CPQ. When a new employee is created in Azure AD, SCIM can automatically create the corresponding CPQ user with the correct user type and company assignment.</p><p>Without SCIM, user provisioning is manual — an admin must create the CPQ user record before the person can use SSO. This is the \"user does not exist in CPQ\" error seen in Sales Cloud integrations, and SCIM eliminates it.</p>"
+    },
+    {
+      "title": "Custom External API Calls from CPQ Scripts",
+      "content": "<p>Beyond the structured integrations with CRM, e-signature, and identity platforms, SAP CPQ scripts can call <strong>any external REST API</strong>. This opens up a wide range of real-time integration possibilities during configuration, pricing, and quoting.</p><p><strong>Real-time stock checks.</strong> During product configuration, a script calls the ERP or warehouse management API to check current stock levels. If the requested quantity exceeds available stock, the script can display a warning message or block the configuration from completing.</p><p><strong>Address validation.</strong> When a customer enters a shipping address on the quote, a script calls a third-party address validation API (e.g. Google Maps, Loqate, or SAP Address Directory) to verify and standardise the address before it is saved.</p><p><strong>Tax calculation.</strong> For quotes that require precise tax calculation based on jurisdiction (common in the US with varying state/county/city tax rates), a script calls a tax engine API (e.g. Avalara, Vertex, or SAP Tax Service) during quote calculation to retrieve the exact tax amount for each line item.</p><p><strong>Credit checks.</strong> Before a quote can be submitted for approval, a pre-action script calls the ERP or a credit bureau API to verify the customer's credit status. If the customer is on credit hold or the quote exceeds their credit limit, the script blocks the submission and notifies the rep.</p><p>All external API calls from scripts share common implementation patterns: construct the HTTP request (URL, method, headers, body), send it, parse the JSON response, handle errors (timeouts, 4xx/5xx responses), and act on the result (update CPQ data, show messages, block/allow actions). Wrapping these calls in <strong>global script functions</strong> makes them reusable across products and workflow actions.</p>"
+    },
+    {
+      "title": "Integration Security & Data Protection",
+      "content": "<p>Every external integration introduces a potential security surface. CPQ implementations must address these concerns systematically.</p><p><strong>Credential management.</strong> API keys, OAuth client secrets, and service account passwords used for external integrations should never be hard-coded in scripts. Best practice is to store credentials in <strong>secure locations</strong> — SAP Integration Suite's credential store for CPI-based integrations, or encrypted custom table entries for script-based integrations. Rotate credentials on a regular schedule.</p><p><strong>Data in transit.</strong> All API communication should use <strong>HTTPS/TLS</strong> — never plain HTTP. SAP CPQ enforces HTTPS for its own APIs, and outbound calls from scripts should always target HTTPS endpoints. Verify SSL certificates to prevent man-in-the-middle attacks.</p><p><strong>Data minimisation.</strong> When sending data to external systems, include only the fields that the receiving system actually needs. Don't send the entire quote payload to an e-signature platform if it only needs the document and signer email. This reduces exposure if an integration endpoint is compromised.</p><p><strong>PII handling.</strong> Customer data flowing through integrations may include personally identifiable information subject to <strong>GDPR</strong> and other privacy regulations. CPQ's custom field PII flag (covered in the quotes topic) helps identify sensitive fields. Integration designs should document which PII flows to which external system and ensure data processing agreements are in place.</p><p><strong>Audit logging.</strong> Log all external API calls — what was sent, when, to where, and what response was received. This is essential for debugging integration failures and for compliance audits. CPQ's script logging mechanism can capture this information, and more sophisticated implementations forward logs to a central monitoring platform.</p>"
+    },
+    {
+      "title": "External Integration Design Decisions & Exam Tips",
+      "content": "<p>External integrations vary enormously by client landscape. Here are the design patterns and exam-relevant points:</p><p><strong>Build vs buy.</strong> Before building a custom integration, check whether a pre-built connector or SAP partner solution exists. SAP's ecosystem includes partner-built connectors for common platforms. Custom integration is more flexible but more expensive to build and maintain.</p><p><strong>Middleware vs direct.</strong> Use middleware (CPI, MuleSoft) when the integration requires data transformation, error handling, retry logic, or orchestration across multiple systems. Use direct API calls from scripts when the integration is simple, point-to-point, and the data formats are already compatible.</p><p><strong>Sync direction.</strong> For each data domain, determine whether the sync is one-way (e.g. product master from ERP to CPQ), two-way (e.g. quote data between CRM and CPQ), or event-driven (e.g. order creation triggered by quote approval). Two-way syncs require conflict resolution rules — which system wins when both have changed the same record?</p><p><strong>Failure modes.</strong> Design for failure. Every integration will experience downtime, timeouts, and data errors. Define what happens in each case: does the user see an error? Is the action blocked or allowed? Is the failed operation queued for retry? Document failure modes and test them before go-live.</p><p><strong>Key exam points:</strong> SAP CPQ can integrate with non-SAP CRMs via REST APIs. E-signature integration follows a send-sign-callback pattern via IronPython scripts calling DocuSign/Adobe Sign APIs. SSO uses SAML 2.0 with an external IdP. SCIM automates user provisioning from IdP to CPQ. Scripts can call any external REST API for real-time integrations. Credentials should never be hard-coded in scripts. All communication must use HTTPS.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-external-integrations-q1",
+      "type": "multiple-choice",
+      "text": "In a hybrid landscape where the client uses Salesforce CRM with SAP CPQ, how is the integration typically built?",
+      "options": [
+        "Using SAP's pre-built Salesforce connector with zero custom development",
+        "Via REST APIs on both sides, with custom field mapping and middleware orchestration",
+        "By replacing Salesforce with SAP Sales Cloud first",
+        "Through a shared database between Salesforce and CPQ"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Salesforce + SAP CPQ integration uses <strong>REST APIs</strong> on both sides to exchange opportunity, customer, and quote data. Unlike the native Sales Cloud integration, there are <strong>no pre-built connectors</strong> — every field mapping must be designed and built, typically with middleware orchestration.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q2",
+      "type": "true-false",
+      "text": "SAP CPQ provides pre-built connectors for Salesforce CRM and Microsoft Dynamics 365 that require no custom development.",
+      "correctAnswer": false,
+      "explanation": "<p>Unlike the native SAP Sales Cloud integration, there are <strong>no pre-built connectors</strong> for Salesforce or Dynamics. These integrations require custom development — REST API calls, field mapping, and middleware configuration must all be built from scratch.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q3",
+      "type": "multiple-choice",
+      "text": "What is the typical flow for e-signature integration with SAP CPQ?",
+      "options": [
+        "Customer signs within the CPQ interface directly",
+        "Generate document → Send to e-signature platform via API → Customer signs → Callback updates CPQ status",
+        "Export quote to Word → Customer adds a typed signature → Re-import to CPQ",
+        "The e-signature platform generates the quote document independently"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The standard flow is: CPQ <strong>generates the document</strong>, sends it to the e-signature platform (DocuSign/Adobe Sign) via API, the <strong>customer signs</strong> electronically, and the platform <strong>notifies CPQ</strong> (via callback/polling). CPQ then updates the quote status and stores the signed document.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q4",
+      "type": "true-false",
+      "text": "E-signature integrations with SAP CPQ are typically implemented using IronPython scripts that call the DocuSign or Adobe Sign REST APIs.",
+      "correctAnswer": true,
+      "explanation": "<p>The integration is implemented via <strong>IronPython scripts</strong> — typically a workflow post-action script on a \"Send for Signature\" action that calls the e-signature platform's REST API. A separate script or scheduled job handles the signature completion callback.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q5",
+      "type": "multiple-choice",
+      "text": "Which protocol does SAP CPQ use for Single Sign-On (SSO)?",
+      "options": [
+        "LDAP",
+        "Kerberos",
+        "SAML 2.0",
+        "OpenID Connect exclusively"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>SAP CPQ supports SSO via <strong>SAML 2.0</strong>. The user authenticates with the corporate Identity Provider (Azure AD, Okta, SAP IAS, ADFS), which sends a signed SAML assertion to CPQ confirming the identity. CPQ creates a session without requiring separate credentials.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q6",
+      "type": "true-false",
+      "text": "With SAML SSO configured, users no longer need a local user record in SAP CPQ — the IdP handles all authentication and authorization.",
+      "correctAnswer": false,
+      "explanation": "<p>Users must <strong>exist in both systems</strong>. The IdP handles authentication (verifying identity), but CPQ still needs a local user record for <strong>authorization</strong> — determining user type, company, permission groups, default market, and pricebook. Without a CPQ user record, SSO authentication succeeds but CPQ access fails.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q7",
+      "type": "multiple-choice",
+      "text": "What does SCIM (System for Cross-domain Identity Management) automate in the context of SAP CPQ?",
+      "options": [
+        "Product catalog synchronisation between CPQ and ERP",
+        "User provisioning — automatically creating and updating CPQ user accounts from the identity provider",
+        "Pricebook entries based on market currency rates",
+        "Quote workflow status transitions"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>SCIM</strong> automates user provisioning by syncing accounts from the Identity Provider to CPQ. When a new employee is created in the IdP (e.g. Azure AD), SCIM can automatically create the corresponding CPQ user record with the correct user type and company, eliminating the 'user does not exist' error.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q8",
+      "type": "true-false",
+      "text": "A CPQ IronPython script can call a third-party tax engine API like Avalara during quote calculation to retrieve precise tax amounts.",
+      "correctAnswer": true,
+      "explanation": "<p>IronPython scripts can call <strong>any external REST API</strong>, including tax engines like Avalara or Vertex. During quote calculation, a script sends line item data to the tax API and applies the returned tax amounts to the quote — enabling jurisdiction-specific tax precision.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q9",
+      "type": "multiple-choice",
+      "text": "What is the recommended approach for storing API credentials used by CPQ scripts for external integrations?",
+      "options": [
+        "Hard-code them in the global script for easy access",
+        "Store them in a product attribute so they can be changed without code changes",
+        "Store them in secure locations like CPI's credential store or encrypted custom tables",
+        "Email them to the CPQ administrator for manual entry each session"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Credentials should <strong>never be hard-coded</strong> in scripts. Best practice is to store them in <strong>secure locations</strong> — SAP Integration Suite's credential store for CPI-based integrations, or encrypted custom table entries for script-based integrations. Credentials should be rotated regularly.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q10",
+      "type": "true-false",
+      "text": "All external API communication from SAP CPQ should use HTTPS to ensure data is encrypted in transit.",
+      "correctAnswer": true,
+      "explanation": "<p>All API communication should use <strong>HTTPS/TLS</strong> — never plain HTTP. SAP CPQ enforces HTTPS for its own APIs, and outbound calls from scripts should always target HTTPS endpoints to prevent data interception.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q11",
+      "type": "multiple-choice",
+      "text": "A pre-action script on 'Submit for Approval' calls the ERP API to check the customer's credit status. The ERP system is temporarily down. What should the script do?",
+      "options": [
+        "Approve the quote automatically since the credit check couldn't be performed",
+        "Block the submission, log the error, and inform the user that the credit check is unavailable",
+        "Delete the quote to prevent any risk",
+        "Switch to a backup ERP system automatically"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>For a <strong>critical</strong> integration like credit checks, the script should <strong>block the action</strong> when the external system is unavailable. The error should be logged, and the user should be informed with a clear message. Silently approving without the credit check creates financial risk.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q12",
+      "type": "true-false",
+      "text": "When choosing between SAP CPQ and a CRM-native CPQ solution, the client's existing CRM platform is an important factor in the recommendation.",
+      "correctAnswer": true,
+      "explanation": "<p>The client's CRM platform is a <strong>key factor</strong>. SAP CPQ is strongest with SAP Sales Cloud and S/4HANA. Salesforce CPQ is more natural for Salesforce-centric organisations. Honestly assessing this fit — and recommending alternatives when SAP CPQ isn't the best choice — builds consultant credibility.</p>"
+    },
+    {
+      "id": "cpq-external-integrations-q13",
+      "type": "multiple-choice",
+      "text": "Which of the following is NOT a common use case for calling external APIs from CPQ IronPython scripts?",
+      "options": [
+        "Real-time stock availability checks",
+        "Address validation via a third-party service",
+        "Compiling IronPython scripts into native machine code",
+        "Customer credit limit verification"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Real-time stock checks, address validation, and credit verification are all common external API use cases from CPQ scripts. <strong>Compiling scripts into machine code</strong> is not a CPQ integration scenario — IronPython scripts run server-side within the CPQ platform.</p>"
+    }
+  ]
+}

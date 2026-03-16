@@ -1,0 +1,169 @@
+{
+  "id": "cpq-sap-integrations",
+  "title": "Sales Cloud, S/4HANA & Commerce Cloud Integration",
+  "description": "Understand how SAP CPQ integrates with Sales Cloud, S/4HANA, Commerce Cloud, and other SAP systems in the quote-to-cash landscape.",
+  "icon": "🔄",
+  "category": "cpq-phase-4",
+  "tags": ["integration", "sales-cloud", "c4c", "s4hana", "commerce-cloud", "variant-configuration", "lead-to-cash", "middleware"],
+  "sections": [
+    {
+      "title": "CPQ's Place in the SAP Landscape",
+      "content": "<p>SAP CPQ sits within the <strong>SAP Customer Experience (CX)</strong> portfolio, formerly known as C/4HANA. The CX suite contains five cloud solutions: <strong>Marketing Cloud</strong> (campaign automation), <strong>Commerce Cloud</strong> (web shop), <strong>Customer Data Cloud</strong> (identity and consent), <strong>Sales Cloud</strong> (sales automation including CPQ), and <strong>Service Cloud</strong> (customer service and field service). CPQ's core role is to handle the <strong>Opportunity-to-Quote</strong> and <strong>Quote-to-Order</strong> stages in the broader Lead-to-Cash process.</p><p>The Lead-to-Cash process spans eight stages and is split across the <strong>demand chain</strong> (handled by CX/C4HANA: contact identification, lead management, opportunity management, quotation) and the <strong>supply chain</strong> (handled by S/4HANA: customer order management, fulfilment, invoicing). CPQ bridges the two — it receives opportunity and customer data from CRM, and hands off orders and pricing data to ERP.</p><p>Integration is therefore not optional — it is <strong>fundamental</strong> to CPQ's purpose. A CPQ instance that runs in isolation without CRM or ERP connections delivers only a fraction of its potential value. Understanding which system owns which data domain, and where handoffs occur, is essential for any CPQ consultant.</p><p>The typical integration layer uses <strong>SAP Integration Suite (CPI)</strong> as middleware, or direct REST API connections for simpler scenarios. Some integrations use pre-built connectors maintained by SAP, while others require custom development. The choice depends on the complexity of the data mapping and the client's existing middleware landscape.</p>"
+    },
+    {
+      "title": "SAP Sales Cloud (C4C) Integration",
+      "content": "<p>The integration between SAP CPQ and <strong>SAP Sales Cloud</strong> (formerly SAP Cloud for Customer / C4C) is the tightest and most common CRM integration in the SAP landscape. It enables sales reps to work in a single interface — starting in Sales Cloud for opportunity management and seamlessly launching CPQ for product configuration and quoting.</p><p>The integration is <strong>bi-directional</strong>. From Sales Cloud to CPQ: opportunity data, customer data (accounts, contacts), and context information are passed when the user launches CPQ from within an opportunity. From CPQ back to Sales Cloud: the completed quote (including products, pricing, and status) is synced back to the opportunity so the sales manager has full visibility without leaving the CRM.</p><p>From the user's perspective, CPQ <strong>opens within a Sales Cloud screen</strong> — the rep clicks \"Create Quote\" or \"Save and Open\" from an opportunity, and the CPQ quote editor appears embedded in the C4C interface. The overview of all quotes remains in Sales Cloud (not in CPQ), and the rep navigates back to the opportunity context after finishing the quote. This embedded experience means the rep rarely needs to log into CPQ standalone.</p><p>Common integration issues to watch for: <strong>user does not exist in CPQ</strong> (the user must be provisioned in both systems), and <strong>field mapping failures</strong> (when data copied from Sales Cloud to CPQ cannot be mapped — e.g. a customer field value that doesn't match CPQ's expected format). Both are typically caught during initial setup and testing.</p><p>Not all data from the quote always maps back to an ERP order — sometimes only <strong>pricing conditions</strong> are created in ERP, and the sales order is created manually because not all CPQ products exist as ERP materials.</p>"
+    },
+    {
+      "title": "SAP S/4HANA & ECC Integration",
+      "content": "<p>The integration between SAP CPQ and <strong>S/4HANA (or ECC)</strong> covers the order handoff — the critical moment when a won quote becomes a sales order in the ERP system. This is the <strong>Quote-to-Order</strong> and <strong>Order-to-Cash</strong> boundary.</p><p>Key data flows from CPQ to ERP include: <strong>sales order creation</strong> (product lines, quantities, pricing, customer references), <strong>pricing conditions</strong> (discount percentages, surcharges, promotional prices mapped to ERP condition types), and <strong>customer data</strong> (bill-to, ship-to, sold-to parties mapped to ERP business partners). Order fulfilment can result in a sales order, a solution order (which creates both sales orders and service orders), or simply pricing conditions if the full order is created manually in ERP.</p><p>Key data flows from ERP to CPQ include: <strong>product master data</strong> (material numbers, descriptions, basic specifications synced to CPQ's product catalog), <strong>customer master data</strong> (business partner records synced for quote customer assignment), and <strong>pricing data</strong> (condition records loaded into pricebooks). Best practice is to maintain <strong>ERP as the master</strong> for material numbers, customer data, and cost information, with CPQ holding configuration logic, sales descriptions, and pricing rules.</p><p>The integration typically uses <strong>SAP Integration Suite (CPI)</strong> as middleware. CPI provides pre-built integration content (iFlows) for common CPQ-to-S/4HANA scenarios, handles data mapping and transformation, and provides error handling and monitoring. For simpler setups, direct REST API connections are possible but offer less flexibility for complex transformations.</p><p>A critical design decision: <strong>keeping Part Numbers aligned</strong> between CPQ and ERP material numbers. When these are misaligned, the order handoff breaks because ERP cannot identify the products. Best practice is to use the same identifier in both systems from the start.</p>"
+    },
+    {
+      "title": "SAP Variant Configuration & Pricing Integration",
+      "content": "<p><strong>SAP Variant Configuration and Pricing (VCP)</strong> integration connects CPQ with SAP's external product configuration and pricing engine. This is relevant for manufacturing companies that maintain complex variant models in S/4HANA and want to leverage them during CPQ quoting.</p><p>When this integration is active, CPQ products can use the <strong>External</strong> Configuration Type (instead of Standard). This means the product's configuration logic — attributes, rules, constraints, and pricing — is managed entirely in the SAP Variant Configuration engine, not in CPQ. When a user configures such a product in CPQ, the configurator calls the external engine in real time to validate selections, enforce constraints, and calculate prices.</p><p>With Variant Pricing selected as the pricing type, product prices are <strong>synchronised from SAP Variant Configuration and Pricing</strong> — CPQ displays the externally calculated prices but does not manage them locally. The CPQ pricing fields become read-only.</p><p>Important implications of External configuration type: CPQ's <strong>rules and messages, scripts, layout, and advanced settings</strong> are all disabled for that product. The configuration experience is driven entirely by the external engine. This means CPQ serves as the quoting front-end while VCP handles the product logic back-end.</p><p>This pattern is common in industries with deep product complexity (automotive, industrial machinery, building materials) where the variant model already exists in ERP and replicating it in CPQ would be impractical and error-prone. The trade-off is latency — each configuration interaction requires a round-trip to the external engine.</p>"
+    },
+    {
+      "title": "SAP Commerce Cloud & Self-Service Scenarios",
+      "content": "<p>SAP CPQ can be embedded into <strong>SAP Commerce Cloud</strong> storefronts to enable <strong>B2B self-service</strong> configuration and quoting. In this scenario, the customer (rather than a sales rep) configures products, reviews pricing, and requests or generates quotes directly on the web shop — no human sales interaction required.</p><p>The integration works by embedding CPQ's configuration interface within the Commerce Cloud storefront. The customer browses the product catalog on the storefront, clicks to configure a complex product, and is presented with CPQ's configurator. Selections, pricing, and the resulting quote flow through CPQ's standard engine — including rules, pricing methods, and approval workflows.</p><p>This pattern is growing rapidly in B2B commerce. It addresses a key customer expectation: the ability to self-serve for complex, configurable products with the same guided selling and real-time pricing that a sales rep would provide. It also frees sales reps from routine quote requests, allowing them to focus on high-value, consultative deals.</p><p>The Commerce Cloud integration also supports the <strong>Request a Quote</strong> workflow: the customer configures products and submits a quote request. A sales rep reviews the request in CPQ or Sales Cloud, potentially adjusts pricing or adds discounts, and sends the formal quote back to the customer — blending self-service with human oversight.</p><p>For the exam, remember: CPQ's Commerce integration enables B2B self-service, the configurator is embedded in the storefront, and the standard CPQ engine (rules, pricing, approval) still applies behind the scenes.</p>"
+    },
+    {
+      "title": "Integration Design Decisions & Data Governance",
+      "content": "<p>Every CPQ integration project must answer a fundamental question: <strong>which system is the master for each data domain?</strong> Getting this wrong causes data conflicts, stale records, and broken order handoffs.</p><p>The standard data ownership model: <strong>ERP (S/4HANA)</strong> masters material numbers, cost data, customer/business partner records, and financial documents. <strong>CRM (Sales Cloud)</strong> masters opportunities, leads, contacts, activities, and sales pipeline. <strong>CPQ</strong> masters configuration logic, sales-oriented descriptions, guided selling flows, document templates, and quote-specific pricing rules. <strong>Shared data</strong> (product catalog, pricing, customer records) flows from the master system to the consumers via integration.</p><p>Key design decisions to make early in the project: <strong>integration pattern</strong> (CPI middleware vs direct API — CPI is recommended for complex landscapes), <strong>sync frequency</strong> (real-time vs batch — product and customer data is typically batch-synced nightly, while order creation is real-time), <strong>error handling</strong> (what happens when an order handoff fails — retry logic, dead-letter queues, manual intervention processes), and <strong>field mapping</strong> (mapping CPQ products to ERP materials, CPQ custom fields to ERP fields, CPQ pricing to ERP condition types).</p><p>Simple products and their pricing are <strong>usually interfaced</strong> from ERP rather than manually maintained in CPQ. Configurable products are normally <strong>manually created</strong> in CPQ because their configuration logic (attributes, rules, scripts) does not have an ERP equivalent. The exception is products using Variant Configuration integration, where the configuration model lives in ERP.</p><p>Testing integration end-to-end — from opportunity creation through configuration, pricing, approval, quote generation, and order handoff — is critical. Integration failures that only surface in production are extremely expensive to fix. Build integration testing into every sprint, not just the final UAT phase.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-sap-integrations-q1",
+      "type": "multiple-choice",
+      "text": "In the SAP Lead-to-Cash process, which stages does CPQ primarily handle?",
+      "options": [
+        "Contact-to-Lead and Lead-to-Opportunity",
+        "Opportunity-to-Quote and Quote-to-Order",
+        "Order-to-Cash and Fulfilment",
+        "Lead-to-Opportunity and Order-to-Cash"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>CPQ handles the <strong>Opportunity-to-Quote</strong> stage (product configuration and pricing) and the <strong>Quote-to-Order</strong> stage (quote approval and order handoff). Earlier stages belong to CRM, and later stages belong to ERP.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q2",
+      "type": "true-false",
+      "text": "The integration between SAP CPQ and SAP Sales Cloud is uni-directional — data flows only from Sales Cloud to CPQ.",
+      "correctAnswer": false,
+      "explanation": "<p>The integration is <strong>bi-directional</strong>. Opportunity and customer data flow from Sales Cloud to CPQ, and completed quote data (products, pricing, status) flows back from CPQ to Sales Cloud so it is visible on the opportunity.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q3",
+      "type": "multiple-choice",
+      "text": "When a sales rep launches CPQ from within an SAP Sales Cloud opportunity, how does CPQ appear?",
+      "options": [
+        "CPQ opens in a completely separate browser window",
+        "CPQ opens embedded within the Sales Cloud screen",
+        "The rep is redirected to the CPQ standalone login page",
+        "A PDF quote is automatically generated and attached to the opportunity"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>CPQ <strong>opens embedded within the Sales Cloud screen</strong>. The rep clicks a button from the opportunity, and the CPQ quote editor appears within the C4C interface. The quote overview remains in Sales Cloud, and the rep navigates back to the opportunity after finishing.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q4",
+      "type": "true-false",
+      "text": "Best practice is for ERP (S/4HANA) to be the master system for material numbers, customer data, and cost information.",
+      "correctAnswer": true,
+      "explanation": "<p>The standard model makes <strong>ERP the master</strong> for material numbers, cost data, and customer/business partner records. CPQ holds configuration logic, sales descriptions, and pricing rules. Shared data flows from the master system via integration.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q5",
+      "type": "multiple-choice",
+      "text": "Which middleware solution does SAP recommend for orchestrating CPQ-to-S/4HANA integrations in complex landscapes?",
+      "options": [
+        "SAP Process Orchestration (PO)",
+        "SAP Data Intelligence",
+        "SAP Integration Suite (CPI)",
+        "SAP Event Mesh"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>SAP Integration Suite (CPI)</strong> is the recommended middleware. It provides pre-built integration content (iFlows) for CPQ-to-S/4HANA scenarios, handles data mapping and transformation, and offers error handling and monitoring.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q6",
+      "type": "true-false",
+      "text": "When a CPQ product uses the External Configuration Type with Variant Configuration integration, CPQ's local rules, scripts, and layout settings are disabled for that product.",
+      "correctAnswer": true,
+      "explanation": "<p>With the External Configuration Type, all configuration logic is managed by the SAP Variant Configuration engine. CPQ's <strong>rules and messages, scripts, layout, and advanced settings</strong> are all disabled — CPQ serves as the quoting front-end while VCP handles the product logic.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q7",
+      "type": "multiple-choice",
+      "text": "What is the purpose of embedding SAP CPQ into an SAP Commerce Cloud storefront?",
+      "options": [
+        "To allow administrators to configure CPQ products from the storefront back-end",
+        "To enable B2B customers to self-configure products and request quotes without a sales rep",
+        "To replace the CPQ admin interface with the Commerce Cloud admin",
+        "To synchronise the Commerce Cloud product catalog with CPQ automatically"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The Commerce Cloud integration enables <strong>B2B self-service</strong>: customers browse the storefront, configure complex products using CPQ's embedded configurator, see real-time pricing, and request or generate quotes — all without needing a sales rep.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q8",
+      "type": "true-false",
+      "text": "When CPQ is embedded in Commerce Cloud, the standard CPQ rules, pricing, and approval workflows still apply behind the scenes.",
+      "correctAnswer": true,
+      "explanation": "<p>Even in the self-service Commerce Cloud scenario, the <strong>standard CPQ engine</strong> — including configuration rules, pricing methods, pricebooks, and approval workflows — runs behind the scenes. The customer gets the same accurate configuration and pricing a sales rep would produce.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q9",
+      "type": "multiple-choice",
+      "text": "A common Sales Cloud ↔ CPQ integration issue is 'user does not exist in CPQ'. What causes this?",
+      "options": [
+        "The user's password has expired in Sales Cloud",
+        "The user has not been provisioned in CPQ — they must exist in both systems",
+        "The user's market visibility is restricted in CPQ",
+        "The user does not have the Administrator role in Sales Cloud"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>For the embedded CPQ experience to work, the user must be <strong>provisioned in both systems</strong>. If a Sales Cloud user tries to open CPQ but has no corresponding CPQ user account, the integration fails. User provisioning should be automated via SSO/SCIM in production environments.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q10",
+      "type": "true-false",
+      "text": "Simple products and their pricing are usually interfaced from ERP, while configurable products are typically created manually in CPQ.",
+      "correctAnswer": true,
+      "explanation": "<p>Simple products and their prices are <strong>usually interfaced from ERP</strong> (via API or pricebook sync). Configurable products are <strong>normally created manually</strong> in CPQ because their configuration logic (attributes, rules, scripts) has no direct ERP equivalent — unless using Variant Configuration integration.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q11",
+      "type": "multiple-choice",
+      "text": "In the order handoff from CPQ to S/4HANA, what can the result be in ERP?",
+      "options": [
+        "Always a complete sales order with all line items",
+        "A sales order, a solution order (sales + service), or only pricing conditions",
+        "A purchase order sent to the customer",
+        "A billing document created directly without an order"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The order handoff can result in a <strong>sales order</strong>, a <strong>solution order</strong> (which creates both sales orders and service orders), or sometimes <strong>only pricing conditions</strong> — especially when not all CPQ products exist as ERP materials and the sales order is created manually.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q12",
+      "type": "true-false",
+      "text": "Keeping Part Numbers aligned between CPQ and ERP material numbers is a best practice to ensure successful order handoffs.",
+      "correctAnswer": true,
+      "explanation": "<p>Aligned Part Numbers are <strong>critical</strong> for order handoffs. When CPQ Part Numbers don't match ERP material numbers, the order creation fails because ERP cannot identify the products. Best practice is to use the same identifier in both systems from the start.</p>"
+    },
+    {
+      "id": "cpq-sap-integrations-q13",
+      "type": "multiple-choice",
+      "text": "Which SAP CX solution handles campaign automation and marketing-related activities?",
+      "options": [
+        "SAP Sales Cloud",
+        "SAP Commerce Cloud",
+        "SAP Marketing Cloud",
+        "SAP Service Cloud"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>SAP Marketing Cloud</strong> handles campaign automation, segmentation, and marketing activities. It belongs to the CX suite alongside Sales Cloud (sales automation), Commerce Cloud (web shop), Customer Data Cloud (identity/consent), and Service Cloud (customer service).</p>"
+    }
+  ]
+}
