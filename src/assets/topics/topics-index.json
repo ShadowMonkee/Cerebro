@@ -19,20 +19,6 @@
     "cc-search-solr",
     "cc-events",
     "cpq-overview",
-    "cpq-platform-basics",
-    "cpq-product-catalog",
-    "cpq-configurable-products",
-    "cpq-rules-engine",
-    "cpq-scripting",
-    "cpq-guided-selling",
-    "cpq-advanced-config",
-    "cpq-pricing",
-    "cpq-quote-management",
-    "cpq-approvals",
-    "cpq-document-generation",
-    "cpq-sap-integrations",
-    "cpq-apis",
-    "cpq-external-integrations",
-    "cpq-architecture"
+    "cpq-platform-basics"
   ]
 }
