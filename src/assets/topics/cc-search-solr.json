@@ -3,7 +3,7 @@
   "title": "Search with Solr — Indexing, Facets & Synonyms",
   "description": "How SAP Commerce Cloud integrates with Apache Solr to power product search, faceted navigation, and search relevance tuning.",
   "icon": "🔎",
-  "category": "sap-commerce-cloud",
+  "category": "cc-tier-2",
   "tags": ["solr", "search", "indexing", "facets", "synonyms"],
   "sections": [
     {

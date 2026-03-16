@@ -3,7 +3,7 @@
   "title": "Extensions — Structure, Dependencies & the Build System",
   "description": "How SAP Commerce Cloud organizes code into extensions, manages dependencies, and compiles the platform with the Ant build system.",
   "icon": "🧩",
-  "category": "sap-commerce-cloud",
+  "category": "cc-tier-1",
   "tags": ["extensions", "build-system", "ant", "dependencies", "platform-structure"],
   "sections": [
     {

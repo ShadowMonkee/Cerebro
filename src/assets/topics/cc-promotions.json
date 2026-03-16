@@ -1,0 +1,176 @@
+{
+  "id": "cc-promotions",
+  "title": "Promotions — Rule Engine, Conditions & Actions",
+  "description": "Configure rule-based promotions with conditions, actions, priority, and understand the Promotion Engine architecture.",
+  "icon": "🏷️",
+  "category": "cc-tier-3",
+  "tags": ["promotions", "promotion-engine", "rules", "conditions", "actions", "drools", "promotion-groups", "cart-promotions", "product-promotions"],
+  "sections": [
+    {
+      "title": "Promotions in SAP Commerce Cloud — Two Generations",
+      "content": "<p>SAP Commerce Cloud has two promotion systems. The <strong>legacy promotions</strong> (sometimes called \"classic promotions\") were part of the original platform and used Java-based promotion classes. The <strong>Promotion Engine</strong> (also called Rule Engine–based promotions) is the modern, recommended approach — it uses a <strong>Drools-based rule engine</strong> to evaluate conditions and fire actions at runtime.</p><p>The Promotion Engine ships as the <code>promotionengineservices</code> and <code>promotions</code> extensions and is the default in current Commerce Cloud versions. Legacy promotions are still supported for backward compatibility but should not be used for new implementations. The exam focuses on the Promotion Engine.</p><p>The Promotion Engine integrates deeply with the <strong>cart calculation cycle</strong>. When the cart is calculated, the engine evaluates all applicable promotion rules against the current cart contents, customer, date, and other conditions. Matching promotions apply their actions (discounts, free products, free shipping) to the cart, and the results are reflected in the cart totals.</p><p>Promotions are managed primarily through the <strong>Backoffice</strong> — specifically the Marketing → Promotion Rules area. Business users can create, modify, and publish promotions without developer involvement, making the Promotion Engine a key self-service tool for merchandising teams.</p>"
+    },
+    {
+      "title": "Promotion Rule Structure — Conditions & Actions",
+      "content": "<p>Every promotion rule has two parts: <strong>conditions</strong> (what must be true for the promotion to apply) and <strong>actions</strong> (what happens when the conditions are met). This is the classic rule pattern: IF conditions THEN actions.</p><p><strong>Conditions</strong> are composable building blocks that evaluate against the current context (cart, customer, session). Standard condition types include: <strong>Cart conditions</strong> — cart total above/below a threshold, cart contains a minimum number of items. <strong>Product conditions</strong> — cart contains a specific product, a product from a specific category, or a product with a qualifying quantity. <strong>Customer conditions</strong> — customer belongs to a specific customer group, is a registered user, or has a specific attribute. <strong>Time conditions</strong> — current date falls within a start/end range. <strong>Coupon conditions</strong> — customer has entered a valid coupon code.</p><p>Conditions can be combined with <strong>AND/OR/NOT</strong> logic using container conditions. For example: \"cart total > €100 AND customer is in the VIP group AND date is between Dec 1–25\" — all three must be true.</p><p><strong>Actions</strong> define the promotion outcome. Standard action types include: <strong>Percentage discount on cart</strong> (e.g. 10% off the entire order). <strong>Fixed discount on cart</strong> (e.g. €15 off). <strong>Percentage discount on products</strong> (e.g. 20% off all items in a category). <strong>Fixed price on products</strong> (e.g. selected items at €9.99 each). <strong>Buy X get Y free</strong> (e.g. buy 2 shirts, get 1 free). <strong>Free delivery</strong> (delivery cost set to zero). <strong>Free gift</strong> (add a product to the cart at zero cost).</p><p>Multiple actions can be attached to a single rule, and multiple rules can apply to the same cart simultaneously.</p>"
+    },
+    {
+      "title": "Promotion Groups, Priority & Exclusivity",
+      "content": "<p>Managing how promotions interact — especially when multiple promotions match the same cart — is one of the trickiest aspects of promotion design.</p><p><strong>Promotion Groups</strong> (<code>PromotionGroup</code>) organise promotions into logical sets. Each BaseStore is associated with one or more promotion groups, and only promotions in those groups are evaluated for that store. This enables store-specific promotions — a promotion for the electronics store doesn't interfere with the fashion store.</p><p><strong>Priority</strong> determines evaluation order when multiple rules match. Each rule has a <strong>priority value</strong> (integer) — higher numbers mean higher priority. The engine evaluates rules in priority order: a priority-100 rule is evaluated before a priority-50 rule. When a higher-priority rule's action has been applied, lower-priority rules may or may not still apply depending on exclusivity settings.</p><p><strong>Exclusivity</strong> controls whether a promotion can coexist with other promotions. A rule can be marked as <strong>exclusive</strong> — if it fires, no other promotions of the same type (product or order level) apply. This is how \"best deal for the customer\" logic works: the engine evaluates all matching rules, applies the highest-priority exclusive one, and skips the rest.</p><p>The interaction between priority and exclusivity is a common exam topic. The key principle: <strong>priority determines evaluation order; exclusivity determines whether other rules are suppressed</strong>. A non-exclusive rule at priority 100 will fire AND allow lower-priority rules to also fire. An exclusive rule at priority 100 will fire AND suppress other rules of the same scope.</p><p>There are two promotion scopes: <strong>product-level</strong> (discounts applied to specific products/entries) and <strong>order-level</strong> (discounts applied to the cart total). Exclusivity operates within scope — an exclusive product promotion suppresses other product promotions but not order promotions, and vice versa.</p>"
+    },
+    {
+      "title": "The Drools Rule Engine Under the Hood",
+      "content": "<p>The Promotion Engine is powered by <strong>Drools</strong>, an open-source business rule management system. When a promotion rule is created in Backoffice, it is <strong>compiled into a Drools rule</strong> (a .drl file) and deployed to the rule engine. At runtime, the engine evaluates these compiled rules against the cart context — this is significantly faster than interpreting rules from the database on every cart calculation.</p><p>The compilation and deployment process works as follows: <strong>1.</strong> A business user creates or modifies a promotion rule in Backoffice. <strong>2.</strong> The rule is stored as a <code>PromotionSourceRule</code> in the database. <strong>3.</strong> When the user <strong>publishes</strong> the rule (via a publish action or a scheduled publish), the system compiles the source rule into a Drools rule and deploys it to a <strong>rule module</strong>. <strong>4.</strong> The deployed rule module is what the engine evaluates at runtime.</p><p>This publish step is important: <strong>creating or editing a rule does not make it active immediately</strong>. The rule must be published (deployed) to take effect. This gives merchandising teams a review step — they can create and preview rules before making them live.</p><p>The Drools engine uses a concept called <strong>facts</strong> — data objects inserted into the engine's working memory for evaluation. The Promotion Engine inserts cart data, entry data, customer data, and session data as facts. Conditions in the rule match against these facts, and actions modify the cart (via the <code>RuleActionService</code>).</p><p>For most implementations, you never need to write Drools rules directly — the Backoffice UI generates them from the condition/action building blocks. However, for advanced scenarios, you can create <strong>custom condition and action definitions</strong> that extend the available building blocks with bespoke logic.</p>"
+    },
+    {
+      "title": "Custom Conditions & Actions",
+      "content": "<p>The Promotion Engine ships with a rich set of standard conditions and actions, but implementations frequently need custom ones. SAP Commerce Cloud provides a well-defined extension mechanism for this.</p><p>A <strong>custom condition definition</strong> requires: a <strong>definition</strong> (registered in <code>*-rules.xml</code> with a unique ID, parameters, and translators), a <strong>condition translator</strong> (a Java class that converts the Backoffice-configured parameters into Drools rule syntax), and a <strong>RAO (Rule Aware Object) provider</strong> (a class that supplies the data the condition needs to evaluate — e.g. fetching customer loyalty points from a service).</p><p>A <strong>custom action definition</strong> requires: a <strong>definition</strong> (also in <code>*-rules.xml</code>), an <strong>action translator</strong> (converts parameters to Drools), and a <strong>rule action strategy</strong> (a Java class implementing <code>RuleActionStrategy</code> that performs the actual cart manipulation — e.g. adding a custom discount entry or a free product).</p><p>Examples of custom conditions: \"customer has placed more than 5 orders in the last 6 months\" (loyalty condition), \"cart contains a product with a specific classification attribute value\" (technical specification condition), \"customer's delivery address is in a specific postcode range\" (geographic condition).</p><p>Examples of custom actions: \"apply a tiered discount based on customer loyalty tier\", \"add a personalised gift product based on customer segment\", \"apply a discount and log it to a custom audit table\".</p><p>Custom conditions and actions appear in the Backoffice rule builder alongside the standard ones — business users can use them without knowing they are custom. This is the key design goal: extend the engine's capabilities while keeping the merchandiser experience consistent.</p>"
+    },
+    {
+      "title": "Promotion Testing, Troubleshooting & Exam Tips",
+      "content": "<p>Promotions are notoriously tricky to test because they depend on the intersection of cart contents, customer state, date, coupon codes, and interaction with other promotions.</p><p><strong>Preview and simulation.</strong> The Backoffice provides a <strong>promotion preview</strong> feature that lets you simulate a rule against a test cart without publishing it. Use this to verify conditions and actions before going live. Always test with edge cases: empty cart, single item, large cart, boundary values (exactly at the threshold), expired dates, and multiple qualifying promotions.</p><p><strong>Promotion results on the cart.</strong> After calculation, the cart stores <strong>PromotionResult</strong> objects that describe which promotions fired, which actions were applied, and the resulting discount amounts. These results are visible in the Backoffice cart editor and are returned in OCC API responses — useful for debugging why a promotion did or didn't fire.</p><p><strong>Common troubleshooting:</strong> promotion not firing — check: is it published? Is the date range active? Is the correct promotion group assigned to the store? Does the cart actually meet the conditions? Is a higher-priority exclusive rule suppressing it? Promotion applying incorrectly — check: action parameters, priority conflicts, condition logic (AND vs OR), and whether the cart was recalculated after the last change.</p><p><strong>Key exam points:</strong> The Promotion Engine uses Drools (rule engine). Rules have conditions and actions. Rules must be published to take effect. PromotionGroups are assigned to stores. Priority (higher number = higher priority) determines evaluation order. Exclusivity suppresses other rules within the same scope (product or order level). Two scopes: product-level and order-level. Custom conditions and actions are registered in *-rules.xml with translators and strategies. PromotionResult objects on the cart record which promotions fired. Legacy promotions exist but are not recommended for new implementations.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-promotions-q1",
+      "type": "multiple-choice",
+      "text": "Which rule engine technology powers the SAP Commerce Cloud Promotion Engine?",
+      "options": [
+        "BPMN 2.0",
+        "Drools",
+        "Apache Camel",
+        "Spring Expression Language (SpEL)"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The Promotion Engine is powered by <strong>Drools</strong>, an open-source business rule management system. Promotion rules created in Backoffice are compiled into Drools rules and evaluated at runtime against cart context data.</p>"
+    },
+    {
+      "id": "cc-promotions-q2",
+      "type": "true-false",
+      "text": "Creating or editing a promotion rule in Backoffice makes it active immediately — no additional step is required.",
+      "correctAnswer": false,
+      "explanation": "<p>Rules must be <strong>published</strong> (deployed) to take effect. Creating or editing a rule stores it as a PromotionSourceRule, but it is not compiled into a Drools rule and deployed until the publish action is executed. This gives merchandising teams a review step.</p>"
+    },
+    {
+      "id": "cc-promotions-q3",
+      "type": "multiple-choice",
+      "text": "A promotion rule has priority 100 and is marked as exclusive at the product level. Another product-level rule has priority 50. Both match the current cart. What happens?",
+      "options": [
+        "Both rules apply — exclusivity only affects order-level rules",
+        "Only the priority-100 rule applies — it is exclusive and suppresses other product-level rules",
+        "Only the priority-50 rule applies — lower priority wins in exclusive mode",
+        "Neither applies — exclusive rules cancel each other out"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The exclusive priority-100 rule fires first (higher priority) and <strong>suppresses other product-level rules</strong>. The priority-50 rule is skipped. Exclusivity operates within scope — product-level exclusivity does not affect order-level promotions.</p>"
+    },
+    {
+      "id": "cc-promotions-q4",
+      "type": "true-false",
+      "text": "Promotion groups are assigned to BaseStore, and only promotions within a store's assigned groups are evaluated for that store.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>PromotionGroups</strong> are assigned to BaseStore. Only promotions belonging to the store's groups are evaluated during cart calculation. This enables store-specific promotions without interference across stores.</p>"
+    },
+    {
+      "id": "cc-promotions-q5",
+      "type": "multiple-choice",
+      "text": "Which of the following is NOT a standard promotion condition type?",
+      "options": [
+        "Cart total above a threshold",
+        "Customer belongs to a specific customer group",
+        "Product has a specific Solr boost value",
+        "Cart contains a product from a specific category"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Solr boost values are part of the search indexing system, not the promotion engine. Standard conditions include cart total thresholds, customer group membership, product/category presence, qualifying quantities, date ranges, and coupon codes.</p>"
+    },
+    {
+      "id": "cc-promotions-q6",
+      "type": "true-false",
+      "text": "An exclusive product-level promotion will suppress both other product-level promotions and order-level promotions.",
+      "correctAnswer": false,
+      "explanation": "<p>Exclusivity operates <strong>within scope</strong>. An exclusive product-level promotion suppresses other <strong>product-level</strong> promotions but does <strong>not</strong> affect order-level promotions. The two scopes are independent.</p>"
+    },
+    {
+      "id": "cc-promotions-q7",
+      "type": "multiple-choice",
+      "text": "In the Promotion Engine's priority system, which rule is evaluated first?",
+      "options": [
+        "The rule with the lowest priority number",
+        "The rule with the highest priority number",
+        "The most recently created rule",
+        "The rule with the most conditions"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Higher priority numbers mean higher priority. A rule with <strong>priority 100 is evaluated before</strong> a rule with priority 50. This is the opposite convention from some other systems where lower numbers mean higher priority.</p>"
+    },
+    {
+      "id": "cc-promotions-q8",
+      "type": "true-false",
+      "text": "Promotion conditions can be combined with AND, OR, and NOT logic using container conditions.",
+      "correctAnswer": true,
+      "explanation": "<p>Container conditions allow <strong>AND/OR/NOT</strong> composition. For example: \"cart total > €100 AND customer is VIP AND date is Dec 1–25\" requires all three conditions to be true. OR containers require at least one to be true.</p>"
+    },
+    {
+      "id": "cc-promotions-q9",
+      "type": "multiple-choice",
+      "text": "After cart calculation, which object on the cart records which promotions fired and what discounts were applied?",
+      "options": [
+        "PromotionLog",
+        "PromotionResult",
+        "DiscountRow",
+        "PromotionAuditEntry"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>PromotionResult</strong> objects are stored on the cart after calculation. They describe which promotions fired, which actions were applied, and the resulting discount amounts. They are visible in Backoffice and returned in OCC API responses.</p>"
+    },
+    {
+      "id": "cc-promotions-q10",
+      "type": "true-false",
+      "text": "Custom promotion conditions and actions appear in the Backoffice rule builder alongside the standard ones, providing a consistent experience for business users.",
+      "correctAnswer": true,
+      "explanation": "<p>Custom conditions and actions are registered in <code>*-rules.xml</code> and <strong>appear in the Backoffice rule builder</strong> alongside standard ones. Business users can use them without knowing they are custom — the design goal is a consistent merchandiser experience.</p>"
+    },
+    {
+      "id": "cc-promotions-q11",
+      "type": "multiple-choice",
+      "text": "What is required to create a custom promotion action in SAP Commerce Cloud?",
+      "options": [
+        "A Drools .drl file written manually and deployed to the rule engine",
+        "A definition in *-rules.xml, an action translator, and a RuleActionStrategy implementation",
+        "A new CronJob that applies the discount on a schedule",
+        "A FlexibleSearch query that identifies qualifying carts"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>A custom action requires three components: a <strong>definition</strong> in <code>*-rules.xml</code> (with ID, parameters, translators), an <strong>action translator</strong> (converts parameters to Drools syntax), and a <strong>RuleActionStrategy</strong> (Java class that performs the actual cart manipulation).</p>"
+    },
+    {
+      "id": "cc-promotions-q12",
+      "type": "true-false",
+      "text": "Legacy (classic) promotions are the recommended approach for new SAP Commerce Cloud implementations.",
+      "correctAnswer": false,
+      "explanation": "<p>Legacy promotions are supported for backward compatibility but <strong>not recommended</strong> for new implementations. The <strong>Promotion Engine</strong> (Drools-based) is the modern, recommended approach with better flexibility, Backoffice management, and extensibility.</p>"
+    },
+    {
+      "id": "cc-promotions-q13",
+      "type": "multiple-choice",
+      "text": "A promotion is created in Backoffice but does not fire when a qualifying cart is calculated. Which of the following is the LEAST likely cause?",
+      "options": [
+        "The rule has not been published",
+        "The promotion group is not assigned to the store",
+        "The cart's currency does not match the promotion's currency condition",
+        "The promotion's Drools .drl file has a syntax error in a manually written section"
+      ],
+      "correctIndex": 3,
+      "explanation": "<p>Drools rules are <strong>generated automatically</strong> from the Backoffice configuration — they are not manually written. Syntax errors in .drl files are extremely unlikely. The most common causes of non-firing promotions are: not published, wrong promotion group, unmet conditions (date, threshold, currency).</p>"
+    },
+    {
+      "id": "cc-promotions-q14",
+      "type": "true-false",
+      "text": "The Promotion Engine evaluates promotions during cart calculation, and the results are reflected in the cart totals.",
+      "correctAnswer": true,
+      "explanation": "<p>The Promotion Engine integrates with the <strong>cart calculation cycle</strong>. When the cart is calculated, the engine evaluates all applicable rules against the cart context. Matching promotions apply their actions, and the discounts are reflected in entry-level and cart-level totals.</p>"
+    }
+  ]
+}

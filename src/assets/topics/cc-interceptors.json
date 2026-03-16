@@ -3,7 +3,7 @@
   "title": "Interceptors — Validate, Prepare, Remove & Load",
   "description": "How SAP Commerce Cloud's interceptor framework hooks into the Model lifecycle to enforce rules and automate data management.",
   "icon": "🪝",
-  "category": "sap-commerce-cloud",
+  "category": "cc-tier-1",
   "tags": ["interceptors", "model-lifecycle", "validation", "persistence", "hooks"],
   "sections": [
     {

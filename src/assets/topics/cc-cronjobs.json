@@ -3,7 +3,7 @@
   "title": "CronJobs & Maintenance Tasks",
   "description": "How SAP Commerce Cloud schedules and executes background tasks using the CronJob framework, triggers, and job performers.",
   "icon": "⏰",
-  "category": "sap-commerce-cloud",
+  "category": "cc-tier-2",
   "tags": ["cronjobs", "scheduling", "background-tasks", "triggers", "maintenance"],
   "sections": [
     {

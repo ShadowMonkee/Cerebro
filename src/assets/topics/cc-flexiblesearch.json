@@ -3,7 +3,7 @@
   "title": "FlexibleSearch — Query Language Deep Dive",
   "description": "SAP Commerce Cloud's type-aware query language for retrieving Models from the database safely and efficiently.",
   "icon": "🔍",
-  "category": "sap-commerce-cloud",
+  "category": "cc-tier-1",
   "tags": ["flexiblesearch", "querying", "dao", "performance", "database"],
   "sections": [
     {

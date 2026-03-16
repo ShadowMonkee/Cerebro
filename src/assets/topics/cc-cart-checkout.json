@@ -1,0 +1,176 @@
+{
+  "id": "cc-cart-checkout",
+  "title": "Cart & Checkout — Calculation, Strategies & Flow",
+  "description": "Master the cart lifecycle, calculation service, commercial strategies, and the multi-step checkout process.",
+  "icon": "🛍️",
+  "category": "cc-tier-3",
+  "tags": ["cart", "checkout", "calculation", "strategies", "payment", "delivery", "order-placement", "commerceCartService"],
+  "sections": [
+    {
+      "title": "The Cart Model & Lifecycle",
+      "content": "<p>In SAP Commerce Cloud, the shopping cart is represented by the <code>Cart</code> type, which extends <code>AbstractOrder</code> — the same base type that <code>Order</code> extends. This shared inheritance means carts and orders have the same structural fields: header-level data (currency, user, date, totals) and a collection of <strong>entries</strong> (<code>CartEntry</code> / <code>OrderEntry</code>, each extending <code>AbstractOrderEntry</code>) representing individual line items with product, quantity, and pricing.</p><p>Every user session can have one <strong>session cart</strong>. For anonymous users, the cart is tied to the session; for logged-in users, it is persisted against their account. When an anonymous user logs in, the anonymous cart is <strong>merged</strong> with any existing saved cart — a process handled by <code>CommerceCartMergingStrategy</code>.</p><p>The cart lifecycle follows this pattern: <strong>creation</strong> (first product added or explicit cart creation) → <strong>modification</strong> (add, remove, update quantity) → <strong>calculation</strong> (prices, discounts, taxes, delivery cost) → <strong>checkout</strong> (address, delivery, payment) → <strong>order placement</strong> (cart converts to an order and is removed from the session). After placement, the cart is consumed — a new cart is created for the next shopping session.</p><p>Commerce Cloud also supports <strong>saved carts</strong> (wishlists or named carts that persist beyond the session) and <strong>quote carts</strong> (carts created from a B2B quote negotiation). These are variants of the same Cart type with different flags and lifecycle rules.</p>"
+    },
+    {
+      "title": "Cart Calculation — The CalculationService",
+      "content": "<p>Cart calculation is the process of resolving all monetary values on the cart: line-item prices, discounts, taxes, delivery costs, and totals. It is triggered by the <strong>CalculationService</strong> (specifically <code>DefaultCalculationService</code>) and runs every time the cart is modified or when explicitly requested.</p><p>The calculation follows a defined sequence: <strong>1.</strong> Resolve <strong>base prices</strong> for each entry using the Europe1 price factory (FindPriceStrategy). <strong>2.</strong> Apply <strong>discounts</strong> per entry and at the order level (FindDiscountValuesStrategy). <strong>3.</strong> Calculate <strong>taxes</strong> per entry (FindTaxValuesStrategy). <strong>4.</strong> Calculate the <strong>delivery cost</strong> based on the selected delivery mode. <strong>5.</strong> Calculate the <strong>payment cost</strong> based on the selected payment mode (if applicable). <strong>6.</strong> Aggregate <strong>totals</strong>: subtotal (sum of entry totals), total discounts, total tax, delivery cost, and grand total.</p><p>Each entry stores its calculated values: <code>basePrice</code>, <code>totalPrice</code> (after quantity multiplication), <code>discountValues</code>, and <code>taxValues</code>. The cart header stores the aggregated totals: <code>subtotal</code>, <code>totalPrice</code>, <code>totalTax</code>, <code>totalDiscounts</code>, <code>deliveryCost</code>, and <code>paymentCost</code>.</p><p>The CalculationService delegates to the Europe1 strategies for price/discount/tax resolution (covered in the pricing topic) and to the <strong>delivery and payment cost strategies</strong> for logistics-related costs. This modular design means you can customise any part of the calculation independently.</p><p>A common pitfall: forgetting to <strong>trigger recalculation</strong> after modifying the cart programmatically. If you add an entry via the model service without calling the calculation service, the totals will be stale. Always use <code>CommerceCartService</code> methods (which handle calculation automatically) rather than manipulating the cart model directly.</p>"
+    },
+    {
+      "title": "Commercial Strategies — The Strategy Pattern",
+      "content": "<p>SAP Commerce Cloud uses the <strong>strategy pattern</strong> extensively in the cart and checkout domain. Commercial strategies are Spring-managed beans that encapsulate specific business logic, making it easy to swap or extend behaviour without modifying core services.</p><p>Key cart strategies include: <strong>CommerceAddToCartStrategy</strong> — controls what happens when a product is added to the cart (validation, quantity merging with existing entries, stock checks). <strong>CommerceUpdateCartEntryStrategy</strong> — controls quantity updates on existing entries. <strong>CommerceRemoveEntryGroupStrategy</strong> — handles entry removal. <strong>CommerceCartCalculationStrategy</strong> — wraps the CalculationService call with additional commercial logic (e.g. triggering promotion evaluation). <strong>CommerceCartMergingStrategy</strong> — merges an anonymous cart with a registered user's cart on login.</p><p>Checkout strategies include: <strong>CommerceCheckoutService</strong> (not a strategy itself but delegates to strategies), <strong>CommerceDeliveryAddressStrategy</strong>, <strong>CommerceDeliveryModeStrategy</strong>, <strong>CommercePaymentInfoStrategy</strong>, and <strong>CommercePlaceOrderStrategy</strong> — the final strategy that converts the cart into an order.</p><p>To customise behaviour, you <strong>extend the default strategy class</strong> and <strong>override the Spring bean definition</strong> using an alias or a bean with higher priority in your extension's <code>*-spring.xml</code>. For example, to add custom stock validation when items are added to the cart, you extend <code>DefaultCommerceAddToCartStrategy</code>, override the <code>validateAddToCart</code> method, and register your class as the <code>commerceAddToCartStrategy</code> bean.</p><p>This strategy-based architecture is a favourite exam topic because it combines design pattern knowledge with practical Commerce Cloud customisation skills.</p>"
+    },
+    {
+      "title": "Delivery Modes & Payment Modes",
+      "content": "<p><strong>Delivery Modes</strong> define how products are shipped to the customer. Each delivery mode has a code, name, description, and an associated <strong>delivery cost</strong>. Commerce Cloud supports several delivery cost calculation patterns.</p><p><strong>Fixed delivery cost</strong> — a flat fee regardless of order contents (e.g. €5.99 standard shipping). Configured by setting a fixed value on the delivery mode. <strong>Zone-based delivery</strong> — cost depends on the delivery zone (region/country) and optionally the weight or value of the order. Uses <code>ZoneDeliveryMode</code> with <code>ZoneDeliveryModeValue</code> entries mapping zones to prices. <strong>Net delivery cost</strong> — delivery cost is calculated net of tax, with tax applied separately.</p><p>Delivery modes are assigned to <strong>stores</strong> (BaseStore) — each store defines which delivery modes are available. During checkout, the storefront presents only the delivery modes valid for the customer's delivery address and the current store. The <code>DeliveryModeService</code> provides the list of supported delivery modes for a given cart.</p><p><strong>Payment Modes</strong> define how the customer pays: credit card, invoice, purchase order, etc. Each payment mode can have an associated cost (e.g. a surcharge for credit card payments). Payment modes are also assigned to stores.</p><p>During checkout, the customer selects a delivery mode and a payment method. These selections are stored on the cart and factored into the calculation. The <code>CommerceCheckoutService</code> provides methods like <code>setDeliveryMode()</code> and <code>setPaymentInfo()</code> that update the cart and trigger recalculation.</p>"
+    },
+    {
+      "title": "The Checkout Flow",
+      "content": "<p>Checkout is the multi-step process that collects all information needed to convert a cart into an order. The standard Commerce Cloud checkout follows a well-defined sequence of steps.</p><p><strong>Step 1 — Delivery Address.</strong> The customer selects or enters a shipping address. For registered users, saved addresses are available. The address is validated and set on the cart. B2B checkouts may restrict addresses to those approved for the customer's organisational unit.</p><p><strong>Step 2 — Delivery Method.</strong> The customer chooses a shipping method from the available delivery modes (filtered by store and address). The delivery cost is calculated and added to the cart total.</p><p><strong>Step 3 — Payment Details.</strong> The customer enters payment information. For credit cards, this typically involves a <strong>Payment Service Provider (PSP)</strong> integration — Commerce Cloud delegates to an external payment gateway (e.g. SAP Digital Payments, Adyen, Stripe) for secure card handling. For B2B, invoice or purchase order payment may be available.</p><p><strong>Step 4 — Review & Place Order.</strong> The customer reviews the complete order summary — products, quantities, prices, discounts, delivery, taxes, and total. On confirmation, <code>CommercePlaceOrderStrategy</code> executes: the cart is validated one final time, converted to an <code>Order</code>, payment is authorised (if applicable), and the order is persisted. The cart is then removed from the session.</p><p>The checkout flow can be <strong>customised per store</strong> using the <code>CheckoutFlowStrategy</code>. Some implementations use a <strong>multi-step</strong> flow (each step on a separate page), while others use a <strong>single-page</strong> checkout. B2B checkouts often add steps for cost centre selection, purchase order number entry, and quote reference. The accelerator storefronts (and Spartacus) provide configurable checkout flow components.</p>"
+    },
+    {
+      "title": "Cart & Checkout Customisation Points & Exam Tips",
+      "content": "<p>Cart and checkout are among the most heavily customised areas in Commerce Cloud implementations. Here are the key extension points and exam-relevant details:</p><p><strong>CommerceCartService vs CartService.</strong> <code>CartService</code> is the lower-level platform service for basic cart operations. <code>CommerceCartService</code> is the commerce-layer service that wraps CartService with commercial logic (stock checks, calculation triggers, strategy delegation). Always use <code>CommerceCartService</code> in commerce implementations — using CartService directly bypasses important business logic.</p><p><strong>AbstractOrder inheritance.</strong> Cart and Order both extend <code>AbstractOrder</code>; CartEntry and OrderEntry both extend <code>AbstractOrderEntry</code>. This means logic written against AbstractOrder works for both carts and orders — a common pattern in interceptors and services that need to operate on either.</p><p><strong>Order placement is a point of no return.</strong> Once <code>CommercePlaceOrderStrategy</code> executes, the cart becomes an order. There is no built-in \"undo\" — cancellation is a separate business process handled by the order management module. Ensure all validation (stock, payment authorisation, address verification) happens before placement.</p><p><strong>Cart recalculation triggers.</strong> Recalculation happens on: add to cart, update quantity, remove entry, set delivery mode, apply voucher/promotion, and explicit recalculate calls. If you modify the cart model directly (e.g. via ModelService), you must trigger recalculation manually — or use CommerceCartService methods that do it automatically.</p><p><strong>Key exam points:</strong> Cart and Order share AbstractOrder as their parent type. CommerceCartService (not CartService) should be used for commercial operations. Strategies are the primary customisation mechanism. The CalculationService delegates to Europe1 strategies for PDT resolution. Delivery modes are store-specific. Checkout flow is customisable per store via CheckoutFlowStrategy. B2B checkout can include additional steps (cost centre, PO number).</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-cart-checkout-q1",
+      "type": "multiple-choice",
+      "text": "What common base type do both Cart and Order extend in SAP Commerce Cloud?",
+      "options": [
+        "BaseOrder",
+        "AbstractOrder",
+        "GenericOrder",
+        "CommerceOrder"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Both Cart and Order extend <strong>AbstractOrder</strong>. This shared inheritance means they have the same structural fields (header data, entries, totals) and logic written against AbstractOrder works for both types.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q2",
+      "type": "true-false",
+      "text": "When an anonymous user logs in, their anonymous cart is automatically merged with any existing saved cart for that account.",
+      "correctAnswer": true,
+      "explanation": "<p>Cart merging is handled by <code>CommerceCartMergingStrategy</code>. When an anonymous user logs in, their anonymous cart is merged with any existing cart — combining items and resolving conflicts (e.g. duplicate products).</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q3",
+      "type": "multiple-choice",
+      "text": "In which order does the CalculationService process cart values?",
+      "options": [
+        "Taxes → Prices → Discounts → Delivery → Totals",
+        "Base prices → Discounts → Taxes → Delivery cost → Payment cost → Totals",
+        "Totals → Delivery → Taxes → Prices → Discounts",
+        "Delivery → Payment → Prices → Taxes → Discounts → Totals"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The calculation sequence is: <strong>base prices</strong> (via FindPriceStrategy) → <strong>discounts</strong> (per entry and order level) → <strong>taxes</strong> (per entry) → <strong>delivery cost</strong> → <strong>payment cost</strong> → <strong>aggregated totals</strong>. Each step feeds into the next.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q4",
+      "type": "true-false",
+      "text": "Using CartService directly in a commerce implementation is recommended because it provides the most complete business logic.",
+      "correctAnswer": false,
+      "explanation": "<p><code>CartService</code> is the lower-level platform service. <strong>CommerceCartService</strong> wraps it with commercial logic (stock checks, calculation triggers, strategy delegation). Always use CommerceCartService — using CartService directly bypasses important business validations.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q5",
+      "type": "multiple-choice",
+      "text": "Which strategy controls what happens when a product is added to the cart, including validation and stock checks?",
+      "options": [
+        "CommercePlaceOrderStrategy",
+        "CommerceAddToCartStrategy",
+        "CommerceCartCalculationStrategy",
+        "CommerceCartMergingStrategy"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>CommerceAddToCartStrategy</strong> controls the add-to-cart process: validating the product, checking stock availability, merging quantities with existing entries, and triggering calculation. It is one of the most commonly customised strategies.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q6",
+      "type": "true-false",
+      "text": "Delivery modes in SAP Commerce Cloud are assigned globally — the same set of delivery options is available in every store.",
+      "correctAnswer": false,
+      "explanation": "<p>Delivery modes are assigned to <strong>stores (BaseStore)</strong>. Each store defines which delivery modes are available. During checkout, only delivery modes valid for the customer's delivery address and the current store are presented.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q7",
+      "type": "multiple-choice",
+      "text": "Which delivery mode type uses zones and optional weight/value thresholds to calculate shipping cost?",
+      "options": [
+        "FixedDeliveryMode",
+        "ZoneDeliveryMode",
+        "WeightDeliveryMode",
+        "TieredDeliveryMode"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>ZoneDeliveryMode</strong> calculates delivery cost based on the delivery zone (region/country) using <code>ZoneDeliveryModeValue</code> entries that map zones to prices. It can optionally factor in order weight or value.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q8",
+      "type": "true-false",
+      "text": "The CommercePlaceOrderStrategy converts the cart into an order — once executed, there is no built-in undo mechanism.",
+      "correctAnswer": true,
+      "explanation": "<p>Order placement is a <strong>point of no return</strong>. Once <code>CommercePlaceOrderStrategy</code> executes, the cart becomes an order and is removed from the session. Cancellation is a separate business process in the order management module — there is no built-in undo.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q9",
+      "type": "multiple-choice",
+      "text": "What is the standard sequence of steps in the Commerce Cloud checkout flow?",
+      "options": [
+        "Payment → Delivery Address → Delivery Method → Review",
+        "Delivery Address → Delivery Method → Payment Details → Review & Place Order",
+        "Review → Delivery Address → Payment → Delivery Method",
+        "Login → Product Selection → Payment → Confirmation"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The standard checkout sequence is: <strong>Delivery Address</strong> → <strong>Delivery Method</strong> → <strong>Payment Details</strong> → <strong>Review & Place Order</strong>. B2B checkouts may add additional steps like cost centre or PO number entry.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q10",
+      "type": "true-false",
+      "text": "The checkout flow can be customised per store using the CheckoutFlowStrategy.",
+      "correctAnswer": true,
+      "explanation": "<p>The <code>CheckoutFlowStrategy</code> allows different checkout flows per store — multi-step, single-page, or custom flows with additional B2B steps. The accelerator storefronts and Spartacus provide configurable checkout flow components.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q11",
+      "type": "multiple-choice",
+      "text": "How should you customise the add-to-cart behaviour — for example, adding a custom stock validation?",
+      "options": [
+        "Modify the DefaultCommerceAddToCartStrategy source code directly",
+        "Extend DefaultCommerceAddToCartStrategy, override the relevant method, and register the custom bean via Spring",
+        "Create a new interceptor on the Cart type",
+        "Add a FlexibleSearch query in the product DAO"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The correct approach is to <strong>extend the default strategy class</strong>, override the relevant method (e.g. <code>validateAddToCart</code>), and <strong>register your bean via Spring</strong> as the <code>commerceAddToCartStrategy</code>. This follows the strategy pattern and is upgrade-safe.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q12",
+      "type": "true-false",
+      "text": "If you modify the cart model directly via ModelService without calling the CalculationService, the cart totals will be stale.",
+      "correctAnswer": true,
+      "explanation": "<p>Direct model manipulation does <strong>not trigger recalculation</strong>. The totals remain stale until recalculation is explicitly triggered. This is why <code>CommerceCartService</code> methods should be used — they automatically handle calculation after modifications.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q13",
+      "type": "multiple-choice",
+      "text": "During checkout, which service provides the list of supported delivery modes for a given cart?",
+      "options": [
+        "CartService",
+        "CatalogService",
+        "DeliveryModeService",
+        "Europe1PriceFactory"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><code>DeliveryModeService</code> provides the list of supported delivery modes for a cart, filtered by the current store and the customer's delivery address. The checkout UI uses this service to present valid shipping options.</p>"
+    },
+    {
+      "id": "cc-cart-checkout-q14",
+      "type": "true-false",
+      "text": "B2B checkouts in SAP Commerce Cloud can include additional steps such as cost centre selection and purchase order number entry.",
+      "correctAnswer": true,
+      "explanation": "<p>B2B checkouts commonly extend the standard flow with additional steps: <strong>cost centre selection</strong> (for budget allocation), <strong>purchase order number</strong> (for customer reference), and <strong>quote reference</strong> (for negotiated pricing). These are configured via the CheckoutFlowStrategy.</p>"
+    }
+  ]
+}

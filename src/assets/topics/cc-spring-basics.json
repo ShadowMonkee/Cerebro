@@ -3,7 +3,7 @@
   "title": "Spring in Commerce Cloud — Beans, Aliases & Overrides",
   "description": "How SAP Commerce Cloud uses Spring for dependency injection, bean configuration, and safe customization without modifying platform code.",
   "icon": "🌱",
-  "category": "sap-commerce-cloud",
+  "category": "cc-tier-1",
   "tags": ["spring", "dependency-injection", "beans", "customization", "converters"],
   "sections": [
     {

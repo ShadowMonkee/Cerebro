@@ -3,7 +3,7 @@
   "title": "Event System — Publishing & Listening",
   "description": "Master the SAP Commerce Cloud event framework for decoupled, asynchronous communication between modules.",
   "icon": "📡",
-  "category": "sap-commerce-cloud",
+  "category": "cc-tier-2",
   "tags": ["events", "listeners", "publishing", "asynchronous", "decoupling", "cluster-aware"],
   "sections": [
     {

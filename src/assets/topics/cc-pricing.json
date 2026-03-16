@@ -1,0 +1,176 @@
+{
+  "id": "cc-pricing",
+  "title": "Pricing — Price Rows, PDT & the Europe1 System",
+  "description": "Understand SAP Commerce Cloud's pricing architecture — Europe1, price rows, discount rows, tax rows, and price factories.",
+  "icon": "💶",
+  "category": "cc-tier-3",
+  "tags": ["pricing", "europe1", "price-rows", "discounts", "taxes", "PDT", "price-factory"],
+  "sections": [
+    {
+      "title": "The Europe1 Pricing System",
+      "content": "<p>SAP Commerce Cloud uses the <strong>Europe1 pricing system</strong> as its default pricing engine. Europe1 is a flexible, rule-based system that resolves prices, discounts, and taxes (collectively called <strong>PDT — Price, Discount, Tax</strong>) for products based on a set of matching conditions.</p><p>The name \"Europe1\" is historical — it was originally designed for European pricing requirements but is used globally. It ships as the <code>europe1</code> extension and is enabled by default in most Commerce Cloud configurations. While it's possible to replace it with a custom pricing engine, the vast majority of implementations use Europe1 either directly or with extensions.</p><p>Europe1 works by maintaining <strong>rows</strong> of pricing data — Price Rows, Discount Rows, and Tax Rows — each with conditions that determine when they apply. When a product's price is requested (e.g. during cart calculation), Europe1 evaluates all matching rows and resolves the final price. The resolution follows a priority-based matching algorithm that considers product, user, user group, currency, quantity, date range, and other dimensions.</p><p>Understanding Europe1 is essential for the certification exam because pricing questions span multiple areas: how prices are stored, how they're resolved, how discounts stack, how taxes apply, and how to customise pricing behaviour.</p>"
+    },
+    {
+      "title": "Price Rows — How Prices Are Stored",
+      "content": "<p><strong>Price Rows</strong> (<code>PriceRow</code> type) are the fundamental unit of product pricing in Europe1. Each price row represents a specific price for a product under specific conditions.</p><p>A price row contains: the <strong>product</strong> (or product group) it applies to, the <strong>user</strong> (or user group) it applies to, the <strong>currency</strong>, the <strong>net/gross</strong> flag, the <strong>price value</strong>, the <strong>minimum quantity</strong> (for volume-based pricing — e.g. unit price drops when ordering 10+), and optional <strong>date ranges</strong> (valid from/to for time-limited pricing like seasonal sales).</p><p>A single product can have <strong>many price rows</strong>. For example, a laptop might have: a standard retail price (any user, EUR), a B2B price (B2B user group, EUR), a volume price for 10+ units (any user, EUR, minQty=10), and a USD price (any user, USD). When the system requests the price, Europe1 evaluates all matching rows and selects the <strong>best match</strong> based on specificity — a price row targeting a specific user group is more specific than one targeting all users.</p><p>Price rows can be assigned to a product <strong>directly</strong> (on the product item) or via a <strong>product price group</strong>. Product price groups let you assign the same pricing to multiple products without duplicating rows — change the group's price and all member products update. This is analogous to assigning a discount to a category rather than individual products.</p><p>Price rows are commonly loaded via <strong>ImpEx</strong> or synced from an external pricing system (like S/4HANA pricing conditions). They can also be managed in the Backoffice product editor.</p>"
+    },
+    {
+      "title": "Discount Rows & Tax Rows",
+      "content": "<p><strong>Discount Rows</strong> (<code>DiscountRow</code>) follow the same pattern as price rows but define discounts instead of base prices. Each discount row specifies: the product (or product group), the user (or user group), the <strong>discount value</strong> (either a percentage or an absolute amount), the currency (for absolute discounts), an optional date range, and a <strong>priority</strong>.</p><p>Multiple discount rows can match for a single product-user combination. When they do, the <strong>priority</strong> determines the order of application. Discounts can be configured to apply <strong>sequentially</strong> (each discount applies to the result of the previous one) or in other combination modes depending on configuration. A common pattern: a 10% loyalty discount for returning customers stacks with a 5% bulk-order discount.</p><p>Discount rows can also be grouped into <strong>discount user groups</strong> and <strong>discount product groups</strong>, enabling bulk discount assignment without row duplication.</p><p><strong>Tax Rows</strong> (<code>TaxRow</code>) define tax rates. Each tax row specifies: the product (or product group), the user (or user group), the <strong>tax value</strong> (percentage), and the <strong>tax code</strong>. Tax rows support date ranges for tax rate changes (e.g. temporary VAT reductions). Multiple tax rows can apply to the same product — for example, a standard VAT row and an eco-tax row — and their rates are combined.</p><p>Together, Price Rows + Discount Rows + Tax Rows form the complete <strong>PDT model</strong>. The price factory resolves all three to calculate the final price shown to the customer.</p>"
+    },
+    {
+      "title": "The Price Resolution Algorithm",
+      "content": "<p>When Commerce Cloud needs a price (e.g. during cart calculation or PDP rendering), the Europe1 price factory executes a <strong>resolution algorithm</strong> that finds the best matching price row for the current context.</p><p>The matching context includes: the <strong>product</strong> (and its product price groups), the <strong>user</strong> (and their user price group and user discount groups), the <strong>currency</strong> (from the session or store configuration), the <strong>quantity</strong>, and the <strong>current date</strong>.</p><p>The algorithm ranks matches by <strong>specificity</strong>. A price row that targets a specific product + specific user group is more specific than one targeting a product price group + any user. The specificity hierarchy (from most to least specific) is roughly: <strong>product + user</strong> → <strong>product + user group</strong> → <strong>product group + user</strong> → <strong>product group + user group</strong> → <strong>product + any user</strong> → <strong>product group + any user</strong>. Within the same specificity level, <strong>quantity matching</strong> applies — a row with minQty=10 beats a row with minQty=1 when the cart quantity is 15.</p><p>If multiple rows tie in specificity, the system returns the <strong>lowest price</strong> (for price rows) by default, though this behaviour can be customised. For discount and tax rows, all matching rows are applied according to their priority and combination rules.</p><p>This resolution happens through the <strong>FindPriceStrategy</strong> (for prices), <strong>FindDiscountValuesStrategy</strong> (for discounts), and <strong>FindTaxValuesStrategy</strong> (for taxes). These are Spring-managed strategy beans that can be overridden to customise the matching logic — a common extension point for implementations with non-standard pricing requirements.</p>"
+    },
+    {
+      "title": "Price Factory & Customisation Points",
+      "content": "<p>The <strong>Price Factory</strong> (specifically <code>Europe1PriceFactory</code>) is the service that orchestrates the entire PDT resolution. It sits between the commerce services (cart calculation, product detail) and the raw PDT rows. When asked for a price, it delegates to the find-strategies, applies discounts, calculates taxes, and returns the final result.</p><p>The key customisation points are the <strong>strategy beans</strong>. <code>FindPriceStrategy</code> — override to change how the best price row is selected (e.g. prefer a specific user group over the general price). <code>FindDiscountValuesStrategy</code> — override to change how discounts are resolved, combined, or capped. <code>FindTaxValuesStrategy</code> — override to change tax resolution (e.g. integrate with an external tax engine).</p><p>These strategies are defined as Spring beans and can be replaced by registering a custom bean with the same ID or a higher priority alias. This is the <strong>recommended</strong> approach for pricing customisation — override the strategy, not the price factory itself. Replacing the entire Europe1PriceFactory is possible but rarely necessary and significantly harder to maintain across upgrades.</p><p>Another extension point is the <strong>PDT (Price/Discount/Tax) row model</strong> itself. You can add custom conditions to price rows by extending the PriceRow type in <code>items.xml</code> — for example, adding a \"channel\" attribute so that different prices apply to web vs mobile vs call centre. The custom find-strategy then includes this attribute in its matching logic.</p><p>For implementations that need fundamentally different pricing (e.g. real-time pricing from an external engine with no local price rows), Commerce Cloud supports replacing the price factory entirely with a <strong>custom implementation</strong>. However, this is a significant undertaking that affects cart calculation, checkout, promotions, and every price-display touchpoint.</p>"
+    },
+    {
+      "title": "Pricing in Practice — ImpEx, Backoffice & Exam Tips",
+      "content": "<p>In day-to-day implementation work, pricing data is managed through several channels.</p><p><strong>ImpEx</strong> is the most common method for loading price rows in bulk. A typical ImpEx block creates PriceRows with product code, currency, price value, net/gross flag, unit, minQty, date range, and user price group. ImpEx is used both for initial data loading and for ongoing price updates (e.g. a scheduled import of updated prices from ERP).</p><p><strong>Backoffice</strong> provides a UI for managing prices on individual products. The product editor's Pricing tab shows all price rows, discount rows, and tax rows. Merchandisers can add, edit, and delete rows directly. This is practical for ad-hoc price changes but doesn't scale for catalogs with thousands of products.</p><p><strong>Synchronisation from ERP.</strong> In SAP-centric landscapes, prices often originate in S/4HANA as pricing conditions. An integration (via CPI or Data Hub) transforms ERP condition records into Commerce Cloud PriceRow ImpEx or API calls. The mapping between ERP condition types (e.g. PR00 for base price) and Commerce PriceRow fields is a key integration design task.</p><p><strong>Key exam points:</strong> Europe1 is the default pricing system. PDT stands for Price, Discount, Tax. Price rows match by product (or group), user (or group), currency, quantity, and date. Specificity determines which row wins. Strategies (FindPriceStrategy, etc.) are the recommended customisation points. Price rows can be loaded via ImpEx, managed in Backoffice, or synced from ERP. Volume pricing uses the minQty field on price rows. Product price groups and user price groups avoid row duplication.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-pricing-q1",
+      "type": "multiple-choice",
+      "text": "What does PDT stand for in the context of SAP Commerce Cloud pricing?",
+      "options": [
+        "Product Data Transfer",
+        "Price, Discount, Tax",
+        "Price Determination Table",
+        "Product Description Template"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>PDT stands for <strong>Price, Discount, Tax</strong> — the three types of pricing data managed by the Europe1 pricing system. Each is stored as rows (PriceRow, DiscountRow, TaxRow) with matching conditions.</p>"
+    },
+    {
+      "id": "cc-pricing-q2",
+      "type": "true-false",
+      "text": "The Europe1 pricing system is an optional extension that must be explicitly enabled in SAP Commerce Cloud.",
+      "correctAnswer": false,
+      "explanation": "<p>Europe1 is the <strong>default pricing system</strong> and ships enabled in most Commerce Cloud configurations. While it can be replaced with a custom pricing engine, it is active out of the box — not something you need to enable manually.</p>"
+    },
+    {
+      "id": "cc-pricing-q3",
+      "type": "multiple-choice",
+      "text": "Which field on a PriceRow enables volume-based pricing (e.g. a lower unit price when ordering 10+ units)?",
+      "options": [
+        "maxQuantity",
+        "minQuantity (minQty)",
+        "volumeTier",
+        "quantityBreak"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <strong>minQuantity (minQty)</strong> field specifies the minimum order quantity for the price row to apply. A row with minQty=10 and a lower price activates when the customer orders 10 or more units, enabling volume-based pricing.</p>"
+    },
+    {
+      "id": "cc-pricing-q4",
+      "type": "true-false",
+      "text": "A single product in SAP Commerce Cloud can have multiple price rows with different conditions (currency, user group, quantity, date range).",
+      "correctAnswer": true,
+      "explanation": "<p>A product can have <strong>many price rows</strong> — each with different conditions. The Europe1 resolution algorithm evaluates all matching rows and selects the best match based on specificity and quantity when a price is requested.</p>"
+    },
+    {
+      "id": "cc-pricing-q5",
+      "type": "multiple-choice",
+      "text": "In the Europe1 price resolution algorithm, which combination is considered the MOST specific?",
+      "options": [
+        "Product price group + any user",
+        "Product + user group",
+        "Product group + user group",
+        "Product + specific user"
+      ],
+      "correctIndex": 3,
+      "explanation": "<p><strong>Product + specific user</strong> is the most specific match. The specificity hierarchy goes from product+user (most specific) down through product+user group, product group+user, product group+user group, to product+any user (least specific).</p>"
+    },
+    {
+      "id": "cc-pricing-q6",
+      "type": "true-false",
+      "text": "Product price groups allow you to assign the same pricing to multiple products without duplicating price rows on each product.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>Product price groups</strong> let you define price rows once at the group level and assign multiple products to the group. Changing the group's price updates all member products — avoiding duplication and simplifying maintenance.</p>"
+    },
+    {
+      "id": "cc-pricing-q7",
+      "type": "multiple-choice",
+      "text": "What is the recommended approach for customising price resolution logic in SAP Commerce Cloud?",
+      "options": [
+        "Replace the entire Europe1PriceFactory with a custom implementation",
+        "Override the find-strategy beans (e.g. FindPriceStrategy) via Spring configuration",
+        "Modify the Europe1 extension source code directly",
+        "Create custom interceptors on the PriceRow type"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The recommended approach is to <strong>override the strategy beans</strong> (FindPriceStrategy, FindDiscountValuesStrategy, FindTaxValuesStrategy) via Spring. This targets the specific resolution logic without replacing the entire price factory — making the customisation focused and upgrade-safe.</p>"
+    },
+    {
+      "id": "cc-pricing-q8",
+      "type": "true-false",
+      "text": "Discount rows in Europe1 can define discounts as either a percentage or an absolute currency amount.",
+      "correctAnswer": true,
+      "explanation": "<p>Discount rows support both <strong>percentage discounts</strong> and <strong>absolute amount discounts</strong>. For absolute discounts, a currency must be specified. Multiple discount rows can match and stack according to their priority and combination rules.</p>"
+    },
+    {
+      "id": "cc-pricing-q9",
+      "type": "multiple-choice",
+      "text": "When multiple price rows match with the same specificity level, what does Europe1 return by default?",
+      "options": [
+        "The first row created",
+        "The most recently modified row",
+        "The lowest price",
+        "An error — duplicate matches are not allowed"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>When multiple price rows tie in specificity, Europe1 returns the <strong>lowest price</strong> by default. This behaviour can be customised by overriding the FindPriceStrategy, but the default favours the customer.</p>"
+    },
+    {
+      "id": "cc-pricing-q10",
+      "type": "true-false",
+      "text": "Tax rows in Europe1 support date ranges, enabling scheduled tax rate changes (e.g. temporary VAT reductions).",
+      "correctAnswer": true,
+      "explanation": "<p>Tax rows support <strong>date ranges</strong> (valid from/to). This allows scheduled tax rate changes — for example, a temporary VAT reduction that automatically activates on a specific date and reverts after the promotion period ends.</p>"
+    },
+    {
+      "id": "cc-pricing-q11",
+      "type": "multiple-choice",
+      "text": "Which is the most common method for loading price rows in bulk during an SAP Commerce Cloud implementation?",
+      "options": [
+        "Backoffice product editor",
+        "ImpEx import",
+        "Direct database insertion",
+        "FlexibleSearch UPDATE queries"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>ImpEx</strong> is the standard method for bulk-loading price rows. It supports all PriceRow fields (product, currency, value, net/gross, unit, minQty, date range, user price group) and is used for both initial data loading and ongoing price updates.</p>"
+    },
+    {
+      "id": "cc-pricing-q12",
+      "type": "true-false",
+      "text": "Replacing the entire Europe1PriceFactory with a custom implementation is the recommended first step when pricing customisation is needed.",
+      "correctAnswer": false,
+      "explanation": "<p>Replacing the entire price factory is a <strong>last resort</strong>. The recommended first step is to override the <strong>find-strategy beans</strong>. Full replacement is rarely necessary and significantly harder to maintain across platform upgrades, since it affects cart calculation, checkout, promotions, and every price-display touchpoint.</p>"
+    },
+    {
+      "id": "cc-pricing-q13",
+      "type": "multiple-choice",
+      "text": "In an SAP-centric landscape, ERP pricing conditions (like PR00) are typically mapped to which Commerce Cloud object?",
+      "options": [
+        "Product.basePrice attribute",
+        "PriceRow items loaded via ImpEx or API",
+        "Solr indexed price fields",
+        "CMS price components"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>ERP pricing conditions are transformed and loaded as <strong>PriceRow items</strong> in Commerce Cloud — via ImpEx or API. The mapping between ERP condition types (e.g. PR00 for base price) and PriceRow fields is a key integration design task.</p>"
+    },
+    {
+      "id": "cc-pricing-q14",
+      "type": "true-false",
+      "text": "You can extend the PriceRow type in items.xml to add custom matching conditions — for example, a 'channel' attribute for different prices per sales channel.",
+      "correctAnswer": true,
+      "explanation": "<p>The PriceRow type can be <strong>extended in items.xml</strong> with custom attributes (e.g. a channel attribute). A custom FindPriceStrategy then includes this attribute in its matching logic — enabling scenarios like web vs mobile vs call centre pricing.</p>"
+    }
+  ]
+}

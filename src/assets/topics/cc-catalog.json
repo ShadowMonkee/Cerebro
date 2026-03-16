@@ -1,0 +1,176 @@
+{
+  "id": "cc-catalog",
+  "title": "Product Catalog — Versions, Synchronization & Classification",
+  "description": "Understand catalog structure, staged vs online content, sync jobs, and the classification system.",
+  "icon": "📦",
+  "category": "cc-tier-3",
+  "tags": ["catalog", "catalog-version", "synchronization", "classification", "categories", "products"],
+  "sections": [
+    {
+      "title": "Catalog Architecture Overview",
+      "content": "<p>The <strong>catalog system</strong> is one of the most fundamental concepts in SAP Commerce Cloud. It organises all product-related content — products, categories, media, prices, and more — into versioned containers that separate editorial work from what the customer sees on the storefront.</p><p>A <strong>Catalog</strong> is a top-level container identified by a unique ID (e.g. <code>electronicsProductCatalog</code>). Each catalog holds one or more <strong>CatalogVersions</strong>. The standard pattern uses exactly two versions: <code>Staged</code> (where content managers make changes) and <code>Online</code> (what the storefront serves). This two-version model acts as a built-in approval workflow — changes are prepared in Staged and pushed to Online only when ready.</p><p>Every catalog-aware item (products, categories, media, keywords) belongs to exactly one CatalogVersion at a time. This means the same product code can exist in both Staged and Online, but they are separate item instances with independent attribute values. The <code>CatalogVersion</code> is part of the item's unique key, alongside its code.</p><p>Commerce Cloud supports multiple catalogs in a single system — a common setup includes a <strong>Product Catalog</strong> for product data and a <strong>Content Catalog</strong> for CMS pages and components. Multi-country deployments often use one catalog per region.</p>"
+    },
+    {
+      "title": "Staged vs Online — The Content Lifecycle",
+      "content": "<p>The Staged/Online split enforces a clear content lifecycle. Content managers, product managers, and merchandisers work exclusively in the <strong>Staged</strong> version. They create products, upload images, adjust descriptions, and reorganise categories. None of these changes are visible to customers until a <strong>synchronization job</strong> copies them to the Online version.</p><p>This separation provides several benefits. It prevents half-finished edits from appearing on the storefront. It allows bulk preparation — for example staging an entire seasonal collection before publishing it in one go. And it creates an implicit audit trail: you can compare Staged and Online to see what has changed.</p><p>Each user session in Commerce Cloud has an <strong>active catalog version</strong> set in the session context. Backoffice users typically work in Staged; storefront sessions resolve to Online. The <code>CatalogVersionService</code> manages which version is active and provides methods like <code>getSessionCatalogVersions()</code> and <code>setSessionCatalogVersion()</code>.</p><p>A subtle but important detail: <strong>FlexibleSearch queries</strong> are automatically filtered by the active session catalog versions unless you explicitly disable the filter with <code>FlexibleSearchQuery.setDisableCatalogVersionFilter(true)</code>. Forgetting this is a frequent source of confusion when queries return no results in test or backoffice contexts.</p>"
+    },
+    {
+      "title": "Catalog Synchronization",
+      "content": "<p><strong>Synchronization</strong> is the mechanism that copies items from one CatalogVersion to another — typically from Staged to Online. It is executed by a <code>SyncItemJob</code>, which is a specialised CronJob configured per catalog.</p><p>During sync the platform compares every catalog-aware item in the source version against the target. Items are created, updated, or optionally removed in the target to mirror the source. The comparison uses a <strong>sync timestamp</strong>: only items modified after the last successful sync are processed, making incremental syncs efficient even for large catalogs.</p><p>Sync jobs are configured with <strong>SyncAttributeDescriptorConfig</strong> entries that control which attributes are copied. You can include or exclude specific attributes — for instance, syncing product descriptions but not internal editor notes. The configuration also lets you decide whether to <strong>remove items</strong> from the target that no longer exist in the source.</p><p>Key points for the exam: sync is <strong>not instantaneous</strong> — large catalogs may take minutes to hours. Sync can be triggered from Backoffice, via ImpEx, or programmatically through the <code>CatalogSynchronizationService</code>. You can sync individual items (partial sync) or the entire catalog version (full sync). <strong>Sync conflicts</strong> arise when the same item has been modified in both Staged and Online; the platform can be configured to overwrite or skip conflicting items.</p>"
+    },
+    {
+      "title": "Categories and Category Hierarchies",
+      "content": "<p>Categories organise products into navigable hierarchies that drive storefront navigation, faceted search, and merchandising rules. In the type system, <code>Category</code> is a catalog-aware item linked to a <code>CatalogVersion</code>.</p><p>Categories form a <strong>directed acyclic graph</strong> (DAG), not a strict tree. This means a single category can have <strong>multiple supercategories</strong> (parents), and a product can belong to <strong>multiple categories</strong>. For example a laptop could sit under both <em>Computers → Laptops</em> and <em>Back-to-School → Deals</em>.</p><p>The relationship between categories and products is stored through the <code>CategoryProductRelation</code>. The <code>supercategories</code> and <code>subcategories</code> attributes of the <code>Category</code> type define the hierarchy itself.</p><p>When building the storefront navigation, the system typically starts from <strong>root categories</strong> (those with no supercategories within the catalog) and renders their children recursively. The order of subcategories and products within a category is controlled via a sortable position attribute on the relation.</p><p>Best practice: keep your category tree shallow (3–4 levels) for both performance and usability, and leverage the classification system (next section) rather than deep category nesting to capture product attributes.</p>"
+    },
+    {
+      "title": "The Classification System",
+      "content": "<p>The <strong>classification system</strong> extends the category concept to attach structured, type-safe attributes to products without modifying the type system. It is based on a separate <strong>ClassificationSystem</strong> catalog (itself a subtype of <code>Catalog</code>) containing <strong>ClassificationClasses</strong> and <strong>ClassificationAttributes</strong>.</p><p>A <code>ClassificationClass</code> is a specialised category. When a product is assigned to a ClassificationClass, it inherits all the classification attributes defined for that class. For example, a classification class <em>Laptops</em> might define attributes like <em>Screen Size</em> (number, unit: inches), <em>RAM</em> (number, unit: GB), and <em>Processor Brand</em> (enum: Intel, AMD, Apple).</p><p>Classification attributes support rich metadata: <strong>data types</strong> (string, number, boolean, enum, date), <strong>units of measurement</strong> (grouped into <code>ClassificationSystemUnitGroup</code>), <strong>multi-value</strong> support, and <strong>localisation</strong>. Values are stored in <code>ProductFeature</code> items linking the product, the attribute, and the value.</p><p>The key advantage over adding custom attributes to the Product type directly is <strong>flexibility without deployment</strong>. Classification attributes can be created and managed at runtime through Backoffice or ImpEx — no <code>items.xml</code> change, no build, no system update needed. This makes them ideal for product attributes that vary by product type or change frequently.</p><p>Commerce Cloud's Solr integration can index classification attributes for faceted search, and the Backoffice displays them automatically in the product editor when the product is assigned to the relevant classification class.</p>"
+    },
+    {
+      "title": "Multi-Catalog Strategies and Best Practices",
+      "content": "<p>Real-world deployments often involve multiple catalogs to handle different concerns. Common patterns include: a <strong>global product catalog</strong> with region-specific catalogs that inherit from it (using catalog-version references or data replication), <strong>supplier catalogs</strong> ingested from external PIM systems and merged into the master catalog, and separate <strong>content catalogs</strong> per site for CMS content.</p><p>When multiple catalogs exist, <strong>catalog-aware references</strong> between items must point to the correct version. A common mistake is linking a Staged product to an Online category (or vice versa), which causes the reference to break during synchronization. Always ensure cross-references stay within the same CatalogVersion scope.</p><p>Performance tips for large catalogs: schedule sync jobs during off-peak hours, use <strong>incremental sync</strong> rather than full sync wherever possible, and break very large syncs into partitioned jobs. Monitor sync duration in the CCV2 Cloud Portal and set alerts for syncs that exceed expected windows.</p><p>For the exam, remember these key services: <code>CatalogService</code> (retrieve catalogs and versions), <code>CatalogVersionService</code> (manage session versions), <code>CategoryService</code> (navigate category trees), <code>ClassificationService</code> (read and write classification features), and <code>CatalogSynchronizationService</code> (trigger sync programmatically).</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-catalog-q1",
+      "type": "multiple-choice",
+      "text": "What is the standard two-version pattern used in SAP Commerce Cloud catalogs?",
+      "options": [
+        "Draft and Published",
+        "Staged and Online",
+        "Development and Production",
+        "Preview and Live"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The standard pattern uses <strong>Staged</strong> (for editorial work) and <strong>Online</strong> (served to the storefront). Changes are prepared in Staged and published to Online via synchronization.</p>"
+    },
+    {
+      "id": "cc-catalog-q2",
+      "type": "true-false",
+      "text": "A product with the same code in Staged and Online is the same item instance with shared attribute values.",
+      "correctAnswer": false,
+      "explanation": "<p>They are <strong>separate item instances</strong>. The CatalogVersion is part of the item's unique key, so the Staged and Online versions of a product are independent objects with their own attribute values.</p>"
+    },
+    {
+      "id": "cc-catalog-q3",
+      "type": "multiple-choice",
+      "text": "Which job type is responsible for copying items from one CatalogVersion to another?",
+      "options": [
+        "CatalogMergeJob",
+        "SyncItemJob",
+        "CatalogTransferCronJob",
+        "VersionReplicationJob"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><code>SyncItemJob</code> is the specialised CronJob that performs catalog synchronization. It compares source and target versions and copies new or modified items.</p>"
+    },
+    {
+      "id": "cc-catalog-q4",
+      "type": "true-false",
+      "text": "Incremental catalog synchronization uses a sync timestamp to process only items modified since the last successful sync.",
+      "correctAnswer": true,
+      "explanation": "<p>The platform tracks when each item was last modified and when the last successful sync occurred. Only items with a modification timestamp newer than the sync timestamp are processed, making incremental syncs efficient.</p>"
+    },
+    {
+      "id": "cc-catalog-q5",
+      "type": "multiple-choice",
+      "text": "What type of graph structure do categories form in SAP Commerce Cloud?",
+      "options": [
+        "Strict binary tree",
+        "Flat list with sort order",
+        "Directed acyclic graph (DAG)",
+        "Circular linked list"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Categories form a <strong>directed acyclic graph</strong>. A category can have multiple parent categories and a product can belong to multiple categories, making it more flexible than a simple tree.</p>"
+    },
+    {
+      "id": "cc-catalog-q6",
+      "type": "true-false",
+      "text": "FlexibleSearch queries are automatically filtered by the active session catalog versions unless explicitly disabled.",
+      "correctAnswer": true,
+      "explanation": "<p>The platform applies a catalog version filter by default. You can disable it with <code>FlexibleSearchQuery.setDisableCatalogVersionFilter(true)</code>, which is sometimes needed in background jobs or test contexts.</p>"
+    },
+    {
+      "id": "cc-catalog-q7",
+      "type": "multiple-choice",
+      "text": "What is the main advantage of using classification attributes instead of adding custom attributes to the Product type in items.xml?",
+      "options": [
+        "Classification attributes are indexed faster by Solr",
+        "Classification attributes can be created at runtime without a build or deployment",
+        "Classification attributes support more data types than the type system",
+        "Classification attributes are automatically translated into all languages"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Classification attributes can be managed at runtime through Backoffice or ImpEx with no <code>items.xml</code> changes and no system update required. This makes them ideal for attributes that vary by product type or change frequently.</p>"
+    },
+    {
+      "id": "cc-catalog-q8",
+      "type": "true-false",
+      "text": "A product can be assigned to multiple ClassificationClasses and inherit attributes from each.",
+      "correctAnswer": true,
+      "explanation": "<p>Since ClassificationClasses are specialised categories and products can belong to multiple categories, a product can inherit classification attributes from multiple classes simultaneously.</p>"
+    },
+    {
+      "id": "cc-catalog-q9",
+      "type": "multiple-choice",
+      "text": "Which service is used to manage which CatalogVersion is active in the current user session?",
+      "options": [
+        "CatalogService",
+        "CatalogVersionService",
+        "SessionService",
+        "CatalogSynchronizationService"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><code>CatalogVersionService</code> manages session catalog versions. It provides methods like <code>getSessionCatalogVersions()</code> and <code>setSessionCatalogVersion()</code> to control which version queries resolve against.</p>"
+    },
+    {
+      "id": "cc-catalog-q10",
+      "type": "true-false",
+      "text": "During catalog synchronization, it is possible to sync only a subset of attributes for each item using SyncAttributeDescriptorConfig.",
+      "correctAnswer": true,
+      "explanation": "<p><code>SyncAttributeDescriptorConfig</code> entries let you include or exclude specific attributes from synchronization — for example, syncing product descriptions but excluding internal notes.</p>"
+    },
+    {
+      "id": "cc-catalog-q11",
+      "type": "multiple-choice",
+      "text": "Classification attribute values for a product are stored in which item type?",
+      "options": [
+        "ClassificationAttributeValue",
+        "ProductFeature",
+        "FeatureValue",
+        "ClassificationEntry"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><code>ProductFeature</code> items link a product to a classification attribute and its value. This is the storage mechanism for all classification data on products.</p>"
+    },
+    {
+      "id": "cc-catalog-q12",
+      "type": "true-false",
+      "text": "Linking a Staged product to an Online category is a recommended practice for cross-catalog references.",
+      "correctAnswer": false,
+      "explanation": "<p>Cross-version references (e.g. Staged product → Online category) break during synchronization. All references between catalog-aware items should stay within the <strong>same CatalogVersion</strong> scope.</p>"
+    },
+    {
+      "id": "cc-catalog-q13",
+      "type": "multiple-choice",
+      "text": "How can you trigger a catalog synchronization programmatically?",
+      "options": [
+        "Call CatalogService.syncVersions()",
+        "Use CatalogSynchronizationService",
+        "Execute a SyncItemJob via ModelService.save()",
+        "Invoke CatalogVersionService.publish()"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><code>CatalogSynchronizationService</code> is the service that allows you to trigger synchronization programmatically. It supports both full and partial sync operations.</p>"
+    },
+    {
+      "id": "cc-catalog-q14",
+      "type": "true-false",
+      "text": "A ClassificationSystem in SAP Commerce Cloud is itself a subtype of Catalog.",
+      "correctAnswer": true,
+      "explanation": "<p><code>ClassificationSystem</code> extends <code>Catalog</code>, which means it follows the same versioning and synchronization patterns. It contains ClassificationClasses and ClassificationAttributes instead of regular products.</p>"
+    }
+  ]
+}

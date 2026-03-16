@@ -3,7 +3,7 @@
   "title": "Caching — Regions, Invalidation & Configuration",
   "description": "How SAP Commerce Cloud caches data across multiple layers to maximize performance and how to configure, extend, and invalidate caches.",
   "icon": "⚡",
-  "category": "sap-commerce-cloud",
+  "category": "cc-tier-2",
   "tags": ["caching", "performance", "regions", "invalidation", "ehcache"],
   "sections": [
     {

@@ -3,7 +3,7 @@
   "title": "ServiceLayer — Services, DAOs & ModelService",
   "description": "The architecture and patterns behind Commerce Cloud's business logic layer, from DAOs to ModelService to the Facade pattern.",
   "icon": "⚙️",
-  "category": "sap-commerce-cloud",
+  "category": "cc-tier-1",
   "tags": ["servicelayer", "modelservice", "dao", "facades", "business-logic"],
   "sections": [
     {

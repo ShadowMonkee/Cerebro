@@ -3,7 +3,7 @@
   "title": "ImpEx — Import, Export & Data Migration",
   "description": "SAP Commerce Cloud's declarative CSV-based format for importing, exporting, and migrating platform data at any scale.",
   "icon": "📦",
-  "category": "sap-commerce-cloud",
+  "category": "cc-tier-2",
   "tags": ["impex", "data-migration", "import", "export", "scripting"],
   "sections": [
     {

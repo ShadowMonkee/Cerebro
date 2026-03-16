@@ -3,7 +3,7 @@
   "title": "TypeSystem — Items, Types & Deployments",
   "description": "How SAP Commerce Cloud defines, stores, and manages all data entities through its declarative TypeSystem.",
   "icon": "🧱",
-  "category": "sap-commerce-cloud",
+  "category": "cc-tier-1",
   "tags": ["typesystem", "data-modeling", "persistence", "items-xml", "platform"],
   "sections": [
     {

@@ -1,0 +1,169 @@
+{
+  "id": "cc-vouchers",
+  "title": "Vouchers & Coupons — Codes, Restrictions & Redemption",
+  "description": "Understand voucher types, coupon codes, restrictions, redemption tracking, and how coupons integrate with the Promotion Engine.",
+  "icon": "🎟️",
+  "category": "cc-tier-3",
+  "tags": ["vouchers", "coupons", "coupon-codes", "redemption", "restrictions", "promotions", "discount-codes"],
+  "sections": [
+    {
+      "title": "Vouchers vs Coupons — Two Mechanisms",
+      "content": "<p>SAP Commerce Cloud provides two distinct mechanisms for code-based discounts: <strong>legacy vouchers</strong> and <strong>Promotion Engine coupons</strong>. Understanding the difference — and when to use which — is essential.</p><p><strong>Legacy vouchers</strong> are part of the original platform (the <code>voucher</code> extension). They are standalone discount objects with their own configuration, restrictions, and redemption tracking. They operate independently of the Promotion Engine. A voucher has a code that the customer enters during checkout, and if valid, it applies a discount to the cart.</p><p><strong>Promotion Engine coupons</strong> are the modern approach. A coupon is not a discount itself — it is a <strong>condition</strong> attached to a promotion rule. The coupon code acts as a gate: the customer enters the code, and if valid, the promotion rule's conditions are fully evaluated. If all conditions are met (coupon valid + any other conditions like minimum cart total), the promotion actions fire. This approach is more flexible because the coupon can be combined with any other promotion condition or action.</p><p>The industry direction is clearly toward <strong>Promotion Engine coupons</strong>. They benefit from the full power of the rule engine (composable conditions, priority, exclusivity, Backoffice management). Legacy vouchers are maintained for backward compatibility but lack the flexibility and integration depth of the Promotion Engine approach.</p><p>For the exam, know both mechanisms but understand that coupons within the Promotion Engine are the recommended approach for new implementations.</p>"
+    },
+    {
+      "title": "Legacy Vouchers — Types & Configuration",
+      "content": "<p>Legacy vouchers come in two types: <strong>Serial Vouchers</strong> and <strong>Promotional Vouchers</strong>.</p><p><strong>Promotional Vouchers</strong> have a <strong>single code</strong> shared by all customers. For example, code <code>SUMMER20</code> gives 20% off — anyone who knows the code can use it. They are typically distributed through marketing campaigns, social media, or email newsletters. The same code can be redeemed multiple times (up to a configured limit).</p><p><strong>Serial Vouchers</strong> generate a <strong>set of unique codes</strong> — each code can only be used once (or a limited number of times). For example, a serial voucher might generate 10,000 unique codes distributed to individual customers via email. This provides better tracking (which customer used which code) and prevents abuse (sharing a single code publicly).</p><p>Both types share common configuration fields: <strong>discount value</strong> (absolute amount or percentage), <strong>currency</strong> (for absolute discounts), <strong>free shipping flag</strong> (voucher grants free delivery instead of a price discount), and <strong>validity dates</strong> (start and end dates for the voucher's active period).</p><p>Vouchers are managed in Backoffice under Marketing → Vouchers. Serial voucher codes can be generated in bulk (specifying a quantity and an optional prefix/suffix pattern) and exported for distribution.</p>"
+    },
+    {
+      "title": "Voucher Restrictions",
+      "content": "<p><strong>Restrictions</strong> control when and how a voucher can be used. They are the legacy voucher system's equivalent of promotion conditions — but less flexible since they are predefined restriction types rather than composable rules.</p><p>Standard restriction types include: <strong>User restriction</strong> — limits the voucher to specific users or user groups. <strong>Product restriction</strong> — limits the discount to specific products (only these products are discounted, even if the cart contains other items). <strong>Category restriction</strong> — limits the discount to products in specific categories. <strong>Order value restriction</strong> — requires a minimum cart total before the voucher can be applied (e.g. voucher only valid for orders above €50). <strong>Date restriction</strong> — enforces a validity period (also set on the voucher itself, but restrictions allow more granular date logic).</p><p>Multiple restrictions can be applied to a single voucher and are evaluated with <strong>AND logic</strong> — all restrictions must be satisfied for the voucher to be valid. For example: a voucher with a user group restriction (VIP customers only) AND an order value restriction (minimum €100) AND a category restriction (electronics only) will only apply for VIP customers buying €100+ of electronics.</p><p>Restrictions are configured on the voucher's <strong>Restrictions tab</strong> in Backoffice. Each restriction is a separate item linked to the voucher. This modular design allows the same restriction patterns to be reused, but in practice, restrictions are usually created specifically for each voucher.</p>"
+    },
+    {
+      "title": "Redemption Tracking & Limits",
+      "content": "<p><strong>Redemption tracking</strong> is how the system ensures vouchers are used within their allowed limits. Every time a voucher code is applied to a completed order, a redemption record is created.</p><p>Key redemption settings on a voucher: <strong>Maximum total redemptions</strong> — the total number of times the voucher (or individual serial code) can be redeemed across all customers. Once this limit is reached, the code becomes invalid. <strong>Maximum redemptions per user</strong> — limits how many times a single customer can use the voucher. Set to 1 for \"one use per customer\" vouchers.</p><p>For <strong>Promotional Vouchers</strong> (single code), the total redemption limit controls overall usage — useful for limited-quantity offers (\"first 500 customers get 20% off\"). For <strong>Serial Vouchers</strong> (unique codes), the per-code limit is typically 1 (each code is single-use), and the total limit equals the number of generated codes.</p><p>Redemption happens at <strong>order placement</strong>, not when the code is entered. The customer applies the code to the cart and sees the discount during checkout, but the redemption is only recorded when the order is successfully placed. If the customer abandons the cart, the code remains available.</p><p>Redemption data is stored on the voucher as <strong>VoucherInvalidation</strong> records. These track which user redeemed which code, on which order, and when. This data is useful for marketing analytics — tracking campaign performance, redemption rates, and customer behaviour.</p><p>If an order with a redeemed voucher is <strong>cancelled</strong>, the redemption can optionally be reversed — freeing the code for reuse. This behaviour depends on the cancellation implementation; it is not automatic out of the box and typically requires custom logic.</p>"
+    },
+    {
+      "title": "Promotion Engine Coupons — The Modern Approach",
+      "content": "<p><strong>Coupons</strong> in the Promotion Engine are managed under Marketing → Coupon Management in Backoffice. Like legacy vouchers, they come in two flavours: <strong>Single-Code Coupons</strong> (one code for all customers) and <strong>Multi-Code Coupons</strong> (a batch of unique codes).</p><p>The fundamental difference from legacy vouchers: a coupon is <strong>not a discount by itself</strong>. It is a condition that gates a promotion rule. The workflow is: <strong>1.</strong> Create a coupon with a code (or generate a batch of codes). <strong>2.</strong> Create a promotion rule in the Promotion Engine. <strong>3.</strong> Add a <strong>coupon condition</strong> to the rule that references the coupon. <strong>4.</strong> Add any other conditions (minimum cart value, specific products, customer group). <strong>5.</strong> Define the actions (percentage discount, free shipping, free gift). <strong>6.</strong> Publish the rule.</p><p>This approach is more powerful than legacy vouchers because: the coupon can be <strong>combined with any promotion condition</strong> (e.g. coupon + minimum cart total + specific category + VIP customer — all in one rule), the discount <strong>actions are fully flexible</strong> (anything the Promotion Engine supports), coupons participate in <strong>priority and exclusivity</strong> logic alongside other promotions, and coupon-triggered promotions are managed in the <strong>same Backoffice UI</strong> as all other promotions.</p><p>Coupon redemption tracking works similarly to vouchers: maximum total redemptions and maximum redemptions per customer are configurable. Multi-code coupons support bulk code generation with configurable prefixes and code patterns.</p><p>The coupon code is applied to the cart via the storefront UI (a \"Enter coupon code\" field) or via the OCC API. The Promotion Engine then evaluates the cart with the coupon condition included. If the coupon is valid and all other conditions are met, the promotion fires.</p>"
+    },
+    {
+      "title": "Design Decisions & Exam Tips",
+      "content": "<p>Choosing between vouchers and coupons — and designing the right code-based discount strategy — is a common implementation decision.</p><p><strong>Use Promotion Engine coupons</strong> for all new implementations. They integrate with the full promotion rule engine, support complex condition combinations, participate in priority/exclusivity logic, and are managed in the same UI as other promotions. The only reason to use legacy vouchers is backward compatibility with existing implementations that already use them.</p><p><strong>Single-code vs multi-code.</strong> Use single-code coupons for broad campaigns (shared publicly — \"use code SAVE10 for 10% off\"). Use multi-code coupons for targeted campaigns (unique codes per customer — better tracking, prevents public sharing abuse). Multi-code is preferred for email campaigns and loyalty programmes.</p><p><strong>Stacking behaviour.</strong> Can a customer use a coupon code AND benefit from an automatic promotion? With the Promotion Engine, this is controlled by <strong>priority and exclusivity</strong>. If both the coupon-triggered promotion and the automatic promotion are non-exclusive, they stack. If either is exclusive, the higher-priority one wins. Design this intentionally — unintended stacking (\"20% coupon + 15% automatic = 35% off\") can erode margins.</p><p><strong>Redemption reversal on cancellation.</strong> Out of the box, voucher/coupon redemptions are not automatically reversed when an order is cancelled. If the business requires reusable codes after cancellation, custom logic must be implemented. This is a common missed requirement in projects.</p><p><strong>Key exam points:</strong> Two mechanisms — legacy vouchers (standalone discounts) and Promotion Engine coupons (conditions gating promotion rules). Promotional vouchers have one shared code; serial vouchers / multi-code coupons generate unique codes. Restrictions (vouchers) use AND logic. Coupons integrate with the full Promotion Engine (conditions, actions, priority, exclusivity). Redemption is recorded at order placement, not at code entry. Promotion Engine coupons are the recommended approach for new implementations.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cc-vouchers-q1",
+      "type": "multiple-choice",
+      "text": "What is the key difference between a legacy voucher and a Promotion Engine coupon?",
+      "options": [
+        "Vouchers can only be percentage discounts; coupons can be fixed amounts",
+        "Vouchers are standalone discount objects; coupons are conditions that gate promotion rules",
+        "Coupons can only be used once; vouchers have unlimited redemptions",
+        "Vouchers require the Drools engine; coupons do not"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Legacy vouchers are <strong>standalone discount objects</strong> with their own configuration and redemption. Promotion Engine coupons are <strong>conditions attached to promotion rules</strong> — the coupon code gates the rule, and the promotion's actions define the discount. This makes coupons more flexible.</p>"
+    },
+    {
+      "id": "cc-vouchers-q2",
+      "type": "true-false",
+      "text": "Legacy vouchers are the recommended approach for new SAP Commerce Cloud implementations.",
+      "correctAnswer": false,
+      "explanation": "<p>Legacy vouchers are maintained for backward compatibility. <strong>Promotion Engine coupons</strong> are the recommended approach — they integrate with the full rule engine, support complex conditions, and are managed alongside other promotions in Backoffice.</p>"
+    },
+    {
+      "id": "cc-vouchers-q3",
+      "type": "multiple-choice",
+      "text": "What is the difference between a Promotional Voucher and a Serial Voucher?",
+      "options": [
+        "Promotional vouchers apply to products; serial vouchers apply to the cart total",
+        "Promotional vouchers have one shared code; serial vouchers generate a set of unique codes",
+        "Serial vouchers are free; promotional vouchers always have a cost",
+        "Promotional vouchers require approval; serial vouchers do not"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Promotional vouchers</strong> have a single code shared by all customers (e.g. SUMMER20). <strong>Serial vouchers</strong> generate a set of unique codes — each typically single-use — providing better tracking and abuse prevention.</p>"
+    },
+    {
+      "id": "cc-vouchers-q4",
+      "type": "true-false",
+      "text": "Multiple restrictions on a legacy voucher are evaluated with OR logic — satisfying any one restriction is sufficient.",
+      "correctAnswer": false,
+      "explanation": "<p>Multiple restrictions are evaluated with <strong>AND logic</strong> — all restrictions must be satisfied for the voucher to be valid. For example, a user group restriction AND an order value restriction both must pass.</p>"
+    },
+    {
+      "id": "cc-vouchers-q5",
+      "type": "multiple-choice",
+      "text": "When is a voucher or coupon redemption recorded in SAP Commerce Cloud?",
+      "options": [
+        "When the customer enters the code on the cart",
+        "When the cart is recalculated with the code applied",
+        "When the order is successfully placed",
+        "When the payment is captured"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Redemption is recorded at <strong>order placement</strong>, not when the code is entered. The customer sees the discount during checkout, but if they abandon the cart, the code remains available. Only a completed order consumes a redemption.</p>"
+    },
+    {
+      "id": "cc-vouchers-q6",
+      "type": "true-false",
+      "text": "A Promotion Engine coupon can be combined with other conditions (e.g. minimum cart value, customer group) within the same promotion rule.",
+      "correctAnswer": true,
+      "explanation": "<p>This is a key advantage of coupons over legacy vouchers. A coupon condition can be combined with <strong>any other promotion condition</strong> — cart total thresholds, product/category requirements, customer groups, date ranges — all within a single rule.</p>"
+    },
+    {
+      "id": "cc-vouchers-q7",
+      "type": "multiple-choice",
+      "text": "Which voucher restriction type limits the discount to products in specific categories?",
+      "options": [
+        "User restriction",
+        "Order value restriction",
+        "Category restriction",
+        "Date restriction"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Category restriction</strong> limits the voucher's discount to products belonging to specific categories. Other items in the cart are not affected by the discount even if the voucher is applied.</p>"
+    },
+    {
+      "id": "cc-vouchers-q8",
+      "type": "true-false",
+      "text": "When an order with a redeemed voucher is cancelled, the redemption is automatically reversed out of the box.",
+      "correctAnswer": false,
+      "explanation": "<p>Redemption reversal on cancellation is <strong>not automatic</strong>. If the business requires codes to become reusable after order cancellation, custom logic must be implemented. This is a commonly missed requirement in projects.</p>"
+    },
+    {
+      "id": "cc-vouchers-q9",
+      "type": "multiple-choice",
+      "text": "A serial voucher generates 5,000 unique codes. What is the typical redemption limit per code?",
+      "options": [
+        "Unlimited — each code can be used by any number of customers",
+        "One — each unique code is single-use",
+        "Five — each code can be used by up to five customers",
+        "It depends on the total redemption limit divided by the number of codes"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Serial voucher codes are typically <strong>single-use</strong> (per-code limit of 1). Each unique code is distributed to an individual customer and can only be redeemed once, providing tracking and preventing abuse.</p>"
+    },
+    {
+      "id": "cc-vouchers-q10",
+      "type": "true-false",
+      "text": "Promotion Engine coupons participate in the same priority and exclusivity logic as other promotion rules.",
+      "correctAnswer": true,
+      "explanation": "<p>Coupon-triggered promotions are <strong>full promotion rules</strong> — they participate in the same priority and exclusivity system as automatic promotions. This means coupon promotions can be suppressed by higher-priority exclusive rules, or can themselves suppress lower-priority rules.</p>"
+    },
+    {
+      "id": "cc-vouchers-q11",
+      "type": "multiple-choice",
+      "text": "What is the correct workflow for creating a coupon-based promotion in the Promotion Engine?",
+      "options": [
+        "Create coupon → Attach coupon directly to products → Publish products",
+        "Create coupon → Create promotion rule → Add coupon condition + other conditions → Define actions → Publish rule",
+        "Create promotion rule → The system auto-generates a coupon code → Distribute the code",
+        "Create coupon → Set discount value on coupon → Publish coupon"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The workflow is: <strong>create coupon</strong> (with code) → <strong>create promotion rule</strong> → <strong>add coupon condition</strong> referencing the coupon + any other conditions → <strong>define actions</strong> (discount, free shipping, etc.) → <strong>publish</strong> the rule. The coupon itself has no discount — it gates the promotion rule.</p>"
+    },
+    {
+      "id": "cc-vouchers-q12",
+      "type": "true-false",
+      "text": "Multi-code coupons in the Promotion Engine support bulk code generation with configurable prefixes and code patterns.",
+      "correctAnswer": true,
+      "explanation": "<p>Multi-code coupons support <strong>bulk generation</strong> with configurable quantity, prefix, and code pattern. The generated codes can be exported for distribution via email campaigns, loyalty programmes, or partner channels.</p>"
+    },
+    {
+      "id": "cc-vouchers-q13",
+      "type": "multiple-choice",
+      "text": "A customer applies coupon code SAVE10 to their cart and sees a 10% discount. They then abandon the cart without placing the order. What happens to the coupon code?",
+      "options": [
+        "The code is consumed — it cannot be used again",
+        "The code remains available — redemption only occurs at order placement",
+        "The code enters a 24-hour cooldown before it can be reused",
+        "The code is flagged as potentially fraudulent"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Redemption is recorded at <strong>order placement</strong>, not at code entry. Since the customer abandoned the cart, no order was placed and no redemption was recorded. The code <strong>remains available</strong> for future use.</p>"
+    }
+  ]
+}
