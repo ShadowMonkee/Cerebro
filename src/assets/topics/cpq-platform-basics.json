@@ -1,0 +1,162 @@
+{
+  "id": "cpq-platform-basics",
+  "title": "Admin UI, Data Model & Roles",
+  "description": "Navigate the SAP CPQ admin interface, understand the core data model, and learn how roles control access.",
+  "icon": "🖥️",
+  "category": "cpq-phase-1",
+  "tags": ["admin", "data-model", "roles", "permissions", "tenant", "navigation", "users"],
+  "sections": [
+    {
+      "title": "Tenant Architecture & Environments",
+      "content": "<p>Every SAP CPQ deployment revolves around <strong>tenants</strong> — isolated instances of the application, each with its own data, configuration, and user base. A typical project maintains at least three tenants: <strong>Development</strong> (where consultants build and experiment), <strong>Test / QA</strong> (where business users validate), and <strong>Production</strong> (the live environment used by sales reps).</p><p>Tenants are fully independent — products, rules, scripts, and user accounts do not automatically sync between them. Moving configuration from one tenant to another is done through <strong>deployment packages</strong> (sometimes called snapshots or migrations), which export selected objects and import them into the target tenant. Getting this promotion process right is critical: a misconfigured deployment can overwrite production data.</p><p>Each tenant has its own URL, and users log in directly to the tenant they need. SSO can be configured so that users authenticate through a corporate identity provider (Azure AD, SAP IAS, SAML-based IdP) rather than managing separate CPQ credentials.</p><p>For the exam, remember that tenant isolation is absolute — there is no cross-tenant query or shared configuration. Every environment must be set up and maintained independently.</p>"
+    },
+    {
+      "title": "Navigating the Admin Interface",
+      "content": "<p>The SAP CPQ admin UI is a web-based back-office where administrators and configurators build the entire CPQ solution. The interface is organised into several major areas accessible from the top navigation bar and side menus.</p><p><strong>Products</strong> — where you create, edit, and organise the product catalog. This includes simple products, configurable products, product families, and bundles. <strong>Pricing</strong> — where you manage price lists, discount schedules, surcharges, and pricing rules. <strong>Quotes</strong> — where you can view, search, and manage all quotes in the system; useful for troubleshooting and auditing. <strong>Workflow</strong> — where approval chains, routing rules, and notification templates are configured.</p><p><strong>Scripts</strong> — the scripting area where IronPython global scripts, custom scripts, and event scripts are written and managed. <strong>Setup</strong> — the system-wide configuration area covering general settings, user management, roles, permissions, custom fields, integrations, and deployment tools. <strong>Reports</strong> — built-in analytics and reporting on quote volume, conversion rates, and pricing trends.</p><p>The admin UI also includes a <strong>Quote Designer</strong> for building document templates and a <strong>Commerce</strong> area for managing the optional self-service storefront. Navigation takes some getting used to — spend time clicking through each section in a sandbox tenant to build muscle memory.</p>"
+    },
+    {
+      "title": "The Core Data Model",
+      "content": "<p>Understanding how SAP CPQ's data objects relate to each other is the foundation for everything you'll configure. The model centres around a chain: <strong>Product → Quote Line Item → Quote → Order</strong>.</p><p>A <strong>Product</strong> is anything that can be sold — a physical item, a service, a subscription. Products live in <strong>Product Categories</strong> (folders that organise the catalog) and can belong to <strong>Product Families</strong> (groupings that share configuration logic). Each product has <strong>Attributes</strong> — the parameters a user selects during configuration (colour, size, SLA level, etc.).</p><p>When a product is added to a proposal, it becomes a <strong>Quote Line Item</strong> — a snapshot of the product with its selected configuration, calculated price, quantity, and any applied discounts. Multiple line items live inside a <strong>Quote</strong>, which also holds customer information, validity dates, terms, and status (draft, submitted, approved, won, lost).</p><p>Supporting objects include <strong>Price Lists</strong> (which assign prices to products by currency, customer, or region), <strong>Discount Schedules</strong> (volume or tiered discount tables), <strong>Approval Rules</strong> (threshold conditions that trigger workflow), and <strong>Document Templates</strong> (the layout used when generating a PDF or Word quote).</p><p>A key modelling decision in every project is which data lives natively in CPQ versus being mastered in an external system (ERP for material data, CRM for customer data) and synchronised in.</p>"
+    },
+    {
+      "title": "Custom Fields & Custom Tables",
+      "content": "<p>Out-of-the-box, SAP CPQ provides a fixed set of fields on its core objects (quotes, line items, products). When your business needs additional data — a custom reference number, an internal cost centre, a technical specification — you use <strong>custom fields</strong>.</p><p>Custom fields can be added to <strong>quotes</strong>, <strong>quote line items</strong>, and <strong>products</strong>. Each custom field has a data type (text, number, date, boolean, picklist), a label, and visibility settings. They appear in the UI automatically once created and are accessible in IronPython scripts, pricing formulas, document templates, and API responses.</p><p>For more complex data that doesn't fit neatly onto a single object, SAP CPQ supports <strong>custom tables</strong>. These are standalone tables you define in the admin UI with their own columns and rows — useful for lookup data like regional tax rates, material cross-references, or customer-tier mappings. Scripts can query custom tables at runtime to drive configuration or pricing logic.</p><p>Best practices: name custom fields with a consistent prefix (e.g. <code>CF_ProjectRef</code>, <code>CF_CostCentre</code>) so they are easy to identify in scripts and API payloads. Keep custom tables small and focused — if you find yourself building a relational database inside CPQ, that data probably belongs in an external system.</p>"
+    },
+    {
+      "title": "Roles, Permissions & User Management",
+      "content": "<p>SAP CPQ uses a <strong>role-based access control</strong> model. Every user is assigned one or more <strong>roles</strong>, and each role defines a set of <strong>permissions</strong> that control what the user can see and do.</p><p>The platform ships with several standard roles. <strong>Administrator</strong> — full access to all configuration, scripts, setup, and user management. <strong>Sales Representative</strong> — can create and manage quotes, configure products, and generate documents, but cannot modify the product catalog or pricing rules. <strong>Approver / Manager</strong> — can review and approve/reject quotes that hit workflow thresholds. <strong>Read-Only / Viewer</strong> — can view quotes and reports but cannot edit anything.</p><p>Permissions are granular: you can control access to specific menu areas (Products, Pricing, Scripts), specific actions (create quote, apply manual discount, override price), and even field-level visibility (hide cost fields from sales reps). Permissions also govern <strong>discount authority</strong> — a sales rep might be allowed to discount up to 10%, while a manager can go to 25%, and anything beyond requires VP approval.</p><p>User accounts can be created manually in the admin UI or provisioned automatically via <strong>SSO and SCIM</strong> (System for Cross-domain Identity Management) integrations. In enterprise deployments, user provisioning is almost always automated through the corporate identity provider.</p><p>For the exam, understand the relationship: <strong>Users → Roles → Permissions</strong>, and know that discount authority is role-driven.</p>"
+    },
+    {
+      "title": "Personas — Who Uses What and When",
+      "content": "<p>A CPQ implementation serves multiple personas, each interacting with a different slice of the platform. Understanding these personas helps you design the right experience for each group.</p><p>The <strong>Sales Rep</strong> is the primary end user. They log into CPQ (often embedded inside the CRM) to configure products, build quotes, apply discounts within their authority, and send proposals to customers. Their experience should be streamlined — minimal clicks, guided flows, no exposure to back-end complexity.</p><p>The <strong>Sales Manager / Approver</strong> reviews quotes flagged by the approval workflow. They see deal margins, discount percentages, and can approve, reject, or send back for revision. Dashboards showing pending approvals and deal health are critical for this persona.</p><p>The <strong>CPQ Administrator</strong> manages day-to-day platform operations: adding products, updating price lists, adjusting rules, managing users, and troubleshooting issues. In smaller organisations this might be a power user from the sales ops team; in larger companies it is a dedicated IT role.</p><p>The <strong>CPQ Configurator / Developer</strong> (often a consultant during implementation) builds the product models, writes IronPython scripts, designs document templates, and configures integrations. After go-live, this role transitions to the client's internal team or an ongoing support partner.</p><p>The optional <strong>Customer / Self-Service Buyer</strong> persona interacts with CPQ through a Commerce storefront, configuring products and requesting quotes without a sales rep involved. This B2B self-service use case is growing rapidly.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-platform-basics-q1",
+      "type": "multiple-choice",
+      "text": "What is a 'tenant' in SAP CPQ?",
+      "options": [
+        "A customer account within a quote",
+        "An isolated CPQ environment with its own data and configuration",
+        "A user role for external partners",
+        "A pricing region within a price list"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>A <strong>tenant</strong> is a fully isolated SAP CPQ instance. Each tenant has its own products, rules, scripts, users, and configuration. Typical setups include dev, test, and production tenants.</p>"
+    },
+    {
+      "id": "cpq-platform-basics-q2",
+      "type": "true-false",
+      "text": "Configuration changes made in a development tenant automatically sync to the production tenant.",
+      "correctAnswer": false,
+      "explanation": "<p>Tenants are <strong>fully independent</strong>. Moving configuration between tenants requires explicit deployment packages (exports and imports). There is no automatic synchronisation.</p>"
+    },
+    {
+      "id": "cpq-platform-basics-q3",
+      "type": "multiple-choice",
+      "text": "In SAP CPQ's data model, what does a product become once it is added to a proposal with a selected configuration and price?",
+      "options": [
+        "A product variant",
+        "A quote line item",
+        "A price list entry",
+        "A product instance"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>When a product is added to a quote, it becomes a <strong>quote line item</strong> — a snapshot that includes the selected configuration, calculated price, quantity, and any applied discounts.</p>"
+    },
+    {
+      "id": "cpq-platform-basics-q4",
+      "type": "true-false",
+      "text": "Custom fields in SAP CPQ can be added to quotes, quote line items, and products.",
+      "correctAnswer": true,
+      "explanation": "<p>SAP CPQ supports <strong>custom fields</strong> on quotes, quote line items, and products. These fields are accessible in scripts, pricing formulas, document templates, and API responses.</p>"
+    },
+    {
+      "id": "cpq-platform-basics-q5",
+      "type": "multiple-choice",
+      "text": "Which feature is used to store standalone lookup data — such as regional tax rates or customer-tier mappings — in SAP CPQ?",
+      "options": [
+        "Custom fields",
+        "Product attributes",
+        "Custom tables",
+        "Price lists"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Custom tables</strong> are standalone tables with their own columns and rows, ideal for lookup data that doesn't belong on a single product, quote, or line item. Scripts can query them at runtime.</p>"
+    },
+    {
+      "id": "cpq-platform-basics-q6",
+      "type": "multiple-choice",
+      "text": "In SAP CPQ's access control model, what determines a user's discount authority?",
+      "options": [
+        "The price list assigned to the customer",
+        "The user's assigned role and its permissions",
+        "The product category's configuration",
+        "The approval workflow threshold"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Discount authority is <strong>role-driven</strong>. Each role defines the maximum discount percentage a user can apply. Discounts beyond that limit trigger approval workflows.</p>"
+    },
+    {
+      "id": "cpq-platform-basics-q7",
+      "type": "true-false",
+      "text": "SAP CPQ supports automatic user provisioning through SSO and SCIM integrations.",
+      "correctAnswer": true,
+      "explanation": "<p>In enterprise deployments, user accounts are typically provisioned automatically via <strong>SCIM</strong> (System for Cross-domain Identity Management) integrated with a corporate identity provider, avoiding manual account creation.</p>"
+    },
+    {
+      "id": "cpq-platform-basics-q8",
+      "type": "multiple-choice",
+      "text": "Which persona typically writes IronPython scripts, designs document templates, and configures integrations during a CPQ implementation?",
+      "options": [
+        "Sales Representative",
+        "CPQ Configurator / Developer",
+        "Approver / Manager",
+        "Self-Service Buyer"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <strong>CPQ Configurator / Developer</strong> (often a consultant) builds the product models, scripts, templates, and integrations. After go-live this role typically transitions to the client's internal team.</p>"
+    },
+    {
+      "id": "cpq-platform-basics-q9",
+      "type": "true-false",
+      "text": "SAP CPQ permissions can control field-level visibility, such as hiding cost fields from sales representatives.",
+      "correctAnswer": true,
+      "explanation": "<p>Permissions in SAP CPQ are granular enough to control <strong>field-level visibility</strong>. For example, cost and margin fields can be hidden from sales reps while remaining visible to managers and administrators.</p>"
+    },
+    {
+      "id": "cpq-platform-basics-q10",
+      "type": "multiple-choice",
+      "text": "What is the recommended approach for moving CPQ configuration from a development tenant to production?",
+      "options": [
+        "Manually recreate the configuration in production",
+        "Use deployment packages to export and import selected objects",
+        "Connect both tenants to the same database",
+        "Use SAP Integration Suite to sync tenants in real time"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Deployment packages</strong> allow you to export selected configuration objects from one tenant and import them into another. This is the standard mechanism for promoting changes through the dev → test → production lifecycle.</p>"
+    },
+    {
+      "id": "cpq-platform-basics-q11",
+      "type": "true-false",
+      "text": "The core data chain in SAP CPQ flows from Product → Quote Line Item → Quote → Order.",
+      "correctAnswer": true,
+      "explanation": "<p>This is the central data flow: a <strong>Product</strong> is configured and added to a quote as a <strong>Quote Line Item</strong>, line items are grouped in a <strong>Quote</strong>, and an approved quote converts into an <strong>Order</strong> for ERP handoff.</p>"
+    },
+    {
+      "id": "cpq-platform-basics-q12",
+      "type": "multiple-choice",
+      "text": "Which admin UI area would you use to configure approval chains, routing rules, and notification templates?",
+      "options": [
+        "Products",
+        "Pricing",
+        "Workflow",
+        "Scripts"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>The <strong>Workflow</strong> area in the admin UI is where approval chains, routing rules, escalation logic, and notification templates are configured.</p>"
+    }
+  ]
+}

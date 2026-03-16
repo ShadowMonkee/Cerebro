@@ -1,0 +1,162 @@
+{
+  "id": "cpq-overview",
+  "title": "What is CPQ & the Quote-to-Cash Lifecycle",
+  "description": "Understand Configure, Price, Quote — its business case, SAP ecosystem fit, and the end-to-end quote-to-cash flow.",
+  "icon": "🎯",
+  "category": "cpq-phase-1",
+  "tags": ["cpq", "quote-to-cash", "sap-ecosystem", "sales-cycle", "overview"],
+  "sections": [
+    {
+      "title": "What is CPQ and Why Does It Exist?",
+      "content": "<p><strong>CPQ</strong> stands for <strong>Configure, Price, Quote</strong> — three steps that happen every time a sales rep prepares a proposal for a customer. In businesses with complex product offerings, these steps are painful when done manually: sales reps juggle spreadsheets, reference outdated price lists, and assemble quotes by hand. Errors are common, turnaround is slow, and margins leak through unapproved discounts.</p><p>A CPQ solution automates and enforces this process. <strong>Configure</strong>: guide the rep (or customer) through valid product combinations — no impossible configurations, no missing components. <strong>Price</strong>: apply the correct pricing rules automatically — base prices, volume discounts, customer-specific agreements, currency conversion. <strong>Quote</strong>: generate a professional, branded document ready for customer review and approval.</p><p>The core business case for CPQ boils down to four outcomes: <strong>faster sales cycles</strong> (quotes in minutes instead of days), <strong>fewer errors</strong> (rules prevent invalid configurations and pricing mistakes), <strong>margin protection</strong> (discount guardrails and approval workflows), and <strong>consistency</strong> (every quote follows company standards regardless of which rep creates it).</p><p>CPQ is especially valuable for companies that sell configurable products (manufacturing, high-tech), subscription services (SaaS, telecom), or complex bundles where pricing depends on many variables.</p>"
+    },
+    {
+      "title": "SAP CPQ in the SAP Ecosystem",
+      "content": "<p>SAP CPQ is a cloud-native application that sits within the <strong>SAP Customer Experience (CX)</strong> portfolio. It was originally an independent product called CallidusCloud CPQ before SAP acquired it in 2018. This heritage means SAP CPQ has its own architecture, admin interface, and scripting engine — it is not built on the SAP Commerce Cloud or S/4HANA tech stack.</p><p>Within the SAP landscape, CPQ connects to multiple systems. On the <strong>CRM side</strong>, it integrates tightly with <strong>SAP Sales Cloud (formerly C4C)</strong> — sales reps can launch the configurator directly from an opportunity, and the finished quote syncs back. On the <strong>ERP side</strong>, it connects to <strong>SAP S/4HANA</strong> or ECC for order handoff, product master data, customer master data, and pricing conditions.</p><p>For B2B self-service scenarios, SAP CPQ can be embedded into <strong>SAP Commerce Cloud</strong> storefronts, letting customers configure and quote products themselves without a sales rep. It also integrates with <strong>SAP Revenue Cloud (Subscription Billing)</strong> for recurring revenue models.</p><p>The integration layer typically uses <strong>SAP Integration Suite (CPI)</strong> as middleware, or direct REST API connections depending on complexity. Understanding where CPQ sits in this landscape — and which system is the master for each data domain — is essential for any implementation.</p>"
+    },
+    {
+      "title": "CPQ Market Landscape & When to Recommend SAP CPQ",
+      "content": "<p>SAP CPQ competes with several major players. <strong>Salesforce CPQ</strong> (native to the Salesforce CRM) is the most common alternative and dominates in Salesforce-centric organisations. <strong>Oracle CPQ</strong> is strong in Oracle Cloud environments. <strong>Conga CPQ</strong> (formerly Apttus) offers a Salesforce-native option with advanced contract lifecycle management. <strong>PROS</strong> and <strong>Vendavo</strong> specialise in AI-driven pricing optimisation.</p><p>SAP CPQ is the strongest choice when the client already runs an <strong>SAP-centric landscape</strong> — particularly SAP Sales Cloud as their CRM and S/4HANA as their ERP. The pre-built connectors reduce integration effort significantly. It also excels in scenarios requiring <strong>deep product configuration</strong> (nested BOMs, variant matrices) and <strong>complex pricing structures</strong> (multi-tier discounts, customer-specific agreements, margin-based pricing).</p><p>SAP CPQ is a harder sell when the client is invested in Salesforce CRM (where Salesforce CPQ is more natural), when the product catalog is simple (where CPQ may be overkill), or when the client lacks SAP middleware skills for integration.</p><p>As a consultant, being able to articulate these trade-offs — and honestly recommend alternatives when SAP CPQ isn't the best fit — builds credibility and trust with clients.</p>"
+    },
+    {
+      "title": "The Quote-to-Cash Lifecycle",
+      "content": "<p>CPQ is one stage in the broader <strong>quote-to-cash (QTC)</strong> process — the end-to-end flow from a sales opportunity through to cash collection. Understanding the full lifecycle is critical because CPQ decisions ripple into downstream systems.</p><p>The typical QTC flow has seven stages: <strong>1. Opportunity</strong> — a sales rep identifies a potential deal in the CRM. <strong>2. Configuration</strong> — the rep (or customer) selects and configures products using the CPQ engine. <strong>3. Pricing</strong> — the CPQ system calculates prices, applies discounts, and evaluates margin thresholds. <strong>4. Quote generation</strong> — a formatted proposal document is produced. <strong>5. Approval</strong> — if discounts or terms exceed thresholds, the quote routes through an approval chain. <strong>6. Order</strong> — the approved quote converts into a sales order, handed off to ERP for fulfilment. <strong>7. Invoice & payment</strong> — ERP generates the invoice; the customer pays; revenue is recognised.</p><p>SAP CPQ owns stages 2 through 5 directly. Stages 1 and 6–7 belong to CRM and ERP respectively, but CPQ must exchange data with both seamlessly. A misconfigured handoff — for example, CPQ line items that don't map cleanly to ERP material numbers — can break the entire flow.</p><p>On the exam, expect questions about which system owns which stage and where data handoffs happen. The QTC lifecycle is the conceptual backbone of everything else in CPQ.</p>"
+    },
+    {
+      "title": "Key Terminology You'll See Everywhere",
+      "content": "<p>Before diving deeper, here are the essential terms that appear throughout SAP CPQ documentation and the exam:</p><p><strong>Tenant</strong> — a single SAP CPQ environment (think of it as an instance). Companies typically have separate tenants for development, test, and production. <strong>Product</strong> — an item that can be added to a quote; can be simple (fixed) or configurable. <strong>Attribute</strong> — a property of a configurable product that the user selects (e.g. colour, size, SLA tier). <strong>Bill of Materials (BOM)</strong> — the list of components that make up a configurable product; can include required and optional items.</p><p><strong>Price List</strong> — a collection of prices for products, potentially specific to a customer, region, or currency. <strong>Discount Schedule</strong> — rules that define volume-based or tiered discounts. <strong>Quote</strong> — the output document containing configured products, pricing, and terms. <strong>Approval Workflow</strong> — a rule-driven chain that routes quotes for managerial sign-off when thresholds are breached.</p><p><strong>Global Script</strong> — an IronPython script that runs across the CPQ tenant and can be called from multiple contexts. <strong>Custom Script</strong> — an IronPython script attached to a specific product or action. <strong>Event Script</strong> — an IronPython script triggered by a system event (e.g. quote save, line item add).</p><p>These terms form the vocabulary for everything that follows. If any term feels unfamiliar during later topics, refer back here.</p>"
+    },
+    {
+      "title": "How CPQ Fits Your Career Path",
+      "content": "<p>Understanding CPQ as a consultant means wearing two hats simultaneously: <strong>technical</strong> (how to configure and script the platform) and <strong>business advisory</strong> (how to align CPQ to a client's sales process and commercial goals). The strongest CPQ consultants can sit with a VP of Sales to understand pricing strategy, then turn around and implement it as rules and scripts in the platform.</p><p>In a typical SAP consultancy, CPQ projects involve several roles. A <strong>CPQ Configurator</strong> builds products, rules, and pricing structures. An <strong>Integration Developer</strong> connects CPQ to CRM and ERP. A <strong>Business Analyst</strong> captures requirements and maps them to CPQ capabilities. A <strong>Solution Architect</strong> designs the overall landscape and data flow. As you grow from junior to senior, you move from configurator tasks toward architecture and client advisory.</p><p>CPQ implementations vary in size — a simple deployment with a small product catalog might take 8–12 weeks, while a complex multi-country rollout with deep ERP integration can run 6–12 months. Scope traps include underestimating rule complexity, data migration effort, and the number of pricing edge cases.</p><p>The SAP CPQ certification validates your technical knowledge across configuration, pricing, scripting, and integration. Combined with hands-on project experience, it positions you as a credible specialist — a strong addition to your path toward SAP Architect.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-overview-q1",
+      "type": "multiple-choice",
+      "text": "What do the three letters in CPQ stand for?",
+      "options": [
+        "Configure, Price, Quote",
+        "Customer, Product, Quote",
+        "Configure, Process, Qualify",
+        "Create, Price, Qualify"
+      ],
+      "correctIndex": 0,
+      "explanation": "<p>CPQ stands for <strong>Configure, Price, Quote</strong> — the three steps of selecting valid product combinations, applying pricing rules, and generating a proposal document.</p>"
+    },
+    {
+      "id": "cpq-overview-q2",
+      "type": "multiple-choice",
+      "text": "Which SAP product does SAP CPQ integrate with most tightly on the CRM side?",
+      "options": [
+        "SAP Commerce Cloud",
+        "SAP Sales Cloud (formerly C4C)",
+        "SAP Marketing Cloud",
+        "SAP SuccessFactors"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>SAP CPQ has a native, bi-directional integration with <strong>SAP Sales Cloud</strong>. Sales reps can launch the configurator from an opportunity and sync quotes back to the CRM.</p>"
+    },
+    {
+      "id": "cpq-overview-q3",
+      "type": "true-false",
+      "text": "SAP CPQ is built on the SAP Commerce Cloud technology stack.",
+      "correctAnswer": false,
+      "explanation": "<p>SAP CPQ originated as CallidusCloud CPQ, acquired by SAP in 2018. It has its own cloud-native architecture, admin interface, and scripting engine — it is <strong>not</strong> built on Commerce Cloud or S/4HANA.</p>"
+    },
+    {
+      "id": "cpq-overview-q4",
+      "type": "multiple-choice",
+      "text": "In the quote-to-cash lifecycle, which stages does SAP CPQ directly own?",
+      "options": [
+        "Opportunity through Invoice",
+        "Configuration through Approval",
+        "Order through Payment",
+        "Opportunity through Order"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>SAP CPQ owns the <strong>Configuration → Pricing → Quote Generation → Approval</strong> stages. The opportunity stage belongs to CRM, and order/invoice/payment belong to ERP.</p>"
+    },
+    {
+      "id": "cpq-overview-q5",
+      "type": "true-false",
+      "text": "SAP CPQ can be embedded into SAP Commerce Cloud storefronts for B2B self-service configuration.",
+      "correctAnswer": true,
+      "explanation": "<p>SAP CPQ integrates with Commerce Cloud to enable <strong>B2B self-service</strong> scenarios where customers configure and quote products directly on the storefront without involving a sales rep.</p>"
+    },
+    {
+      "id": "cpq-overview-q6",
+      "type": "multiple-choice",
+      "text": "What scripting language does SAP CPQ use for global, custom, and event scripts?",
+      "options": [
+        "Groovy",
+        "JavaScript",
+        "IronPython",
+        "ABAP"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>SAP CPQ uses <strong>IronPython</strong> (a .NET implementation of Python) as its scripting language. Scripts are categorised as global, custom, or event scripts depending on their scope and trigger.</p>"
+    },
+    {
+      "id": "cpq-overview-q7",
+      "type": "true-false",
+      "text": "A key business benefit of CPQ is margin protection through discount guardrails and approval workflows.",
+      "correctAnswer": true,
+      "explanation": "<p>CPQ enforces <strong>discount limits</strong> and <strong>approval thresholds</strong> to prevent sales reps from giving away excessive discounts. This protects profit margins consistently across the organisation.</p>"
+    },
+    {
+      "id": "cpq-overview-q8",
+      "type": "multiple-choice",
+      "text": "Which competitor CPQ solution is the most natural choice for organisations heavily invested in the Salesforce CRM ecosystem?",
+      "options": [
+        "Oracle CPQ",
+        "SAP CPQ",
+        "Salesforce CPQ",
+        "Conga CPQ"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Salesforce CPQ</strong> is native to the Salesforce platform. For organisations already running Salesforce CRM, it offers the tightest integration with the least middleware effort.</p>"
+    },
+    {
+      "id": "cpq-overview-q9",
+      "type": "true-false",
+      "text": "In SAP CPQ, a 'tenant' refers to a single CPQ environment such as development, test, or production.",
+      "correctAnswer": true,
+      "explanation": "<p>A <strong>tenant</strong> is an isolated SAP CPQ instance. Companies typically maintain separate tenants for development, testing, and production to manage the deployment lifecycle.</p>"
+    },
+    {
+      "id": "cpq-overview-q10",
+      "type": "multiple-choice",
+      "text": "Which SAP middleware solution is commonly used to orchestrate integrations between SAP CPQ, Sales Cloud, and S/4HANA?",
+      "options": [
+        "SAP Process Orchestration (PO)",
+        "SAP Integration Suite (CPI)",
+        "SAP Data Intelligence",
+        "SAP Event Mesh"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>SAP Integration Suite (CPI)</strong> is the recommended middleware for connecting SAP CPQ to other SAP systems. It provides pre-built integration flows and mapping tools for the CPQ landscape.</p>"
+    },
+    {
+      "id": "cpq-overview-q11",
+      "type": "true-false",
+      "text": "SAP CPQ is only suitable for companies that sell physical, configurable products like manufacturing equipment.",
+      "correctAnswer": false,
+      "explanation": "<p>SAP CPQ supports a wide range of business models including <strong>configurable products</strong> (manufacturing, high-tech), <strong>subscription services</strong> (SaaS, telecom), and <strong>complex bundles</strong> (professional services). It is not limited to physical products.</p>"
+    },
+    {
+      "id": "cpq-overview-q12",
+      "type": "multiple-choice",
+      "text": "After a quote is approved in SAP CPQ, what typically happens next in the quote-to-cash lifecycle?",
+      "options": [
+        "The quote is archived and a new version is created",
+        "The quote converts into a sales order and is handed off to ERP",
+        "The customer receives an automatic invoice from CPQ",
+        "The sales rep manually re-enters the order in S/4HANA"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>After approval, the quote <strong>converts into a sales order</strong> that is handed off to ERP (S/4HANA or ECC) for fulfilment, invoicing, and payment processing. This handoff should be automated, not manual.</p>"
+    }
+  ]
+}

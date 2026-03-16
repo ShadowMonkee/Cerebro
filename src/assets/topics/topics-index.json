@@ -1,6 +1,10 @@
 {
   "categories": [
-    { "id": "sap-commerce-cloud", "label": "SAP Commerce Cloud", "icon": "🛒", "color": "#60a5fa" }
+    { "id": "sap-commerce-cloud", "label": "SAP Commerce Cloud", "icon": "🛒", "color": "#60a5fa" },
+    { "id": "cpq-phase-1", "label": "CPQ — Foundation", "icon": "⚙️", "color": "#f59e0b" },
+    { "id": "cpq-phase-2", "label": "CPQ — Configuration", "icon": "🔧", "color": "#f97316" },
+    { "id": "cpq-phase-3", "label": "CPQ — Pricing & Quoting", "icon": "💰", "color": "#ef4444" },
+    { "id": "cpq-phase-4", "label": "CPQ — Integration & Architecture", "icon": "🔗", "color": "#8b5cf6" }
   ],
   "topics": [
     "cc-typesystem",
@@ -12,7 +16,23 @@
     "cc-impex",
     "cc-cronjobs",
     "cc-caching",
+    "cc-search-solr",
     "cc-events",
-    "cc-search-solr"
+    "cpq-overview",
+    "cpq-platform-basics",
+    "cpq-product-catalog",
+    "cpq-configurable-products",
+    "cpq-rules-engine",
+    "cpq-scripting",
+    "cpq-guided-selling",
+    "cpq-advanced-config",
+    "cpq-pricing",
+    "cpq-quote-management",
+    "cpq-approvals",
+    "cpq-document-generation",
+    "cpq-sap-integrations",
+    "cpq-apis",
+    "cpq-external-integrations",
+    "cpq-architecture"
   ]
 }
