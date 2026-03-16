@@ -1,0 +1,189 @@
+{
+  "id": "cpq-configurable-products",
+  "title": "Configurable Products, BOMs & Attributes",
+  "description": "Build configurable products with attributes, values, display types, and understand the full product structure.",
+  "icon": "🔩",
+  "category": "cpq-phase-2",
+  "tags": ["configurable-products", "attributes", "display-types", "system-list", "parent-child", "product-structure", "responder"],
+  "sections": [
+    {
+      "title": "Product Display Types",
+      "content": "<p>Every product in SAP CPQ has a <strong>Display Type</strong> that determines how it behaves when added to a quote. Choosing the right display type is one of the most important design decisions because it controls the entire user experience during configuration and quoting.</p><p>There are five display types. <strong>Simple Product</strong> — sold as-is with no configuration. The user adds it to the quote with a quantity; it becomes a line item immediately. Simple products can also serve as attribute values inside configurable products (e.g. a specific hard drive model as a selectable option). <strong>Configurable Product</strong> — requires the user to select attribute values before it can be added. There is always at least one main product. The main product can include child items, but child products do not have their own attributes.</p><p><strong>Collection of Configurable Products</strong> (available in CPQ 1.0 only) — loads multiple products to the quote in a single operation. The link between products is <em>not</em> retained once added; the effect is identical to adding each product independently. Child products can be configurable or simple, but configurable children must have default values since extra configuration within the collection is not possible.</p><p><strong>System (List) of Configurable Products</strong> — also loads multiple products in one operation, but the <em>link is retained</em>. All products are clickable in the quote and redirect to the system list configuration. Individual child products <strong>cannot</strong> be independently reconfigured; the entire system must be reconfigured as a whole.</p><p><strong>Parent/Child System (List)</strong> — behaves like a configurable product used for product nesting or hierarchical structures. The link between products is retained and the <strong>parent is visible</strong> on the quote. Only the parent product is clickable; editing redirects to the parent configuration. This display type can also transfer attribute values from parent to child products.</p>"
+    },
+    {
+      "title": "Product Structure & Creation Process",
+      "content": "<p>SAP CPQ's product structure has four key concepts: <strong>Categories</strong>, <strong>Products</strong>, <strong>Attributes</strong>, and <strong>Values</strong>. Understanding how they connect — and the order in which they must be created — is fundamental.</p><p>The catalog is organised into <strong>categories and subcategories</strong> that logically segment products. Products can be tied to any level in the hierarchy. A configurable product contains <strong>attributes</strong> (option groupings like Processor, Memory, Colour), and each attribute contains <strong>values</strong> (the selectable options like 8 GB, 16 GB, 32 GB).</p><p>Creation must follow a <strong>top-down</strong> sequence: categories first, then products, then attributes with their values, and finally the assignment of attributes to products. Top-level objects are prerequisites for the levels below them.</p><p>Each product has important master data fields: <strong>Name</strong>, <strong>Display Type</strong>, <strong>Part Number</strong> (unique identifier, comparable to an SKU — best practice is to keep it aligned across systems for integration), <strong>Product Type</strong> (used to categorise products on the quote for totals per type), <strong>Order Item Type</strong> (Sales, Subscription, or Service Contract), <strong>Description</strong>, <strong>Category</strong>, <strong>Image</strong>, <strong>Validity Dates</strong>, <strong>Permissions</strong>, and <strong>External ID</strong>.</p><p>For configurable products specifically, there is a <strong>Configuration Type</strong> setting: <strong>Standard</strong> (uses CPQ's built-in rules, scripts, and layout) or <strong>External</strong> (configuration handled by an external system like SAP Variant Configuration — when set to External, rules and messages, scripts, layout, and advanced settings are all disabled in CPQ).</p>"
+    },
+    {
+      "title": "Attributes — The Building Blocks of Configuration",
+      "content": "<p><strong>Attributes</strong> are the building blocks of product configuration. They represent the option groupings that a user selects when configuring a product. Attributes are set up <strong>centrally by the admin</strong> and must exist before they can be assigned to configurable products.</p><p>A key advantage of SAP CPQ is that attributes are <strong>reusable</strong>. You create one attribute with all its possible values, and it can be used across multiple configurable products. Each product then determines <strong>which values are visible</strong> and how they are priced. For example, a \"Colour\" attribute with values Red, Blue, Black, and White might show all four for one product but only Blue and Black for another. Never create duplicate attributes — always reuse.</p><p>Attribute values can be either <strong>text values</strong> (like colour names, Yes/No, specification labels) or <strong>simple products</strong> (like a specific hard drive model). Text values should not be treated as quote line items but can drive other selections in the configuration. Simple products used as attribute values can appear as line items on the quote.</p><p>Attributes can be displayed in multiple ways depending on business needs: <strong>Dropdown</strong> (list box), <strong>Checkbox</strong> (with or without quantity), <strong>Radio Button</strong>, <strong>Multi-Selection List</strong>, <strong>Free Text</strong> input, or <strong>Container</strong> (for dynamic, table-based configuration — covered in a later topic). The Attribute Type set during creation determines which display options are available.</p><p>Each attribute has a <strong>Rank</strong> (sort order) for its values. Best practice is to leave gaps between rank values (e.g. 10, 20, 30) so you can insert new values later without renumbering everything.</p>"
+    },
+    {
+      "title": "Assigning Attributes to Products & Controlling Values",
+      "content": "<p>Once attributes exist centrally, they are <strong>assigned to configurable products</strong> via the product's Attributes tab. You search for existing attributes, select them, and add them to the product. Each attribute assignment is then configured independently per product.</p><p>Important settings when assigning an attribute to a product include: <strong>Display Type</strong> (how the attribute renders — dropdown, radio button, etc.), <strong>List as Line Item</strong> (whether the selected value appears as a separate line on the quote), <strong>Required / Optional</strong> (whether the user must make a selection before the product is considered complete), <strong>Custom Label & Hint</strong> (a help text shown as a question mark icon that the user can hover over), and <strong>User Can Enter Quantity / Inherit Quantity from Parent</strong>.</p><p>Additional attribute value settings include: <strong>Spans Across Entire Row</strong> (layout control), <strong>Show One-Time Price / Show Recurring Price</strong> (price display in the configurator), <strong>Triggers Execution of Rules</strong> (whether changing this value triggers rule evaluation), <strong>Refresh Configurator on Change</strong> (whether the screen refreshes when the selection changes), <strong>Visible to User / Display to User</strong> (which values from the central attribute definition are shown for this particular product), and <strong>Preselected / Default Quantity</strong>.</p><p>This per-product control is powerful: the same centrally-managed attribute can look and behave completely differently depending on which product it is assigned to. However, making the same attribute appear very differently across products is <strong>not best practice</strong> — it creates a confusing user experience and maintenance burden.</p>"
+    },
+    {
+      "title": "The Configuration Screen & Responder",
+      "content": "<p>When a user clicks \"Configure\" on a configurable product, they enter the <strong>configuration screen</strong>. This is where all relevant and available options can (or must) be selected before the product is added to the quote. The available selections, attribute types, order, and layout are all determined by the admin.</p><p>The configuration screen has two main areas. The left side contains the <strong>attribute selectors</strong> — the dropdowns, checkboxes, radio buttons, and other inputs where the user makes choices. The right side is the <strong>Responder</strong> — a summary panel that shows all attributes selected for the product with their prices, giving the user a running overview before they add the item to the quote.</p><p>A configurable product has a status that transitions from <strong>Incomplete</strong> to <strong>Complete</strong> as required attributes are filled in. The product can only be added to the quote once it reaches the Complete status. This prevents users from adding partially configured products that would cause downstream problems.</p><p>The <strong>Layout tab</strong> in the product admin controls the configuration screen's appearance. It uses a <strong>drag-and-drop</strong> interface where the admin arranges attributes from a palette on the left onto the configuration screen on the right. The layout also supports a <strong>Configuration Preview</strong> to test changes before making them live. The layout must be set per configurable product — there is no global layout inheritance.</p><p>Note the \"Add\" versus \"Configure\" distinction for users: simple products only show an <strong>Add</strong> button with quantity, while configurable products show both <strong>Add</strong> (adds with default configuration) and <strong>Configure</strong> (opens the configuration screen).</p>"
+    },
+    {
+      "title": "Product Versioning, Aliases & Data Import",
+      "content": "<p>SAP CPQ supports <strong>product versioning</strong>. When changes are made to a product, instead of overwriting it, a new version is created. This lets administrators track changes over time and revert to older versions if needed. However, <strong>only one version can be active at a time</strong>. To deactivate a version, edit it and disable the Active toggle.</p><p><strong>Product Aliases</strong> are used to create different variations of the same product. An alias inherits all properties from the original (parent) product except properties that can be configured in the alias itself. Aliases are useful for setting up multiple <strong>default configurations</strong> — for example, a \"Gaming Laptop\" alias and a \"Business Laptop\" alias of the same base product, each with different preselected attributes. The original product becomes the master and can itself be active or inactive. There is no limit to the number of aliases.</p><p>For <strong>data import</strong>, SAP CPQ supports Excel-based uploads via Setup → Import/Export. You can import: simple products, product translations, attributes and values, and attribute translations. The procedure is: download the import template, populate it with data, import the file, and verify. However, <strong>configurable products are normally created manually</strong> in CPQ. The links between attributes, values, and configurable products <strong>cannot be loaded via Excel</strong> — only via the API.</p><p>Import warnings: data is <strong>case-sensitive</strong>; a typo will create a duplicate rather than matching an existing record. There is <strong>no rollback</strong> for imports. You can reuse the upload mechanism to delete records, but you must be careful — test imports in a development tenant first.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-configurable-products-q1",
+      "type": "multiple-choice",
+      "text": "Which display type retains the link between products on the quote AND makes the parent product visible as a separate quote line?",
+      "options": [
+        "System (List) of Configurable Products",
+        "Collection of Configurable Products",
+        "Parent/Child System (List) of Configurable Products",
+        "Simple Product"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>The <strong>Parent/Child System (List)</strong> retains the link between products and makes the parent visible on the quote. In contrast, the System List retains the link but does not show the system as a visible line, and the Collection does not retain the link at all.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q2",
+      "type": "true-false",
+      "text": "In a System (List) of Configurable Products, individual child products can be independently reconfigured after being added to the quote.",
+      "correctAnswer": false,
+      "explanation": "<p>In a System List, child products <strong>cannot</strong> be independently reconfigured. Clicking any product in the quote redirects to the configuration of the entire system list. The whole system must be reconfigured as a unit.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q3",
+      "type": "multiple-choice",
+      "text": "What happens when a product's Configuration Type is set to 'External' rather than 'Standard'?",
+      "options": [
+        "The product can only be sold via the Commerce Cloud storefront",
+        "Rules and messages, scripts, layout, and advanced settings are disabled in CPQ",
+        "The product is excluded from pricebook pricing",
+        "The product becomes read-only and cannot be modified"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>When Configuration Type is set to <strong>External</strong>, configuration is handled by an external system (e.g. SAP Variant Configuration). CPQ's own rules and messages, scripts, layout, and advanced settings tabs are <strong>all disabled</strong> for that product.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q4",
+      "type": "true-false",
+      "text": "An attribute created centrally in SAP CPQ can be reused across multiple configurable products, with each product controlling which values are visible.",
+      "correctAnswer": true,
+      "explanation": "<p>Attributes are created <strong>centrally</strong> with all possible values. When assigned to a configurable product, the admin selects which values are <strong>visible</strong> for that specific product and how they are priced. This reuse avoids duplication.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q5",
+      "type": "multiple-choice",
+      "text": "In what order must SAP CPQ objects be created when building a configurable product from scratch?",
+      "options": [
+        "Attributes → Products → Categories → Values",
+        "Products → Attributes → Categories → Values",
+        "Categories → Products → Attributes (with values) → Assign attributes to product",
+        "Values → Attributes → Categories → Products"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Creation must follow a <strong>top-down</strong> sequence: categories first (they are prerequisites), then products, then attributes with their values. Finally, attributes are assigned to the configurable product. Top-level objects must exist before the levels below can be created.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q6",
+      "type": "true-false",
+      "text": "Attribute values in SAP CPQ can only be text entries — simple products cannot be used as attribute values.",
+      "correctAnswer": false,
+      "explanation": "<p>Attribute values can be either <strong>text values</strong> (colours, Yes/No, specifications) or <strong>simple products</strong> (e.g. a specific hard drive model). Simple products used as values can appear as line items on the quote.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q7",
+      "type": "multiple-choice",
+      "text": "What is the purpose of the Responder in the SAP CPQ configuration screen?",
+      "options": [
+        "It validates the configuration against ERP material data",
+        "It displays a summary of all selected attributes and their prices before the product is added to the quote",
+        "It sends the configuration to the approval workflow",
+        "It generates a preview of the quote document"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <strong>Responder</strong> is the panel on the right side of the configuration screen. It shows all selected attributes and their prices, giving the user a running overview of the configuration before adding it to the quote.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q8",
+      "type": "true-false",
+      "text": "A configurable product can be added to the quote while its status is still 'Incomplete'.",
+      "correctAnswer": false,
+      "explanation": "<p>A configurable product must reach <strong>Complete</strong> status — meaning all required attributes have been filled in — before it can be added to the quote. This prevents partially configured products from entering the quoting process.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q9",
+      "type": "multiple-choice",
+      "text": "Which of the following is a valid Order Item Type in SAP CPQ?",
+      "options": [
+        "One-Time Fee",
+        "Subscription",
+        "Warranty",
+        "Consulting"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>SAP CPQ supports three Order Item Types: <strong>Sales</strong>, <strong>Subscription</strong>, and <strong>Service Contract</strong>. These categorise how the product is treated downstream for billing and fulfilment.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q10",
+      "type": "true-false",
+      "text": "The links between attributes, their values, and configurable products can be imported via Excel in SAP CPQ.",
+      "correctAnswer": false,
+      "explanation": "<p>While attribute values, attributes, and simple products can be imported via Excel, the <strong>links between them and configurable products cannot</strong>. These links can only be loaded via the API. Configurable products are normally created manually in the admin UI.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q11",
+      "type": "multiple-choice",
+      "text": "What is a Product Alias used for in SAP CPQ?",
+      "options": [
+        "Translating a product name into a different language",
+        "Creating a variation of a product with different default attribute selections",
+        "Linking a CPQ product to an ERP material master",
+        "Defining a different pricing method for the same product"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Product Aliases</strong> create variations of the same product with different default configurations. The alias inherits properties from the original product but can have different preselected attribute values — useful for targeted offerings or marketing campaigns.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q12",
+      "type": "true-false",
+      "text": "In SAP CPQ, multiple product versions can be active simultaneously for the same product.",
+      "correctAnswer": false,
+      "explanation": "<p>Each product can have multiple versions for change tracking, but <strong>only one version can be active at a time</strong>. Administrators can revert to older versions by activating them and deactivating the current one.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q13",
+      "type": "multiple-choice",
+      "text": "User visibility of products and categories in SAP CPQ can be restricted based on which of the following?",
+      "options": [
+        "User Types, Companies, Markets, Brands, and Custom Permission Groups",
+        "Only User Types and Companies",
+        "Only Markets and Currencies",
+        "Only Custom Permission Groups"
+      ],
+      "correctIndex": 0,
+      "explanation": "<p>Visibility can be restricted based on five dimensions: <strong>User Types</strong>, <strong>Companies</strong>, <strong>Markets</strong>, <strong>Brands</strong>, and <strong>Custom Permission Groups</strong>. This allows fine-grained control over who sees which products and categories.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q14",
+      "type": "true-false",
+      "text": "The 'Triggers Execution of Rules' setting on an attribute value causes configuration rules to be re-evaluated whenever that value is changed.",
+      "correctAnswer": true,
+      "explanation": "<p>When <strong>Triggers Execution of Rules</strong> is enabled for an attribute value, any change to that value triggers the rule engine to re-evaluate. This is how dependent logic (like hiding incompatible values) is activated during configuration.</p>"
+    },
+    {
+      "id": "cpq-configurable-products-q15",
+      "type": "multiple-choice",
+      "text": "What is the key difference between the Collection display type and the System List display type?",
+      "options": [
+        "Collections support configurable children; System Lists do not",
+        "Collections retain the link between products on the quote; System Lists do not",
+        "System Lists retain the link between products on the quote; Collections do not",
+        "System Lists are only available in CPQ 1.0"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>The <strong>System List</strong> retains the link between products after they are added to the quote — editing any product returns to the full system configuration. The <strong>Collection</strong> does not retain the link; once added, the products behave as if added independently. Note: Collections are only available in CPQ 1.0.</p>"
+    }
+  ]
+}

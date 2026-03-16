@@ -1,0 +1,176 @@
+{
+  "id": "cpq-approvals",
+  "title": "Approval Workflows, Chains & Escalation",
+  "description": "Configure approval rules, branches, multi-level approval chains, auto-reminders, and email notifications.",
+  "icon": "✅",
+  "category": "cpq-phase-3",
+  "tags": ["approval", "workflow", "approval-rules", "branches", "notifications", "escalation", "auto-reminder"],
+  "sections": [
+    {
+      "title": "Why Approvals Exist & When They Trigger",
+      "content": "<p>Approvals are the governance mechanism that ensures quotes meet company policies before being sent to customers. They prevent sales reps from offering excessive discounts, committing to unfavourable terms, or quoting outside their authority — all without requiring manual managerial oversight on every single quote.</p><p>There are several common reasons a quote might require approval: the <strong>discount is higher than allowed</strong> for the user's role, the <strong>total amount exceeds a threshold</strong>, the <strong>margin falls below a floor</strong>, or a <strong>business rule has been violated</strong> (e.g. a non-standard payment term was selected). The key concept is that approval rules are <strong>conditions evaluated against the quote</strong> — every time a quote is loaded, reconfigured, or repriced, all approval rules are re-evaluated to check if any trigger conditions are now true.</p><p>The approval process always follows the same pattern regardless of the trigger reason: the user <strong>creates a quote</strong> → an approval rule is <strong>triggered</strong> (e.g. discount exceeds the threshold) → the user clicks <strong>Request Approval</strong> → they can add <strong>comments for each violation</strong> → the quote is <strong>submitted</strong> → the status changes and <strong>email notifications</strong> are sent to approvers → the approver <strong>approves or rejects</strong> the quote with comments.</p><p>Once submitted for approval, the quote appears on the approver's <strong>Waiting for Approval</strong> tab. The approval history — including all comments, timestamps, and decisions — is accessible via the <strong>Approval History</strong> action on the quote.</p>"
+    },
+    {
+      "title": "Approval Rules — Conditions & Approver Selection",
+      "content": "<p><strong>Approval Rules</strong> are created under Setup → Workflow/Approval → Approval. Each rule defines a condition that, when true, requires the quote to be approved before proceeding. An approval rule has two key components: <strong>who needs to approve</strong> and <strong>under what conditions</strong>.</p><p><strong>Step 1 — Identify users.</strong> The first step defines for which users the approval rule is valid. This scopes the rule to specific user types, companies, or permission groups — so that an approval rule for junior sales reps doesn't apply to senior managers.</p><p><strong>Step 2 — Define the condition.</strong> The condition is a formula expression that evaluates to true or false. It can reference quote status, company, custom fields, discount percentages, total amounts, margins, or any other quote-level data accessible through the Formula Builder. For example: a condition might check if the quote status is \"Draft\" AND the company is \"SuperTech\" AND the discount exceeds 15%.</p><p>When a rule triggers, the system must determine <strong>who the approver is</strong>. By default, the approver is the <strong>Approval Parent</strong> — a field set on each user record that points to their manager. However, you can override this with <strong>custom approver logic</strong> using a formula or script that dynamically selects the approver based on conditions (e.g. route high-value quotes to the regional VP instead of the direct manager).</p><p>Quotes may require approval from <strong>one or multiple approvers</strong>. The structure of multi-level approval is handled through approval branches, covered in the next section.</p>"
+    },
+    {
+      "title": "Approval Branches — Combining Rules with AND/OR Logic",
+      "content": "<p><strong>Approval Branches</strong> combine multiple approval rules into structured chains, enabling sophisticated multi-level and multi-path approval flows. Branches are configured under the same Approval section in Setup.</p><p>A branch groups two or more approval rules together and applies <strong>AND or OR logic</strong> between them. With <strong>AND logic</strong>, all rules in the branch must be approved for the branch to be considered approved. With <strong>OR logic</strong>, approval of any single rule in the branch is sufficient.</p><p>Each approval rule within a branch can itself have <strong>multiple approvers</strong> with their own logic. A rule with <strong>AND logic</strong> between approvers requires all listed approvers to approve. A rule with <strong>OR logic</strong> requires only one approver to approve.</p><p>Here is a concrete example from the training deck: Branch B1 uses AND logic and contains two rules. <strong>Rule A1</strong> uses AND logic with two approvers (User 1 and User 2) — both must approve. <strong>Rule A2</strong> uses OR logic with two approvers (User 3 and User 4) — either one can approve. When a quote triggers both rules: first, if User 3 approves, Rule A2 is satisfied (OR logic). Then both User 1 and User 2 must approve for Rule A1 to be satisfied (AND logic). Only when both A1 and A2 are approved is Branch B1 considered approved.</p><p>This layered structure (branches → rules → approvers, each with their own logic) enables real-world scenarios like: discount approval from the sales manager AND margin approval from the finance team, where each team has its own internal approval logic.</p>"
+    },
+    {
+      "title": "Approval Auto-Reminders",
+      "content": "<p>Quotes stuck in the \"Waiting for Approval\" status are a common bottleneck in sales processes. <strong>Approval Auto-Reminders</strong> address this by scheduling automatic reminder emails sent to approvers who have not yet acted on pending approval requests.</p><p>The auto-reminder feature is configured with the following parameters: the <strong>number of days</strong> after which a reminder should be sent (e.g. if no action is taken within 3 days, send a reminder), and the <strong>recipient</strong> (the designated approver). Reminders can be recurring — sent at regular intervals until the approver takes action.</p><p>The business rationale is straightforward: sales reps are often on the road and cannot log into CPQ to check which quotes are awaiting their approval. Auto-reminders push the notification to the approver's email inbox, reducing the number of stale quotes and keeping the sales pipeline moving.</p><p>Auto-reminders complement — but do not replace — the standard notifications that are sent when a quote is first submitted for approval. They serve as a follow-up mechanism for quotes that have been pending beyond an acceptable timeframe. The combination of immediate notification on submission plus auto-reminders on inaction creates a complete approval nudging system.</p>"
+    },
+    {
+      "title": "Notifications — Email Lists, Messages & Workflow Integration",
+      "content": "<p><strong>Notifications</strong> are the email communication layer of the CPQ workflow. They allow custom emails to be sent to any user when specific workflow actions occur — such as submitting for approval, approving, rejecting, winning, or losing a quote.</p><p>Notifications have two building blocks: <strong>Email Lists</strong> (who receives the email) and <strong>Messages</strong> (the email content). Email Lists are created first under Setup → Workflow/Approval → Notifications and define the recipient groups. Messages are then created within a notification — each notification can contain <strong>multiple messages</strong>, and each message can target different email lists with different content.</p><p>Messages have a <strong>Subject</strong> and a <strong>Text body</strong>. The body supports HTML formatting and can include <strong>Formula Builder variables</strong> to pull dynamic data from the quote — for example, the quote number, customer name, total amount, or a direct link to the quote in CPQ. Including a quote link is standard practice so the recipient can act on the quote with one click.</p><p>Once notifications are defined, they are <strong>attached to workflow actions</strong> in the Workflow Actions administration. For example, the \"Submit for Approval\" action triggers a notification to the approval parent; the \"Approve\" action triggers a notification to the quote owner. This binding of notifications to workflow actions ensures the right people are notified at the right time, automatically.</p><p>Standard notification scenarios that most implementations include: quote submitted for approval (to the approver), quote approved (to the quote owner), quote rejected with comments (to the quote owner), and quote won/lost (to the sales manager for reporting).</p>"
+    },
+    {
+      "title": "Approval Design Patterns & Exam Tips",
+      "content": "<p>Designing the approval workflow is one of the most business-critical tasks in a CPQ implementation. Here are the patterns and exam-relevant points:</p><p><strong>Discount-driven approval.</strong> The most common pattern: discount rules define max thresholds per user type (e.g. reps: 15%, managers: 25%), and approval rules trigger when the discount exceeds the user's authority. Different approval levels handle escalating discount levels. Remember: the discount rule alone does <strong>not trigger approval</strong> — a matching approval rule must be explicitly created.</p><p><strong>Multi-dimensional approval.</strong> Complex organisations need approval across multiple dimensions simultaneously: discount approval from the sales director, margin approval from finance, and legal approval for non-standard terms. This is modelled with an approval branch using AND logic across three rules, each targeting different approvers.</p><p><strong>Approval Parent field.</strong> Every user has an Approval Parent field on their user record. This is the default approver when no custom logic is specified. Keeping this field accurate is essential — a missing or incorrect approval parent means the quote cannot be routed for approval. In integrated environments, this field is often maintained via SSO/SCIM or CRM sync.</p><p><strong>Approval rules re-evaluate dynamically.</strong> Every time a quote is loaded, reconfigured, or repriced, all approval rules are re-evaluated. This means a quote that initially required no approval can become approval-required after a price change — and vice versa. The approval status is always <strong>current</strong>, not locked at submission time.</p><p><strong>Workflow + approval integration.</strong> The approval process integrates with the workflow engine through the \"Request Approval\" action (typically a transitional action that moves the quote to a \"Waiting for Approval\" status) and the \"Approve\" / \"Reject\" actions (which move it to \"Approved\" or back to \"Preparing\" for revision). Pre-action scripts on the Request Approval action can add validation logic; post-action scripts on Approve can trigger order creation in ERP.</p><p><strong>Quote status changes are possible from the workbench</strong> — administrators can manually change a quote's status as a result of the approval process if needed, providing an override mechanism for exceptional situations.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-approvals-q1",
+      "type": "multiple-choice",
+      "text": "When are approval rules re-evaluated in SAP CPQ?",
+      "options": [
+        "Only when the quote is first created",
+        "Only when the user clicks 'Request Approval'",
+        "Every time the quote is loaded, reconfigured, or prices are refreshed",
+        "Only when an administrator manually triggers re-evaluation"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Approval rules are re-evaluated <strong>every time a quote is loaded, reconfigured, or repriced</strong>. This means a quote's approval requirements are always current — a price change can add or remove the need for approval dynamically.</p>"
+    },
+    {
+      "id": "cpq-approvals-q2",
+      "type": "true-false",
+      "text": "A discount rule that sets a maximum discount of 15% will automatically trigger an approval workflow when exceeded.",
+      "correctAnswer": false,
+      "explanation": "<p>The discount rule alone does <strong>not</strong> trigger an approval workflow. A matching <strong>approval rule</strong> must be explicitly created that evaluates the discount condition and routes the quote for approval. The discount rule only defines the threshold; the approval rule enforces the governance.</p>"
+    },
+    {
+      "id": "cpq-approvals-q3",
+      "type": "multiple-choice",
+      "text": "What is the default mechanism for determining who approves a quote in SAP CPQ?",
+      "options": [
+        "The system administrator always receives approval requests",
+        "The Approval Parent field on the user record",
+        "The sales manager assigned to the customer",
+        "A random selection from users with the Approver role"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>By default, the approver is determined by the <strong>Approval Parent</strong> field set on each user's record. This field points to the user's manager or designated approver. Custom logic can override this for dynamic approver selection.</p>"
+    },
+    {
+      "id": "cpq-approvals-q4",
+      "type": "true-false",
+      "text": "An approval branch with AND logic requires all its contained approval rules to be approved for the branch to be considered approved.",
+      "correctAnswer": true,
+      "explanation": "<p>With <strong>AND logic</strong> on a branch, every approval rule within that branch must be approved. If any single rule remains unapproved, the entire branch stays pending. OR logic would require only one rule to be approved.</p>"
+    },
+    {
+      "id": "cpq-approvals-q5",
+      "type": "multiple-choice",
+      "text": "Branch B1 uses AND logic with two rules: Rule A1 (AND logic, approvers User 1 and User 2) and Rule A2 (OR logic, approvers User 3 and User 4). User 3 approves, and User 1 approves. What is the status of Branch B1?",
+      "options": [
+        "Approved — majority of approvers have approved",
+        "Not approved — User 2 still needs to approve Rule A1",
+        "Approved — at least one approver per rule has approved",
+        "Not approved — User 4 has not yet approved Rule A2"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>User 3's approval satisfies Rule A2 (OR logic — one approval is enough). However, Rule A1 uses AND logic and requires <strong>both</strong> User 1 and User 2 to approve. Since only User 1 has approved, Rule A1 is still pending. Because Branch B1 uses AND logic, both rules must be satisfied — so the branch is <strong>not yet approved</strong>.</p>"
+    },
+    {
+      "id": "cpq-approvals-q6",
+      "type": "true-false",
+      "text": "Once a quote is submitted for approval, it appears on the approver's 'Waiting for Approval' tab.",
+      "correctAnswer": true,
+      "explanation": "<p>After submission, the quote moves to the <strong>Waiting for Approval</strong> tab for the designated approver(s). This is one of the three workflow views (My Quotes, Waiting for Approval, Other Quotes) that can each have different available actions.</p>"
+    },
+    {
+      "id": "cpq-approvals-q7",
+      "type": "multiple-choice",
+      "text": "What is the purpose of the Approval Auto-Reminder feature?",
+      "options": [
+        "To automatically approve quotes after a set number of days",
+        "To send periodic reminder emails to approvers who haven't acted on pending requests",
+        "To escalate unapproved quotes to the next approval level",
+        "To remind sales reps to submit quotes for approval"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Auto-Reminders send <strong>periodic reminder emails</strong> to approvers who have not yet acted on pending approval requests. This reduces stale quotes and keeps the approval pipeline moving. It does not auto-approve or auto-escalate.</p>"
+    },
+    {
+      "id": "cpq-approvals-q8",
+      "type": "true-false",
+      "text": "Notification messages in SAP CPQ can include dynamic data from the quote using Formula Builder variables.",
+      "correctAnswer": true,
+      "explanation": "<p>Notification message bodies support HTML and <strong>Formula Builder variables</strong> that pull dynamic quote data — quote number, customer name, total amount, and direct links to the quote. This makes notifications actionable and informative.</p>"
+    },
+    {
+      "id": "cpq-approvals-q9",
+      "type": "multiple-choice",
+      "text": "Notifications in SAP CPQ are triggered by attaching them to which element?",
+      "options": [
+        "Quote Custom Fields",
+        "Approval Rules directly",
+        "Workflow Actions",
+        "Product definitions"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Notifications are <strong>attached to workflow actions</strong>. When a specific action is executed (e.g. Submit for Approval, Approve, Reject), the bound notification fires and sends emails to the defined email lists. This binding ensures notifications are triggered at the right workflow moments.</p>"
+    },
+    {
+      "id": "cpq-approvals-q10",
+      "type": "true-false",
+      "text": "A notification in SAP CPQ can contain multiple messages, each targeting different email lists with different content.",
+      "correctAnswer": true,
+      "explanation": "<p>A notification is a <strong>group of messages</strong>. Each message can have different content (subject, body) and target different email lists. This allows a single notification event (e.g. quote approved) to send tailored messages to different stakeholders simultaneously.</p>"
+    },
+    {
+      "id": "cpq-approvals-q11",
+      "type": "multiple-choice",
+      "text": "An approval rule in SAP CPQ has two configuration steps. What do they define?",
+      "options": [
+        "Step 1: Which products require approval. Step 2: The approval deadline.",
+        "Step 1: Which users the rule applies to. Step 2: The condition under which approval is required.",
+        "Step 1: The notification template. Step 2: The escalation path.",
+        "Step 1: The approval parent. Step 2: The rejection message."
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Step 1 identifies <strong>which users</strong> the approval rule applies to (scoping by user type, company, etc.). Step 2 defines the <strong>condition</strong> — a formula expression that must evaluate to true for the approval to be triggered (e.g. discount > 15% AND status = Draft).</p>"
+    },
+    {
+      "id": "cpq-approvals-q12",
+      "type": "true-false",
+      "text": "When an approver rejects a quote, the rejection comments are visible to the quote owner via the Approval History action.",
+      "correctAnswer": true,
+      "explanation": "<p>All approval actions — approvals, rejections, and their associated comments — are recorded in the <strong>Approval History</strong>. The quote owner can access this via the Approval History action on the quote to see all decisions and comments.</p>"
+    },
+    {
+      "id": "cpq-approvals-q13",
+      "type": "multiple-choice",
+      "text": "After a quote is rejected, what is the typical next step for the quote owner?",
+      "options": [
+        "The quote is automatically deleted",
+        "The quote owner creates a new revision, adjusts the quote, and resubmits for approval",
+        "The quote is locked permanently and cannot be modified",
+        "The approval rule is automatically removed from the quote"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>After rejection, the quote owner typically <strong>creates a new revision</strong> with adjustments (revised pricing, changed products, updated terms) and resubmits for approval. Revisions retain the history of previous versions, allowing the negotiation cycle to be tracked.</p>"
+    },
+    {
+      "id": "cpq-approvals-q14",
+      "type": "true-false",
+      "text": "Administrators can manually change a quote's status from the workbench as an override during the approval process.",
+      "correctAnswer": true,
+      "explanation": "<p>Administrators have the ability to <strong>change a quote's status from the workbench</strong> — providing an override mechanism for exceptional situations where the standard approval flow cannot accommodate the business need.</p>"
+    }
+  ]
+}

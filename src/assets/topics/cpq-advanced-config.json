@@ -1,0 +1,182 @@
+{
+  "id": "cpq-advanced-config",
+  "title": "Multi-Level Config, Containers, Dynamic Products & Performance",
+  "description": "Master attribute containers, nested product structures, dynamic configuration patterns, and performance optimisation.",
+  "icon": "🏗️",
+  "category": "cpq-phase-2",
+  "tags": ["containers", "multi-level", "nested-config", "parent-child", "system-list", "performance", "dynamic-products"],
+  "sections": [
+    {
+      "title": "Attribute Containers — Dynamic Table-Based Configuration",
+      "content": "<p><strong>Attribute Containers</strong> are a special attribute type used for complex configuration scenarios where the structure of the configurable product is <strong>not strictly defined upfront</strong>. Unlike standard attributes (where the admin pre-defines a fixed set of options), containers allow the user to dynamically add rows of data during configuration — each row representing a configurable item with multiple column values.</p><p>Containers display as a <strong>table</strong> within the configurator. The admin defines the columns (each mapped to an attribute or a standalone data field), and the user adds rows as needed at configuration time. This is the right tool when the <strong>number of items is not known in advance</strong> — for example, specifying multiple billing addresses, configuring support contracts for an unknown number of computers, or defining multiple line items with varying specifications.</p><p>A container can be set to use <strong>products or no products</strong>. When set to \"No products\", the container columns are standalone data fields (dropdowns, text inputs, numbers). When set to use products, each row represents a selectable product with additional configurable columns. Both modes support the full range of column types: String, Number, Date, Boolean, and Attribute (linked to a central attribute for dropdown/checkbox selections).</p><p>Containers create an <strong>additional layer of configuration</strong> within an already configurable product. Think of them as configurable products within configurable products — enabling nested, flexible structures that standard attributes cannot express.</p>"
+    },
+    {
+      "title": "Container Setup — Columns, Calculations & Pricing",
+      "content": "<p>Setting up a container involves defining its columns, permissions, display settings, and pricing formulas. The process starts under <strong>Setup → Product Catalog → Attributes</strong>, where you create a new attribute of type <strong>Container</strong>.</p><p>In the <strong>General tab</strong>, you specify whether the container will use products or not. In the <strong>Columns tab</strong>, you add columns one by one. Each column has: a <strong>Name</strong> (used in scripts and formulas), a <strong>Header Label</strong> (displayed to the user), a <strong>Data Type</strong> (String, Number, Date, Boolean), a <strong>Column Type</strong> (Standalone or linked to an attribute), a <strong>Display Type</strong> (Dropdown, Label, Free Text, Checkbox), and <strong>Column Permissions</strong> (Editable, Read Only, Hidden — configurable per user type).</p><p>Columns can have <strong>Calculation Formulas</strong> that compute values automatically based on other columns in the same row. A common pattern from the training deck: a Support container has columns for Computer Type, Term (12/24/36 months), Manufacturer, Model, Operating System, and a calculated Price column. The Price formula is <code>&lt;*EVAL(&lt;*CTX( MyContainer.CurrentRow.Column(Term).Get )*&gt; * 20)*&gt;</code> — multiplying the selected term by a monthly rate to calculate the row's price automatically.</p><p>At the <strong>product level</strong>, the container is assigned to a configurable product like any other attribute. The product's pricing formula can then <strong>aggregate</strong> container data — for example: <code>&lt;*CTX( Container(username_Support).Sum(Price) )*&gt;</code> sums the Price column across all rows to calculate the total product price. This pattern — per-row calculation plus product-level aggregation — is the standard way to price container-based configurations.</p>"
+    },
+    {
+      "title": "Multi-Level Configuration with System Lists & Parent/Child",
+      "content": "<p>When a solution consists of <strong>multiple products that must be configured and quoted together</strong>, SAP CPQ's multi-product display types come into play. These were introduced in the configurable products topic, but here we go deeper into when and how to use them for multi-level configuration.</p><p>The <strong>System (List) of Configurable Products</strong> is used when you need to load multiple products to the quote in a single operation and the <strong>entire system must be reconfigured as a whole</strong>. Child products can be configurable or simple, but configurable children must have default values since they cannot be individually configured within the system list. All products in the quote are clickable and redirect to the system list configuration screen. The system list itself is not visible as a separate line on the quote — only the child products appear.</p><p>The <strong>Parent/Child System (List)</strong> adds a hierarchical dimension. The parent product is visible on the quote as its own line, and clicking it opens the parent's configuration. This display type is specifically designed for <strong>product nesting</strong> — where a parent product contains child products in a tree structure. It also supports <strong>attribute value transfer from parent to child</strong>, which is useful when a selection on the parent (e.g. colour, region, SLA tier) should cascade down to all children.</p><p>Choosing between the two depends on the business scenario: use <strong>System List</strong> when the products are peers with no natural hierarchy (e.g. a set of AV equipment for a meeting room). Use <strong>Parent/Child</strong> when there is a clear parent-child relationship (e.g. a server with expansion modules, or a vehicle with accessories).</p>"
+    },
+    {
+      "title": "Dynamic Product Generation & Configuration Patterns",
+      "content": "<p>Beyond static product definitions, SAP CPQ supports several patterns for <strong>dynamic product behaviour</strong> — where the configuration itself determines what products or line items appear on the quote.</p><p><strong>Dynamic line items from attributes.</strong> When an attribute value has the \"List as Line Item\" flag enabled, selecting it during configuration creates a separate line item on the quote. Combined with attributes whose values are simple products (rather than text), this pattern lets a single configurable product generate a variable number of quote line items based on user selections. The configurable product acts as a bill-of-materials generator.</p><p><strong>Dynamic part numbers.</strong> As covered in the rules topic, the part number field can use the Formula Builder to construct a unique part number from selected attribute value codes. This means the part number sent to ERP accurately reflects the exact configuration — critical for order fulfilment and inventory matching.</p><p><strong>Container-driven line items.</strong> Containers generate a variable number of rows, each of which can map to a quote line item or a pricing component. Combined with product-level pricing formulas that aggregate container data, this enables fully dynamic quoting where the number and nature of items depends entirely on what the user enters at configuration time.</p><p><strong>Script-driven product addition.</strong> IronPython scripts can programmatically add or remove products from a quote based on configuration choices. For example, a post-configuration script might detect that the user selected a premium SLA and automatically add a corresponding service product to the quote. This is the most flexible pattern but also the hardest to maintain.</p>"
+    },
+    {
+      "title": "Performance Considerations for Complex Configurations",
+      "content": "<p>As configuration complexity grows — more attributes, more rules, more container rows, more script execution — <strong>performance</strong> becomes a critical design concern. A configurator that takes 10 seconds to refresh after each selection will frustrate users and slow down the sales process.</p><p><strong>Rule complexity.</strong> Every rule is evaluated on each configurator refresh. Products with 20+ rules, especially formula rules with nested Eval/CTX tags, can experience noticeable lag. Mitigation: keep rules as simple as possible, prefer simple rules over formula rules where both can express the logic, and consolidate related conditions into fewer rules rather than creating many small ones.</p><p><strong>Attribute trigger management.</strong> The \"Triggers Execution of Rules\" and \"Refresh Configurator on Change\" settings on attribute values control how often the configurator refreshes. Enabling these on every attribute value causes a full refresh on every user interaction. Mitigation: enable triggers <strong>only on attributes that genuinely need them</strong> — typically those involved in dependency rules. Leave them disabled on informational attributes that don't affect other selections.</p><p><strong>Container size.</strong> Containers with many rows and calculated columns execute their formulas for every row on each refresh. A container with 50 rows and 3 calculated columns means 150 formula evaluations per refresh. Mitigation: keep container formulas simple, minimise the number of calculated columns, and consider setting practical row limits.</p><p><strong>Script execution time.</strong> Scripts that call external APIs, query large custom tables, or perform complex loops add latency to the configuration cycle. Mitigation: cache API results where possible, optimise custom table queries (use specific lookups rather than scanning entire tables), and keep script logic focused — do the minimum necessary per execution.</p><p><strong>General guidelines:</strong> test configurator performance with realistic data volumes (not just 2–3 test products but the full catalog), measure response times in the test tenant before go-live, and profile slow configurations by disabling rules one at a time to identify the bottleneck.</p>"
+    },
+    {
+      "title": "Design Decisions — Choosing the Right Configuration Pattern",
+      "content": "<p>SAP CPQ provides multiple tools for product configuration, and choosing the right combination for each product is a key design decision. Here is a decision framework:</p><p><strong>Standard attributes only</strong> — use when the product has a fixed set of options with known values. The configuration is a simple selection process with no variable structure. This is the fastest to implement and easiest to maintain. Example: a laptop with fixed choices for processor, memory, and storage.</p><p><strong>Attributes + rules</strong> — use when selections depend on each other (e.g. processor choice limits available memory options). Start with simple rules; escalate to formula rules if calculations or cross-references are needed. Example: a server where cooling system options depend on the chosen processor's power consumption.</p><p><strong>Attributes + containers</strong> — use when the number of items or rows is unknown at design time. The container handles the variable structure while standard attributes handle the fixed selections. Example: a support contract where the number of covered devices varies per customer.</p><p><strong>System List / Parent-Child</strong> — use when the solution is actually multiple products that must be sold together. System List for peer products with no hierarchy; Parent/Child for tree-structured solutions with value inheritance. Example: an audio-visual package (System List) or a vehicle with accessories (Parent/Child).</p><p><strong>Scripts + custom tables</strong> — use when logic is too complex for declarative rules or when data-driven lookups are required. Always combine with the declarative tools above — scripts should handle the exceptions, not the baseline. Example: a pricing model that depends on a 500-row compatibility matrix stored in a custom table.</p><p>In practice, complex products often combine several patterns. A laptop configurator might use standard attributes for processor/memory/storage, a container for optional accessories, formula rules for dependent pricing, and a script for ERP stock-check integration. The art is knowing which tool to reach for at each decision point.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-advanced-config-q1",
+      "type": "multiple-choice",
+      "text": "What is the primary use case for attribute containers in SAP CPQ?",
+      "options": [
+        "Replacing standard attributes with a more visual interface",
+        "Handling dynamic, table-based configuration where the number of items is not known in advance",
+        "Storing product images and marketing content",
+        "Defining approval workflow steps within a product configuration"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Attribute containers are for <strong>dynamic, table-based configuration</strong> where the structure is not fixed upfront. The user adds rows as needed — each row representing a configurable item with multiple column values. This handles scenarios where the number of items is unknown at design time.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q2",
+      "type": "true-false",
+      "text": "An attribute container in SAP CPQ can only use products as row entries — standalone data columns without products are not supported.",
+      "correctAnswer": false,
+      "explanation": "<p>Containers can be set to use <strong>products or no products</strong>. When set to \"No products\", the container columns are standalone data fields (dropdowns, text, numbers). Both modes support the full range of column types.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q3",
+      "type": "multiple-choice",
+      "text": "A container column has the formula: <*EVAL(<*CTX( MyContainer.CurrentRow.Column(Term).Get )*> * 20)*>. What does this calculate?",
+      "options": [
+        "The total price of all rows in the container",
+        "The price for a single row by multiplying the Term column value by 20",
+        "The number of rows multiplied by 20",
+        "The discount percentage based on the term length"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The formula retrieves the <strong>current row's</strong> Term column value using <code>MyContainer.CurrentRow.Column(Term).Get</code> and multiplies it by 20. This calculates a per-row price — for example, a 12-month term × 20 = 240 per row.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q4",
+      "type": "true-false",
+      "text": "The CTX tag Container(name).Sum(column) can be used in a product's pricing formula to aggregate a column value across all container rows.",
+      "correctAnswer": true,
+      "explanation": "<p><code>&lt;*CTX( Container(name).Sum(column) )*&gt;</code> is the standard pattern for <strong>aggregating container data</strong> at the product level. It sums the specified column across all rows — commonly used to calculate the total price from individual row prices.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q5",
+      "type": "multiple-choice",
+      "text": "What is the key difference between a System (List) and a Parent/Child System (List) on the quote?",
+      "options": [
+        "System List products can be independently reconfigured; Parent/Child cannot",
+        "Parent/Child shows the parent as a visible line on the quote; System List does not show the system as a line",
+        "System List supports only simple products; Parent/Child supports configurable products",
+        "Parent/Child requires approval; System List does not"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>In a <strong>Parent/Child System</strong>, the parent product is visible on the quote as its own line item. In a <strong>System List</strong>, the system itself is not visible — only the child products appear. In both cases, individual children cannot be independently reconfigured.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q6",
+      "type": "true-false",
+      "text": "The Parent/Child System (List) display type supports transferring attribute values from the parent product to its child products.",
+      "correctAnswer": true,
+      "explanation": "<p>Parent/Child System supports <strong>attribute value transfer from parent to child</strong>. This is useful when a parent-level selection (colour, region, SLA tier) should automatically cascade to all child products in the hierarchy.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q7",
+      "type": "multiple-choice",
+      "text": "What setting on attribute values controls whether the configurator refreshes and re-evaluates rules when the user changes a selection?",
+      "options": [
+        "List as Line Item",
+        "Triggers Execution of Rules",
+        "Required / Optional",
+        "Spans Across Entire Row"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Triggers Execution of Rules</strong> controls whether changing an attribute value causes the configurator to refresh and re-evaluate all rules. Enabling this on every attribute causes frequent refreshes and can impact performance — enable it only where dependency logic requires it.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q8",
+      "type": "true-false",
+      "text": "Enabling 'Triggers Execution of Rules' on every attribute value is recommended for maximum configuration accuracy.",
+      "correctAnswer": false,
+      "explanation": "<p>Enabling triggers on <strong>every</strong> attribute value causes a full configurator refresh on every interaction, which degrades performance. Best practice is to enable triggers <strong>only on attributes involved in dependency rules</strong> and leave them disabled on informational attributes.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q9",
+      "type": "multiple-choice",
+      "text": "Which configuration pattern is most appropriate when a solution consists of peer products with no natural hierarchy that must be sold together?",
+      "options": [
+        "Standard configurable product with containers",
+        "Parent/Child System (List)",
+        "System (List) of Configurable Products",
+        "Guided Selling"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>System (List)</strong> is the right choice for peer products with no natural hierarchy that must be sold together (e.g. AV equipment for a meeting room). Parent/Child is for tree-structured solutions where one product is clearly the parent.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q10",
+      "type": "true-false",
+      "text": "When the 'List as Line Item' flag is enabled on an attribute value that is a simple product, selecting it during configuration creates a separate line item on the quote.",
+      "correctAnswer": true,
+      "explanation": "<p>The <strong>List as Line Item</strong> flag causes selected attribute values to appear as separate line items on the quote. When the value is a simple product, it becomes its own quote line with its price and quantity — effectively generating a variable bill of materials from the configuration.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q11",
+      "type": "multiple-choice",
+      "text": "A container has 40 rows and 4 calculated columns. How many formula evaluations occur per configurator refresh?",
+      "options": [
+        "4",
+        "40",
+        "160",
+        "44"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Each calculated column formula is evaluated for every row: 40 rows × 4 calculated columns = <strong>160 formula evaluations</strong> per refresh. This is why keeping container formulas simple and limiting the number of calculated columns is important for performance.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q12",
+      "type": "multiple-choice",
+      "text": "Which container column permission makes a column visible to the user but prevents them from editing the value?",
+      "options": [
+        "Hidden",
+        "Editable",
+        "Read Only",
+        "Required"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Read Only</strong> makes the column visible but non-editable. This is the standard permission for calculated columns (like Price) where the value is computed by a formula and should not be manually overridden by the user. <strong>Hidden</strong> hides the column entirely; <strong>Editable</strong> allows changes.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q13",
+      "type": "true-false",
+      "text": "In a System (List) of Configurable Products, configurable child products must have default attribute values because they cannot be individually configured within the system list.",
+      "correctAnswer": true,
+      "explanation": "<p>Configurable children in a System List <strong>must have default values</strong> because there is no mechanism to individually configure them within the system list flow. The entire system is configured as a unit — individual child configuration is not possible.</p>"
+    },
+    {
+      "id": "cpq-advanced-config-q14",
+      "type": "multiple-choice",
+      "text": "When profiling a slow configurator, what is the recommended approach to identify the performance bottleneck?",
+      "options": [
+        "Delete all rules and rebuild from scratch",
+        "Disable rules one at a time and measure response times to isolate the slow rule",
+        "Increase the CPQ tenant's server resources",
+        "Convert all formula rules to Python scripts"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The recommended approach is to <strong>disable rules one at a time</strong> and measure the response time after each change. This isolates which specific rule (or script, or container formula) is causing the bottleneck — a systematic approach rather than guesswork.</p>"
+    }
+  ]
+}

@@ -1,0 +1,182 @@
+{
+  "id": "cpq-rules-engine",
+  "title": "Configuration Rules & Constraint Logic",
+  "description": "Master simple rules, formula rules, attribute triggers, and the Formula Builder to control product configuration.",
+  "icon": "⚖️",
+  "category": "cpq-phase-2",
+  "tags": ["rules", "formula-rules", "triggers", "formula-builder", "constraints", "dependencies", "CTX-tags"],
+  "sections": [
+    {
+      "title": "The Rules Hierarchy — From Simple to Scripted",
+      "content": "<p>SAP CPQ offers a layered approach to controlling product configuration behaviour. The rule types are arranged in a hierarchy of increasing power and complexity, and a core design principle is to <strong>always start with the simplest tool that solves the problem</strong>.</p><p><strong>Simple Rules</strong> are declarative If…Then statements. They can hide attributes or values, enforce required selections, disallow specific options, or make attributes visible/invisible based on conditions. No coding required — you build them by selecting conditions and actions from dropdowns. <strong>Attribute Triggers</strong> execute actions when an event occurs on an attribute — for example, resetting one attribute when another is selected or changed. There are three trigger types: <strong>Change</strong>, <strong>Select</strong>, and <strong>Reset</strong>. Important: when a trigger conflicts with a rule, the <strong>rule always overrides</strong> the trigger.</p><p><strong>Formula Rules</strong> are an extension of simple rules that use the Formula Builder to create more complex conditions and actions using tags, operators, and expressions. Their key advantage is that they <strong>can be loaded</strong> (exported and imported) — you can copy formula rules and load them into another configurable product, which is not possible with simple rules.</p><p><strong>Product Messages</strong> let you show screen messages to the user or put the product into an Incomplete state based on conditions — useful for warnings or hard-stop validations.</p><p>If none of these declarative mechanisms meet the requirement, the final option is <strong>Python scripting</strong> (IronPython), which offers full programmatic control. Scripts are covered in a dedicated topic.</p>"
+    },
+    {
+      "title": "Simple Rules & Common Patterns",
+      "content": "<p>Simple rules are the workhorse of product configuration. They follow a <strong>Condition → Action</strong> pattern and are configured directly on the product's Rules and Messages tab.</p><p>Common condition patterns include: <strong>IfAnyValue</strong> (checks if any specific attribute value is selected), <strong>IfAllValues</strong> (checks if all listed values are selected), and <strong>IfNoValue</strong> (checks if a specific value is not selected). Actions include: <strong>Hide</strong> (hide an entire attribute or specific values), <strong>Show</strong> (make a hidden attribute or value visible), <strong>Disallow</strong> (grey out specific values so they cannot be selected), <strong>SelectValues</strong> (force-select a value), <strong>DeselectValues</strong>, and <strong>Require</strong> (make an attribute mandatory).</p><p>A typical dependency example: when a user selects Processor C, the rule disallows Memory values 2 GB and 4 GB — because that processor requires at least 8 GB of RAM. Another example: when any Processor A or Processor B is selected, the rule force-selects a 2-year warranty.</p><p>Simple rules are evaluated every time the configurator refreshes — either on page load or when a triggering attribute changes. Multiple simple rules can exist on the same product; they are all evaluated, and if conflicting, the <strong>most restrictive</strong> rule wins (a Disallow overrides a Show).</p><p>Limitations of simple rules: they cannot perform calculations, cannot reference data from custom tables, and cannot be imported or exported between products. When you hit these limits, move to formula rules.</p>"
+    },
+    {
+      "title": "Formula Rules & the Formula Builder",
+      "content": "<p><strong>Formula Rules</strong> use the Formula Builder to construct conditions and actions as <strong>tag-based expressions</strong>. The Formula Builder is accessed wherever a formula expression can be used — in rule conditions, rule actions, pricing formulas, part number generation, and custom field calculations.</p><p>The Formula Builder window has two sections. The <strong>top section</strong> contains dropdown fields for building the formula: select the kind of data (attribute, value, sequence, or complex tag), choose the specifics, and insert variables. The <strong>bottom section</strong> (labelled \"Formula\") is where the expression is assembled, either by manual typing or by selecting elements from the top section. The top section is organised into three tabs: <strong>Variables</strong>, <strong>Sequences</strong>, and <strong>Actions/Conditions</strong> (the last tab appears only in certain contexts).</p><p>The <strong>Variables tab</strong> lets you reference attribute data: attribute value codes, attribute prices, attribute costs, and attribute quantities. For example, <code>&lt;* Value(Processor) *&gt;</code> returns the display value of the selected Processor option, while <code>&lt;* ValueCode(Processor) *&gt;</code> returns its code.</p><p>The <strong>Sequences tab</strong> provides serialisation for part numbers — useful for generating dynamic part numbers based on the configuration. For example, combining the value codes of Processor, Memory, and Hard Drive into a single part number string.</p><p>Two essential buttons: <strong>Check Syntax</strong> validates your formula and reports errors at the bottom of the window. <strong>Visualize</strong> displays the formula as a tree structure with tag names in blue and operators in green — extremely helpful for debugging nested expressions.</p>"
+    },
+    {
+      "title": "Tags — CTX, Arithmetic & Conditional Logic",
+      "content": "<p>Tags are the building blocks of SAP CPQ formulas. They are wrapped in <code>&lt;* ... *&gt;</code> delimiters and can be nested to create complex expressions. The main tag categories are:</p><p><strong>CTX Tags</strong> retrieve values from various parts of the system beyond the current product configuration. They can pull data from the quote header, quote items, user fields, customer data, custom tables, and containers. For example, <code>&lt;*CTX( Quote.Customer(BillTo).Company )*&gt;</code> retrieves the bill-to customer's company name. CTX tags are too complex to build manually — the UI provides a constructor to help build and nest them. Related tags include <strong>Table tags</strong> (retrieve a cell from a custom table) and <strong>List tags</strong> (retrieve a column from a custom table).</p><p><strong>Arithmetic Tags</strong> enable calculations within formulas. There are two: <strong>Eval</strong> evaluates a mathematical expression (it initiates the VBScript engine, allowing all VBScript functions), and <strong>Round</strong> rounds a numeric value to a specified number of decimal places. Example: <code>&lt;* Eval( &lt;*Price(Operating System)*&gt; * 0.10 ) *&gt;</code> calculates 10% of the selected operating system's price. <code>&lt;* Round(&lt;*EVAL(13/3)*&gt;, 2) *&gt;</code> returns 4.33.</p><p><strong>Conditional Tags</strong> use <code>[IF]</code> / <code>[ENDIF]</code> syntax for branching logic. Example: <code>[IF](&lt;* IsSelected(Operating System.Linux 10) *&gt;){&lt;*Price(Operating System)*&gt; * 0.10}{&lt;*Price(Operating System)*&gt; * 0.05}[ENDIF]</code> — if Linux 10 is selected, multiply the OS price by 10%; otherwise by 5%. The IF tag is evaluated first, then the result is computed by the surrounding Eval.</p><p>Eval also supports VBScript string functions: <code>&lt;* Eval( Replace(\"&lt;* Value(Color) *&gt;\", \"Light\", \"Pale\") ) *&gt;</code> replaces every occurrence of \"Light\" with \"Pale\" in the colour value.</p>"
+    },
+    {
+      "title": "Attribute Triggers & Dynamic Part Numbers",
+      "content": "<p><strong>Attribute Triggers</strong> perform actions when an event occurs on a product attribute during configuration. Unlike rules (which evaluate conditions and apply actions on every refresh), triggers fire only when a <strong>specific event</strong> happens on a specific attribute.</p><p>There are three trigger types. <strong>Change Trigger</strong> — fires when the user changes the value of an attribute (e.g. switching from 8 GB to 16 GB). <strong>Select Trigger</strong> — fires when a specific value is selected. <strong>Reset Trigger</strong> — fires to reset an attribute's value when another attribute changes. Triggers are useful for cascading resets — for example, resetting the Model attribute whenever the Manufacturer attribute changes, so the user doesn't end up with an invalid combination.</p><p>The critical rule to remember: <strong>if a trigger conflicts with a rule, the rule always wins</strong>. Rules are evaluated after triggers and will override any trigger action that contradicts them. Design your triggers and rules to complement each other, not compete.</p><p><strong>Dynamic Part Numbers</strong> are a practical application of formula rules. Instead of a static part number, you can use the Formula Builder to construct a part number from the selected attribute value codes. For example: <code>ST-&lt;*ValueCode(Processor)*&gt;-&lt;*ValueCode(Memory)*&gt;-&lt;*ValueCode(Hard_Drive)*&gt;</code> would generate something like <code>ST-PA-8GB-HD200</code>. This ensures the part number sent to ERP accurately reflects the exact configuration, and it updates dynamically as the user changes selections.</p>"
+    },
+    {
+      "title": "Rule Design Best Practices & Debugging",
+      "content": "<p>Well-designed rules make or break a CPQ implementation. Here are the patterns that experienced configurators follow:</p><p><strong>Start declarative, escalate only when needed.</strong> Use simple rules first. If you need calculation or data lookup, move to formula rules. Only resort to scripting when declarative rules genuinely cannot express the logic. This keeps the configuration maintainable by non-developers — critical for long-term client self-sufficiency.</p><p><strong>Always use Check Syntax.</strong> Before saving any formula, use the Check Syntax button in the Formula Builder. It catches malformed tags, mismatched brackets, and invalid references. Make this a reflex — most formula errors are caught at this stage.</p><p><strong>Use the Visualizer for complex formulas.</strong> The Formula Builder's Visualize button renders your formula as a tree structure. When formulas involve multiple nested IF/Eval/CTX tags, the tree view makes it far easier to spot logic errors than reading the raw tag string.</p><p><strong>Test using Configuration Preview.</strong> The Layout tab offers a Configuration Preview that lets you test the product as an end user without leaving the admin UI. After creating or modifying rules, always test the interaction in preview — check that the right values are hidden, disallowed, or force-selected under each condition.</p><p><strong>Beware of circular dependencies.</strong> Rule A hiding a value that Rule B depends on, which in turn triggers Rule A again, can create unpredictable behaviour. Map out your rule dependencies on paper before implementing them — especially for products with more than five or six rules.</p><p><strong>Document your rules.</strong> Use clear naming conventions (e.g. \"Memory Dependency on Processor C\") and maintain a rule matrix document for products with complex configuration logic. This is invaluable during handover and future maintenance.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-rules-engine-q1",
+      "type": "multiple-choice",
+      "text": "What is the correct order of complexity for SAP CPQ configuration mechanisms, from simplest to most powerful?",
+      "options": [
+        "Formula Rules → Simple Rules → Attribute Triggers → Python Scripts",
+        "Simple Rules → Attribute Triggers → Formula Rules → Python Scripts",
+        "Attribute Triggers → Simple Rules → Product Messages → Formula Rules",
+        "Python Scripts → Formula Rules → Simple Rules → Attribute Triggers"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The hierarchy from simplest to most powerful is: <strong>Simple Rules</strong> (declarative If/Then) → <strong>Attribute Triggers</strong> (event-based actions) → <strong>Formula Rules</strong> (tag-based expressions with the Formula Builder) → <strong>Python Scripts</strong> (full IronPython). Always start with the simplest tool that solves the problem.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q2",
+      "type": "true-false",
+      "text": "When a trigger and a rule conflict on the same attribute, the trigger takes priority.",
+      "correctAnswer": false,
+      "explanation": "<p>When a trigger conflicts with a rule, the <strong>rule always overrides the trigger</strong>. Rules are evaluated after triggers and will overwrite any conflicting trigger action.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q3",
+      "type": "multiple-choice",
+      "text": "What is a key advantage of formula rules over simple rules?",
+      "options": [
+        "Formula rules execute faster than simple rules",
+        "Formula rules can be exported and loaded into another configurable product",
+        "Formula rules do not require the Formula Builder",
+        "Formula rules can only be created by administrators with scripting access"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Formula rules can be <strong>exported and imported</strong> (loaded) between configurable products. Simple rules cannot — they must be recreated manually on each product. This makes formula rules preferable for reusable logic.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q4",
+      "type": "true-false",
+      "text": "The Eval arithmetic tag in the Formula Builder initiates the VBScript engine, allowing all VBScript functions to be used in calculations.",
+      "correctAnswer": true,
+      "explanation": "<p>The <strong>Eval</strong> tag initiates the VBScript engine, which means it supports not just arithmetic operators but also all VBScript functions — including string manipulation functions like <code>Replace()</code>, <code>Left()</code>, and <code>InStr()</code>.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q5",
+      "type": "multiple-choice",
+      "text": "Which Formula Builder tab provides tags to retrieve data from the quote header, user fields, custom tables, and other system contexts?",
+      "options": [
+        "Variables tab — Attribute section",
+        "Sequences tab",
+        "CTX Tags (Complex Tags)",
+        "Actions/Conditions tab"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>CTX Tags</strong> retrieve values from various parts of the system beyond the current product: quote header, quote items, user fields, customer data, custom tables, and containers. They are accessed via the complex tag constructor in the Formula Builder.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q6",
+      "type": "true-false",
+      "text": "Simple rules in SAP CPQ can perform arithmetic calculations such as multiplying a price by a percentage.",
+      "correctAnswer": false,
+      "explanation": "<p>Simple rules are limited to declarative logic — hiding, showing, disallowing, selecting, and requiring attribute values. They <strong>cannot perform calculations</strong>. For arithmetic, you need formula rules with the Eval tag or Python scripts.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q7",
+      "type": "multiple-choice",
+      "text": "What does the Round tag in the Formula Builder do?",
+      "options": [
+        "Rounds up the quote total to the nearest hundred",
+        "Rounds a numeric value to a specified number of decimal places",
+        "Rounds the number of selected attribute values to the nearest whole number",
+        "Rounds the discount percentage to avoid fractional values"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <strong>Round</strong> tag rounds a numeric value to a specified number of decimal places. If no precision is specified, it rounds to the closest whole number. Example: <code>&lt;* Round(&lt;*EVAL(13/3)*&gt;, 2) *&gt;</code> returns 4.33.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q8",
+      "type": "multiple-choice",
+      "text": "Which three types of attribute triggers exist in SAP CPQ?",
+      "options": [
+        "Change, Select, Reset",
+        "Add, Remove, Modify",
+        "OnLoad, OnSave, OnSubmit",
+        "Before, During, After"
+      ],
+      "correctIndex": 0,
+      "explanation": "<p>The three trigger types are: <strong>Change</strong> (fires when a value changes), <strong>Select</strong> (fires when a specific value is selected), and <strong>Reset</strong> (resets an attribute's value when another attribute changes).</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q9",
+      "type": "true-false",
+      "text": "The Formula Builder's Visualize button renders the formula as a tree structure to help debug nested expressions.",
+      "correctAnswer": true,
+      "explanation": "<p>The <strong>Visualize</strong> button displays tag names in blue and operators in green, rendering each tag as a node with its arguments as child nodes. This tree structure is extremely helpful for understanding and debugging complex nested formulas.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q10",
+      "type": "multiple-choice",
+      "text": "A product has a formula rule condition: IfAnyValue(Processor:PC). The action is: DisallowValues(Memory:2GB, Memory:4GB). What happens when the user selects Processor C?",
+      "options": [
+        "Memory 2 GB and 4 GB are hidden from the configurator entirely",
+        "Memory 2 GB and 4 GB are greyed out and cannot be selected",
+        "Memory is automatically set to 8 GB",
+        "A warning message appears but 2 GB and 4 GB remain selectable"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>DisallowValues</strong> greys out the specified values so they are still visible but cannot be selected. This is different from <strong>Hide</strong>, which removes them from view entirely. The user can see that 2 GB and 4 GB exist but are not available with Processor C.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q11",
+      "type": "true-false",
+      "text": "Dynamic part numbers can be generated using the Formula Builder by combining ValueCode tags from selected attributes.",
+      "correctAnswer": true,
+      "explanation": "<p>The Formula Builder's <strong>ValueCode</strong> tag retrieves the code of the selected attribute value. By concatenating multiple ValueCode tags with separators, you can generate dynamic part numbers like <code>ST-PA-8GB-HD200</code> that reflect the exact configuration.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q12",
+      "type": "multiple-choice",
+      "text": "Where can you test a product's configuration rules without leaving the SAP CPQ admin interface?",
+      "options": [
+        "In the Workflow Actions tab",
+        "In the Layout tab's Configuration Preview",
+        "In the Pricing tab's Simulation Mode",
+        "By creating a test quote in the My Quotes section"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The <strong>Layout tab</strong> offers a <strong>Configuration Preview</strong> that lets admins test the product as an end user. After creating or modifying rules, you can immediately verify the behaviour without leaving the admin UI or creating a quote.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q13",
+      "type": "true-false",
+      "text": "The Check Syntax button in the Formula Builder should be used before saving any formula to catch malformed tags and mismatched brackets.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>Check Syntax</strong> validates the formula and displays any errors at the bottom of the window. Using it before saving is a best practice — most formula errors (malformed tags, mismatched brackets, invalid references) are caught at this stage.</p>"
+    },
+    {
+      "id": "cpq-rules-engine-q14",
+      "type": "multiple-choice",
+      "text": "Which tag retrieves the current display value of an attribute (e.g. '16 GB' for Memory)?",
+      "options": [
+        "<* ValueCode(Memory) *>",
+        "<* Value(Memory) *>",
+        "<* Price(Memory) *>",
+        "<* CTX(Memory.Display) *>"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><code>&lt;* Value(Memory) *&gt;</code> returns the <strong>display value</strong> of the selected option (e.g. '16 GB'). <code>&lt;* ValueCode(Memory) *&gt;</code> returns the <strong>value code</strong> (e.g. '16GB'). <code>&lt;* Price(Memory) *&gt;</code> returns the price of the selected value.</p>"
+    }
+  ]
+}

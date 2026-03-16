@@ -1,0 +1,169 @@
+{
+  "id": "cpq-scripting",
+  "title": "Scripting with IronPython — Global, Custom & Event Scripts",
+  "description": "Write IronPython scripts in SAP CPQ to extend configuration, pricing, quoting, and integration logic beyond declarative rules.",
+  "icon": "🐍",
+  "category": "cpq-phase-2",
+  "tags": ["scripting", "ironpython", "global-scripts", "custom-scripts", "event-scripts", "custom-tables", "automation"],
+  "sections": [
+    {
+      "title": "When and Why to Use Scripts",
+      "content": "<p>SAP CPQ's declarative tools — simple rules, formula rules, attribute triggers, and the Formula Builder — handle a wide range of configuration logic. But when business requirements exceed what these tools can express, <strong>IronPython scripting</strong> provides full programmatic control over CPQ behaviour.</p><p>IronPython is a .NET implementation of Python 2.7. It runs server-side within the CPQ platform and has access to a rich set of CPQ-specific APIs for manipulating quotes, products, attributes, pricing, custom tables, and integrations.</p><p>Common scenarios that require scripting include: complex <strong>conditional logic</strong> that involves multiple nested conditions across attributes, quote fields, and customer data simultaneously; <strong>custom table lookups</strong> where pricing or configuration depends on data stored in admin-managed tables; <strong>quote-level automation</strong> such as auto-populating fields, calculating totals with custom business logic, or transforming data for integration; <strong>external API calls</strong> to retrieve real-time data from ERP or third-party systems during configuration; and <strong>workflow pre-actions and post-actions</strong> that execute logic before or after a quote status transition.</p><p>The guiding principle from the training deck is clear: <strong>try to use declarative rules as much as possible</strong>. Scripts are powerful but harder to maintain, debug, and hand over to client admin teams. Reserve them for scenarios where rules genuinely cannot express the logic.</p>"
+    },
+    {
+      "title": "Script Types — Global, Product & Event Scripts",
+      "content": "<p>SAP CPQ organises scripts into several types based on their scope and trigger mechanism.</p><p><strong>Global Scripts</strong> are stored centrally under Setup → Develop → Global Scripts. They are not tied to a specific product and can be called from anywhere in the system — other scripts, workflow actions, pricing formulas, or quote table actions. Global scripts are the <strong>best practice</strong> for reusable logic. Rather than duplicating code across multiple products, you write a function once in a global script and call it wherever needed. This makes maintenance significantly easier — a fix in one place propagates everywhere.</p><p><strong>Product Scripts</strong> (also called custom scripts) are attached to a specific configurable product via the product's Scripts tab. They execute in the context of that product's configuration — they have access to the product's attributes, values, and pricing. Use product scripts for logic that is unique to a single product and unlikely to be reused. Even then, best practice is to keep the product script thin and have it call functions defined in global scripts.</p><p><strong>Event Scripts</strong> are triggered by system events such as: quote creation, quote save, quote recalculation, line item addition, line item removal, document generation, and status transitions. They are configured under Setup → Develop → Custom Actions or attached to workflow actions as pre-actions or post-actions. Event scripts are ideal for automation that should happen at specific points in the quote lifecycle.</p><p><strong>Quote Table Scripts</strong> are attached to quote table actions (add row, delete row, custom actions). They manipulate quote table data — for example, loading rows from a custom table, calculating derived columns, or adding cross-sell products to the quote based on user selections.</p>"
+    },
+    {
+      "title": "The Script Context — Accessing CPQ Data",
+      "content": "<p>Every script in SAP CPQ executes within a <strong>context</strong> that provides access to the relevant CPQ objects. The available context objects depend on the script type, but the most important ones are:</p><p><strong>Quote</strong> — the current quote object. Provides access to header fields, custom fields, line items, customer data, status, market, and pricebook. Example: <code>Quote.GetCustomField(\"CF_CostCentre\")</code> retrieves a custom field value. <code>Quote.Items</code> returns the collection of quote line items.</p><p><strong>Product</strong> — the current configurable product (available in product scripts). Provides access to attributes and their selected values. Example: <code>Product.Attr(\"Processor\")</code> returns the Processor attribute object, and <code>Product.Attr(\"Processor\").GetValue()</code> returns the selected value.</p><p><strong>Context (Cxt)</strong> — a general-purpose object that provides access to tables, user info, and system settings. <code>Cxt.Tables[\"MyCustomTable\"]</code> accesses a custom table.</p><p><strong>QuoteTable</strong> — the current quote table object (available in quote table scripts). Provides access to rows, columns, and cell values.</p><p>Scripts can also call <strong>global script functions</strong> using the <code>ScriptExecutor</code> API. This is the mechanism for keeping product scripts lightweight — define the heavy logic in a global script, and call it from the product script passing in the necessary context objects.</p><p>Debugging scripts is done primarily through <strong>log statements</strong>. CPQ provides a log mechanism where you can write messages that appear in the script execution log, accessible to administrators in the admin UI.</p>"
+    },
+    {
+      "title": "Custom Tables — Script-Driven Data Lookups",
+      "content": "<p><strong>Custom Tables</strong> are admin-managed data tables that store non-standard information in CPQ. They are one of the most common reasons for writing scripts, because they allow configuration and pricing logic to be <strong>data-driven rather than hard-coded</strong>.</p><p>Custom tables are created under Setup → Product Catalog → Custom Tables. Each table has columns (with types like string, number, date, boolean) and rows of data. Tables can be maintained manually by admin users, loaded via Excel import, or populated by scripts or API calls.</p><p>Common use cases include: <strong>pricing lookup tables</strong> (product-region-tier combinations mapped to prices), <strong>compatibility matrices</strong> (which processor models are compatible with which memory types), <strong>customer-tier mappings</strong> (customer codes mapped to discount tiers), and <strong>configuration defaults</strong> (default attribute values based on industry or region).</p><p>Scripts query custom tables to retrieve data at runtime. A typical pattern is: during product configuration, a script reads the selected attribute values, queries a custom table for the matching row, and uses the result to set prices, show/hide options, or populate fields. This keeps the logic in the data (which business users can update) rather than in the code (which requires a developer to change).</p><p>The training deck emphasises that users who need to maintain data in tables can be given access to the Custom Tables section in Setup without needing full admin access. Most custom tables work with a <strong>validity period</strong> — the quote's effective date must fall between the table entry's Valid From and Valid To dates for the entry to be active.</p>"
+    },
+    {
+      "title": "Scripting in Workflows — Pre-Actions & Post-Actions",
+      "content": "<p>SAP CPQ's workflow engine supports <strong>pre-action</strong> and <strong>post-action</strong> scripts on any workflow action. These scripts execute automatically before or after a quote transitions from one status to another.</p><p><strong>Pre-action scripts</strong> run before the status change. They are used for validation (e.g. checking that all required fields are populated before allowing a quote to be submitted for approval), data enrichment (e.g. auto-calculating a margin field before the quote moves to review), or integration calls (e.g. checking real-time stock availability in ERP before the quote is finalised).</p><p><strong>Post-action scripts</strong> run after the status change. They are used for side effects that should happen once the transition is confirmed: sending data to an external system, creating a follow-up task, updating a custom table with quote outcome data, or triggering a document generation.</p><p>Workflow scripts have access to the Quote context, so they can read and modify quote header fields, line items, custom fields, and customer data. They can also call global script functions for reusable logic.</p><p>A common pattern from real projects: a pre-action on the \"Submit for Approval\" action validates that the customer's credit limit (retrieved from a custom table or ERP API call) is not exceeded by the quote total. If validation fails, the script can block the transition and display an error message to the user. A post-action on the \"Approved\" status sends the quote data to S/4HANA to create a sales order.</p>"
+    },
+    {
+      "title": "Scripting Best Practices",
+      "content": "<p>Scripts are the most powerful tool in CPQ, which also makes them the highest-risk area for technical debt. Follow these practices to keep scripts maintainable:</p><p><strong>Global over product-specific.</strong> Always prefer global scripts. Define reusable functions centrally and call them from product scripts or workflow actions. This avoids code duplication and makes maintenance feasible. The training deck explicitly states this as a best practice.</p><p><strong>Keep product scripts thin.</strong> A product script should ideally be a few lines that call a global function, passing in the product context. If your product script is more than 20–30 lines, consider refactoring the logic into a global script.</p><p><strong>Comment every script.</strong> Write comments explaining the business purpose, not just the technical operation. Future maintainers (including your future self) will thank you. Include the ticket or requirement number that prompted the script.</p><p><strong>Use custom tables for data, not code.</strong> If logic involves looking up values based on combinations of inputs, put the lookup data in a custom table and write a generic script that queries it. When business users need to change the mapping, they edit the table — no developer needed.</p><p><strong>Handle errors gracefully.</strong> Wrap external API calls and table lookups in try/except blocks. Log errors with meaningful messages. Never let a script fail silently — an unhandled error during quote save or status transition can leave data in an inconsistent state.</p><p><strong>Test in a development tenant first.</strong> Never write or modify scripts directly in production. CPQ has no built-in script versioning or rollback — a broken script in production affects every user immediately. Use deployment packages to promote tested scripts through dev → test → production.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-scripting-q1",
+      "type": "multiple-choice",
+      "text": "What scripting language does SAP CPQ use?",
+      "options": [
+        "Groovy",
+        "JavaScript",
+        "IronPython",
+        "VBScript"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>SAP CPQ uses <strong>IronPython</strong>, a .NET implementation of Python 2.7. It runs server-side and has access to CPQ-specific APIs for manipulating quotes, products, attributes, and integrations.</p>"
+    },
+    {
+      "id": "cpq-scripting-q2",
+      "type": "true-false",
+      "text": "The recommended best practice is to write logic in global scripts and call them from product scripts, rather than duplicating code in each product.",
+      "correctAnswer": true,
+      "explanation": "<p>Global scripts are the <strong>best practice</strong> for reusable logic. Writing functions centrally and calling them from product scripts avoids duplication and makes maintenance significantly easier — a fix in one place propagates everywhere.</p>"
+    },
+    {
+      "id": "cpq-scripting-q3",
+      "type": "multiple-choice",
+      "text": "Which script type is triggered by system events such as quote save, line item addition, or status transition?",
+      "options": [
+        "Global Script",
+        "Product Script",
+        "Event Script",
+        "Formula Rule"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Event Scripts</strong> are triggered by system events — quote creation, quote save, line item addition/removal, document generation, and status transitions. They are ideal for automation at specific points in the quote lifecycle.</p>"
+    },
+    {
+      "id": "cpq-scripting-q4",
+      "type": "true-false",
+      "text": "Product scripts (custom scripts) attached to a configurable product can access that product's attributes and their selected values.",
+      "correctAnswer": true,
+      "explanation": "<p>Product scripts execute in the context of their configurable product and have access to the <strong>Product</strong> object, which provides access to attributes, selected values, and pricing for that specific product.</p>"
+    },
+    {
+      "id": "cpq-scripting-q5",
+      "type": "multiple-choice",
+      "text": "What is the primary purpose of custom tables in SAP CPQ?",
+      "options": [
+        "To replace the product catalog with a flat data structure",
+        "To store non-standard data that scripts can query at runtime for data-driven logic",
+        "To define workflow statuses and transitions",
+        "To store user login credentials securely"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Custom tables</strong> store non-standard data (pricing lookups, compatibility matrices, customer-tier mappings) that scripts query at runtime. This makes logic data-driven — business users can update the table without needing a developer to change code.</p>"
+    },
+    {
+      "id": "cpq-scripting-q6",
+      "type": "true-false",
+      "text": "Custom table entries in SAP CPQ typically work with a validity period — the quote's effective date must fall within the entry's Valid From and Valid To dates.",
+      "correctAnswer": true,
+      "explanation": "<p>Most custom tables use a <strong>validity period</strong>. The quote's effective date is compared against the entry's Valid From and Valid To dates. Only entries where the quote date falls within this range are considered active.</p>"
+    },
+    {
+      "id": "cpq-scripting-q7",
+      "type": "multiple-choice",
+      "text": "A pre-action script on a workflow transition is used to:",
+      "options": [
+        "Execute logic after the status has already changed",
+        "Validate data or enrich fields before the status change occurs",
+        "Generate the quote document automatically",
+        "Send an email notification to the approval parent"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Pre-action scripts</strong> run before the status change. They are used for validation (ensuring required fields are filled), data enrichment (auto-calculating fields), or integration checks (verifying credit limits) — and can block the transition if conditions are not met.</p>"
+    },
+    {
+      "id": "cpq-scripting-q8",
+      "type": "true-false",
+      "text": "SAP CPQ provides built-in script versioning and rollback capabilities for IronPython scripts.",
+      "correctAnswer": false,
+      "explanation": "<p>CPQ has <strong>no built-in script versioning or rollback</strong>. A broken script in production affects every user immediately. This is why scripts should always be developed and tested in a development tenant first, then promoted via deployment packages.</p>"
+    },
+    {
+      "id": "cpq-scripting-q9",
+      "type": "multiple-choice",
+      "text": "Where are global scripts stored and managed in SAP CPQ?",
+      "options": [
+        "Setup → Product Catalog → Scripts",
+        "Setup → Develop → Global Scripts",
+        "Setup → Workflow/Approval → Scripts",
+        "Setup → Quote → Script Library"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Global scripts are managed under <strong>Setup → Develop → Global Scripts</strong>. They are centrally stored and can be called from product scripts, workflow actions, quote table actions, and other contexts throughout the system.</p>"
+    },
+    {
+      "id": "cpq-scripting-q10",
+      "type": "true-false",
+      "text": "Scripts should always be the first approach for implementing configuration logic, as they offer the most flexibility.",
+      "correctAnswer": false,
+      "explanation": "<p>The opposite is recommended. <strong>Declarative rules should always be tried first.</strong> Scripts should be reserved for scenarios where simple rules, formula rules, and triggers genuinely cannot express the logic. Scripts are harder to maintain, debug, and hand over to client teams.</p>"
+    },
+    {
+      "id": "cpq-scripting-q11",
+      "type": "multiple-choice",
+      "text": "Which of the following is a valid use case for a post-action script on a workflow transition?",
+      "options": [
+        "Blocking a status transition because a required field is empty",
+        "Sending quote data to S/4HANA to create a sales order after approval",
+        "Displaying a warning message before the user clicks Submit",
+        "Checking the user's discount authority before allowing a discount"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Post-action scripts</strong> run after the status change is confirmed. They are used for side effects like sending data to external systems, creating follow-up tasks, or updating records. Blocking a transition is a pre-action concern, not post-action.</p>"
+    },
+    {
+      "id": "cpq-scripting-q12",
+      "type": "multiple-choice",
+      "text": "Users who need to maintain data in custom tables can be given access to which admin area without needing full administrator privileges?",
+      "options": [
+        "Setup → Develop → Global Scripts",
+        "Setup → Product Catalog → Custom Tables",
+        "Setup → Workflow/Approval → Statuses",
+        "Setup → Pricing/Calculations → Pricebooks"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Users who need to maintain custom table data can be given access specifically to <strong>Setup → Product Catalog → Custom Tables</strong>. This allows business users to update lookup data without needing full admin access to scripts or system configuration.</p>"
+    },
+    {
+      "id": "cpq-scripting-q13",
+      "type": "true-false",
+      "text": "Quote table scripts can load rows from a custom table, calculate derived columns, and add cross-sell products to the quote based on user selections.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>Quote table scripts</strong> are attached to quote table actions and can manipulate quote table data — loading rows from custom tables, calculating derived values, and even adding products to the quote based on user selections within the table.</p>"
+    }
+  ]
+}

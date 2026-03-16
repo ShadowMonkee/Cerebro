@@ -1,0 +1,189 @@
+{
+  "id": "cpq-pricing",
+  "title": "Price Lists, Pricing Methods & Discounts",
+  "description": "Master SAP CPQ's pricing engine — currencies, markets, pricebooks, custom pricing, discounts, and promotions.",
+  "icon": "💲",
+  "category": "cpq-phase-3",
+  "tags": ["pricing", "pricebooks", "currencies", "markets", "discounts", "promotions", "special-pricing", "custom-pricing"],
+  "sections": [
+    {
+      "title": "Currencies & Markets — The Pricing Foundation",
+      "content": "<p>Before any product can be priced, two foundational objects must be configured: <strong>Currencies</strong> and <strong>Markets</strong>.</p><p><strong>Currencies</strong> are managed under Setup → Pricing/Calculations → Currencies. Every CPQ tenant requires one — and only one — <strong>default currency</strong>. All other currencies are defined with a <strong>conversion rate</strong> relative to this default. The formula is: <code>Foreign Currency = Default Currency × Conversion Rate</code>. For example, if the default is EUR and the USD rate is 1.10, a €100 product costs $110. Every user has a default market and currency set on their user record.</p><p><strong>Markets</strong> represent geographic locations or sales regions, each with a specific currency. Markets are managed under Setup → Pricing/Calculations → Markets and are typically linked to a <strong>sales organisation</strong> in the ERP landscape. A market has a <strong>Market Factor</strong> (usually 1) that applies an additional multiplier on top of the currency conversion: <code>Final Converted Price = Foreign Currency × Market Factor</code>. This allows the same product to have different effective prices in different regions even when using the same currency.</p><p>Every market needs a currency, and every pricebook belongs to a market. When a user creates or opens a quote, they select a market — this determines which currency and pricebook are used for pricing.</p><p><strong>Market Visibility</strong> controls which users can see which markets. Visibility is defined by combinations of User, User Type, and Company — connected with <strong>AND logic</strong> (all three conditions must be true). An advanced visibility formula can also be defined. Important: CPQ evaluates market visibility on <strong>user login</strong>, so quote-dependent tags do not work in market visibility conditions.</p>"
+    },
+    {
+      "title": "Pricing Methods — Custom, Variant & Pricebook",
+      "content": "<p>SAP CPQ supports three pricing methods. Each product is assigned one method, and prices can be defined at both the <strong>product level</strong> and the <strong>attribute level</strong>. Additionally, any single item can carry two prices: a <strong>one-time fee</strong> (Non-Recurring Cost / NRC) and a <strong>recurring fee</strong> (Monthly Recurring Cost / MRC).</p><p><strong>Custom Pricing</strong> is the simplest method. You enter a <strong>Base Price</strong> directly on the product. The total product price is calculated as: <code>Product Base Price + Sum(Attribute Prices)</code>. If more complex logic is needed, a <strong>Pricing Formula</strong> can be entered using the Formula Builder — this allows calculations involving attribute selections, CTX tags, and Eval expressions. For configurable products, the final price can be either a <strong>rolled-up total</strong> of all underlying component prices or a <strong>fixed price</strong> regardless of configuration.</p><p><strong>Variant Pricing</strong> is only available when <strong>SAP Variant Configuration and Pricing</strong> integration is active. Product prices are synchronised from the external variant configuration engine — CPQ does not manage these prices locally. When Variant Pricing is selected, the pricing fields in CPQ become read-only and display the externally calculated values.</p><p><strong>Pricebook Lookup</strong> is the most flexible method and the standard approach for enterprise deployments, especially when pricing is <strong>interfaced from ERP</strong> (e.g. S/4HANA). Pricebooks are configurable data tables that define product prices for specific markets. The system looks up a product's price using its <strong>Part Number</strong> (and optionally a <strong>Price Code</strong>) as the lookup key.</p>"
+    },
+    {
+      "title": "Pricebooks — Structure, Hierarchy & Visibility",
+      "content": "<p>Pricebooks are the backbone of enterprise pricing in SAP CPQ. They are managed under Setup → Pricing/Calculations → Pricebooks and are always <strong>linked to a market</strong>.</p><p>Key rules for pricebooks within a market: all products share the <strong>same currency</strong>, each pricebook has a <strong>unique name</strong>, pricebooks look up pricing by <strong>Part Number</strong>, and a pricebook can <strong>default to values from a parent pricebook</strong> — this is how price hierarchies work.</p><p><strong>Pricebook hierarchies</strong> are organised in parent/child levels within a market. When CPQ looks up a price, it first checks the user's assigned pricebook. If no price is found, it <strong>falls back to the parent pricebook</strong>, and continues up the chain until a price is found. This enables layered pricing: a Gold vendor pricebook inherits from a master pricebook but overrides prices for specific products. Each user has a <strong>default pricebook</strong>; if the market has multiple pricebooks, the user can switch between those visible to them.</p><p><strong>Price Codes</strong> solve a specific problem: when the same Part Number needs different prices depending on context (e.g. the same product sold through different channels). A Price Code is an additional lookup key — the combination of Part Number + Price Code retrieves the correct price. Selecting \"Use Pricebook\" on an attribute value will <strong>overwrite any custom price</strong> with the pricebook price.</p><p><strong>Pricebook visibility</strong> can be configured in three ways: <strong>Visible to Everyone</strong> (the simplest), <strong>Advanced Visibility</strong> (a formula using quote-level and user-level tags — setting the formula to <code>1</code> makes it visible to all), or <strong>Visibility Conditions</strong> (filters based on User and Customer fields with OR logic, or an advanced AND formula for complex conditions). Pricebook data can be loaded through <strong>API, mass upload, or individual entries</strong>.</p>"
+    },
+    {
+      "title": "Discounts — Rules, Thresholds & Priorities",
+      "content": "<p>SAP CPQ's discount system allows <strong>price adjustments after a quote is created</strong>. Discounts are always expressed as <strong>percentages</strong> and are managed under Setup → Pricing/Calculations → Discounts.</p><p>Discount rules are defined using combinations of five parameters: <strong>User</strong>, <strong>User Type</strong>, <strong>Category</strong>, <strong>Product</strong>, and <strong>Product Type</strong>. Each rule specifies three values: a <strong>Minimum discount</strong> (floor), a <strong>Maximum discount</strong> (ceiling), and a <strong>Default discount</strong> (applied automatically when the quote is first generated). Users can enter any discount within the min–max range without triggering an approval process. Exceeding the maximum <strong>can trigger an approval workflow</strong> — but only if a corresponding approval rule has been created.</p><p>When <strong>multiple discount rules</strong> apply to the same quote item, <strong>discount priorities</strong> determine the order. Each rule has a rank, and a ranking of 1 is the highest priority. When two or more rules are relevant, the rule with the <strong>highest priority</strong> (lowest rank number) is applied.</p><p>A typical setup: sales reps can discount up to 15% without approval. Their Sales Manager user type allows up to 25%. Anything above 25% requires VP-level approval. This layered discount authority is implemented through discount rules per user type combined with approval rules that trigger workflow when thresholds are exceeded.</p>"
+    },
+    {
+      "title": "Special Pricing — Promotions, Bundles & Volume Discounts",
+      "content": "<p><strong>Special Pricing</strong> (also called Promotions) is a feature that lets administrators configure and offer targeted discounts for specific products or groups of products. It must be enabled via the application parameter <strong>Enable Promotions</strong> (set to TRUE — it is FALSE by default on Quote 2.0 tenants).</p><p>A promotion has three dimensions: <strong>which products</strong> it applies to (selected by product, product type, or product category), <strong>what conditions</strong> must be met (defined on the quote header, quote item, or involved parties), and <strong>which users</strong> can apply it.</p><p>The <strong>Promotion Type</strong> can be <strong>One Line</strong> (a simple discount on selected products) or <strong>Scale</strong> (complex scenarios with quantity or amount ranges). For One Line, the <strong>Discount Type</strong> options are: <strong>Discount Percent</strong> (percentage off), <strong>Discount Amount</strong> (fixed amount off), or <strong>Exact Price</strong> (a new promotional price replaces the original).</p><p>For Scale promotions, a <strong>Calculation Type</strong> determines how discounts are applied across ranges: <strong>Standard</strong> applies the same discount to all items (e.g. 13 items all get 30% off if they fall in the 10–20 quantity range), while <strong>Cumulative</strong> applies different discounts per break (e.g. first 5 items get 10% off, next 5 get 20% off, remaining 3 get 30% off). Admin users define <strong>Quantity Breaks</strong> or <strong>Amount Breaks</strong> — only one type per promotion, but multiple breaks can be added.</p><p><strong>Conditions</strong> determine when a promotion is available. Conditions can reference the Quote Header (status, market, custom field, total value), Quote Item (product, product type, category), or Involved Parties. Multiple conditions are combined with <strong>AND</strong>, <strong>OR</strong>, or <strong>Custom</strong> logic.</p>"
+    },
+    {
+      "title": "Pricing Design Decisions & Exam Tips",
+      "content": "<p>Pricing is typically the most complex area of a CPQ implementation. Here are the key design decisions and exam-relevant points:</p><p><strong>Where does pricing live?</strong> In most SAP landscapes, product pricing is <strong>mastered in ERP</strong> and interfaced to CPQ via pricebooks. Custom pricing is used for products managed exclusively in CPQ or for quick proof-of-concept setups. Variant pricing is used when SAP Variant Configuration drives the pricing engine. The choice depends on the client's system landscape and data governance model.</p><p><strong>One-time vs recurring.</strong> CPQ supports NRC (one-time) and MRC (recurring) prices on any product. Recurring pricing fields must be enabled via an application parameter. This dual-price model is essential for subscription and service-contract businesses.</p><p><strong>Pricebook fallback logic.</strong> Understand the lookup chain: CPQ checks the user's assigned pricebook → falls back to the parent pricebook → continues up the hierarchy. This means you can maintain exception prices in child pricebooks and let standard prices cascade from the parent. On the exam, expect questions about what happens when a price is not found in the assigned pricebook.</p><p><strong>Discount vs promotion.</strong> Discounts are manual percentage adjustments applied per quote item within admin-defined thresholds. Promotions are automated, condition-driven discounts that can use quantity/amount breaks. Use discounts for sales-rep negotiation flexibility; use promotions for systematic pricing programs (volume discounts, seasonal offers, loyalty pricing).</p><p><strong>Key formulas to remember:</strong> <code>Foreign Currency = Default Currency × Conversion Rate</code> and <code>Final Price = Foreign Currency × Market Factor</code>. For custom pricing: <code>Total = Base Price + Sum(Attribute Prices)</code>. For pricebook: lookup by Part Number + optional Price Code.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-pricing-q1",
+      "type": "multiple-choice",
+      "text": "How many default currencies can a SAP CPQ tenant have?",
+      "options": [
+        "One per market",
+        "One per pricebook",
+        "Exactly one for the entire tenant",
+        "Unlimited — each user sets their own default"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Every CPQ tenant requires <strong>exactly one</strong> default currency. All other currencies are defined with conversion rates relative to this single default. Markets and pricebooks reference currencies, but the tenant-level default is always singular.</p>"
+    },
+    {
+      "id": "cpq-pricing-q2",
+      "type": "true-false",
+      "text": "The formula for calculating a foreign currency price in SAP CPQ is: Foreign Currency = Default Currency × Conversion Rate.",
+      "correctAnswer": true,
+      "explanation": "<p>This is the standard conversion formula. If the default is EUR with a USD rate of 1.10, a €100 product costs $110 in USD. The conversion rate is always defined relative to the tenant's default currency.</p>"
+    },
+    {
+      "id": "cpq-pricing-q3",
+      "type": "multiple-choice",
+      "text": "What is the purpose of the Market Factor in SAP CPQ pricing?",
+      "options": [
+        "It determines which pricebook is assigned to a user",
+        "It applies an additional multiplier on top of the currency conversion for regional price adjustments",
+        "It calculates the discount percentage for a specific market",
+        "It converts recurring fees to one-time fees"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The Market Factor is an <strong>additional multiplier</strong> applied after currency conversion: <code>Final Price = Foreign Currency × Market Factor</code>. It allows the same product to have different effective prices in different regions, even with the same currency. The factor is usually 1 but can be adjusted per market.</p>"
+    },
+    {
+      "id": "cpq-pricing-q4",
+      "type": "true-false",
+      "text": "Market visibility in SAP CPQ is evaluated every time a quote is saved.",
+      "correctAnswer": false,
+      "explanation": "<p>Market visibility is evaluated on <strong>user login</strong>, not on each quote save. This means quote-dependent tags do not work in market visibility conditions — only user-level and company-level tags are effective.</p>"
+    },
+    {
+      "id": "cpq-pricing-q5",
+      "type": "multiple-choice",
+      "text": "What is the total product price formula when using Custom Pricing?",
+      "options": [
+        "Product Base Price × Quantity × Market Factor",
+        "Product Base Price + Sum(Attribute Prices)",
+        "Pricebook Price + Discount Amount",
+        "Sum(All Line Item Prices) ÷ Number of Items"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>With Custom Pricing, the total product price is: <code>Product Base Price + Sum(Attribute Prices)</code>. A Pricing Formula using the Formula Builder can override or extend this calculation for more complex scenarios.</p>"
+    },
+    {
+      "id": "cpq-pricing-q6",
+      "type": "true-false",
+      "text": "Variant Pricing is available in any SAP CPQ tenant and does not require an external system integration.",
+      "correctAnswer": false,
+      "explanation": "<p>Variant Pricing is <strong>only available</strong> when SAP Variant Configuration and Pricing integration is active. Prices are synchronised from the external engine — CPQ does not manage variant prices locally. Without the integration, this pricing method cannot be used.</p>"
+    },
+    {
+      "id": "cpq-pricing-q7",
+      "type": "multiple-choice",
+      "text": "In a pricebook hierarchy, what happens when a product's price is not found in the user's assigned pricebook?",
+      "options": [
+        "The product cannot be added to the quote",
+        "CPQ uses the custom pricing base price as a fallback",
+        "CPQ falls back to the parent pricebook and continues up the chain",
+        "The price is set to zero automatically"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Pricebooks are organised in parent/child hierarchies. When a price is not found in the assigned pricebook, CPQ <strong>falls back to the parent pricebook</strong> and continues up the chain until a price is found. This enables layered pricing with exception prices in child pricebooks.</p>"
+    },
+    {
+      "id": "cpq-pricing-q8",
+      "type": "true-false",
+      "text": "A Price Code allows the same Part Number to have different prices in the same pricebook depending on context (e.g. sales channel).",
+      "correctAnswer": true,
+      "explanation": "<p>A <strong>Price Code</strong> is an additional lookup key used alongside the Part Number. The combination of Part Number + Price Code retrieves the specific price — allowing the same product to have different prices for different channels, customer segments, or contexts within the same pricebook.</p>"
+    },
+    {
+      "id": "cpq-pricing-q9",
+      "type": "multiple-choice",
+      "text": "Discounts in SAP CPQ are always expressed as:",
+      "options": [
+        "Fixed currency amounts",
+        "Percentages",
+        "Either percentages or fixed amounts, configurable per rule",
+        "Price multipliers"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>SAP CPQ discounts are always expressed as <strong>percentages</strong>. Each discount rule defines minimum, maximum, and default percentage values. Fixed-amount discounts are handled through the Special Pricing / Promotions feature instead.</p>"
+    },
+    {
+      "id": "cpq-pricing-q10",
+      "type": "true-false",
+      "text": "Exceeding the maximum discount threshold automatically triggers an approval workflow in SAP CPQ.",
+      "correctAnswer": false,
+      "explanation": "<p>Exceeding the maximum discount <strong>can</strong> trigger an approval workflow, but only if a corresponding <strong>approval rule has been explicitly created</strong>. The discount rule alone does not trigger workflow — the approval rule must be configured separately.</p>"
+    },
+    {
+      "id": "cpq-pricing-q11",
+      "type": "multiple-choice",
+      "text": "When multiple discount rules apply to the same quote item, how does SAP CPQ determine which rule takes effect?",
+      "options": [
+        "The most recently created rule is applied",
+        "All rules are applied cumulatively",
+        "The rule with the highest priority (lowest rank number) is applied",
+        "The user manually selects which rule to use"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Each discount rule has a <strong>rank</strong>, and a ranking of 1 is the highest priority. When multiple rules are relevant, the rule with the <strong>highest priority</strong> (lowest rank number) is applied. This prevents conflicting discounts from stacking unpredictably.</p>"
+    },
+    {
+      "id": "cpq-pricing-q12",
+      "type": "multiple-choice",
+      "text": "In a Scale promotion with Cumulative calculation type and quantity breaks of 0–5 (10%), 5–10 (20%), and 10–20 (30%), what discount does a customer receive when buying 13 items?",
+      "options": [
+        "30% on all 13 items",
+        "10% on 5 items, 20% on 5 items, 30% on 3 items",
+        "20% on all 13 items (average of the breaks)",
+        "No discount — 13 does not match an exact break boundary"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>With <strong>Cumulative</strong> calculation, different discounts apply per break: the first 5 items get 10%, the next 5 get 20%, and the remaining 3 get 30%. With <strong>Standard</strong> calculation, all 13 items would receive 30% (the rate for the 10–20 range).</p>"
+    },
+    {
+      "id": "cpq-pricing-q13",
+      "type": "true-false",
+      "text": "The Enable Promotions application parameter is set to TRUE by default on Quote 2.0 tenants.",
+      "correctAnswer": false,
+      "explanation": "<p>Enable Promotions is set to <strong>FALSE by default</strong> on Quote 2.0 tenants. It must be explicitly enabled under Setup → General → Application Parameters → General Parameters before the Special Pricing / Promotions feature becomes available.</p>"
+    },
+    {
+      "id": "cpq-pricing-q14",
+      "type": "multiple-choice",
+      "text": "Which Discount Type in a promotion sets a new promotional price for the product and calculates the discount based on the difference from the original price?",
+      "options": [
+        "Discount Percent",
+        "Discount Amount",
+        "Exact Price",
+        "Scale Break"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Exact Price</strong> sets a new promotional price for the product. The system calculates the discount as the difference between the original price and the new exact price. This is useful for fixed-price promotions rather than percentage or amount deductions.</p>"
+    },
+    {
+      "id": "cpq-pricing-q15",
+      "type": "true-false",
+      "text": "Selecting 'Use Pricebook' on an attribute value will overwrite any custom price that was previously set for that attribute.",
+      "correctAnswer": true,
+      "explanation": "<p>When <strong>Use Pricebook</strong> is enabled on an attribute value, the pricebook price takes precedence and <strong>overwrites any custom price</strong>. The lookup uses the attribute value's Part Number (and optional Price Code) to retrieve the price from the active pricebook.</p>"
+    }
+  ]
+}

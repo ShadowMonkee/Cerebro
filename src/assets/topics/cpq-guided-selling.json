@@ -1,0 +1,156 @@
+{
+  "id": "cpq-guided-selling",
+  "title": "Guided Selling & Question-Based Configurators",
+  "description": "Build guided selling flows that help sales reps find the right product for the customer based on selected criteria.",
+  "icon": "🧭",
+  "category": "cpq-phase-2",
+  "tags": ["guided-selling", "product-selection", "configurator", "filtering", "sales-enablement", "catalog"],
+  "sections": [
+    {
+      "title": "What is Guided Selling?",
+      "content": "<p><strong>Guided Selling</strong> is an optional functionality in SAP CPQ that helps users find the right product for a customer based on a number of selected criteria — without needing to browse and search the catalog manually. Think of it like a filter or product finder: the user answers a series of questions, and CPQ narrows down the catalog to the products that match.</p><p>Guided selling is most valuable when the sales rep <strong>doesn't know exactly what they're looking for</strong>. Instead of requiring product expertise, the guided selling flow translates customer requirements into product selections. The concept is similar to the filtering experience on booking.com — select a destination, dates, budget range, and amenities, and the system shows matching options.</p><p>A practical example: a sales rep selling laptops creates a guided selling flow with questions about required processor speed, minimum memory, storage capacity, screen size, and whether pre-installed software is needed. The user selects values for each criterion, and CPQ filters the catalog to show only laptops that match. The user can also work with ranges (e.g. price between €500 and €1000).</p><p>Guided selling sits <strong>on top of</strong> the existing product catalog — it does not replace it. Users can still browse categories and search directly. Guided selling simply provides an additional, more intuitive path to product discovery.</p>"
+    },
+    {
+      "title": "How Guided Selling Relates to Configurable Products",
+      "content": "<p>A key design insight in SAP CPQ is that guided selling <strong>reuses the same building blocks</strong> as configurable products. The guided selling configurator uses the <strong>same attributes and values</strong> that are already defined for the products in the catalog. This means there is no separate data model to maintain — if you've already set up attributes like Processor, Memory, and Screen Size for your configurable laptops, you can immediately use those same attributes in a guided selling flow.</p><p>The layout of a guided selling flow is <strong>identical to that of a standard configurable product</strong>. It uses the same configuration screen with attribute selectors, the same display types (dropdowns, checkboxes, radio buttons), and the same drag-and-drop layout editor. From a user's perspective, it looks and feels exactly like configuring a product — but instead of building a specific product, they are filtering the catalog.</p><p>This design has a major practical advantage: <strong>no duplication of attribute data</strong>. The attributes and values you maintain centrally serve double duty — they define product configuration options and guided selling filter criteria. Changes to an attribute (like adding a new memory option) automatically flow into both the product configurators and the guided selling flows that reference it.</p><p>The main difference is what happens after the user finishes the guided selling \"configuration\": instead of adding a configured product to the quote, the system <strong>returns a filtered list of matching products</strong> from the catalog. The user then selects and adds the desired product(s) to the quote through the normal flow.</p>"
+    },
+    {
+      "title": "Setting Up a Guided Selling Flow",
+      "content": "<p>Guided selling flows are created under <strong>Setup → Product Catalog → Guided Selling</strong>. The setup process follows a structured sequence:</p><p><strong>Step 1 — Product Definition.</strong> Create a new guided selling entry and provide a name (e.g. \"Laptop Guided Search\"). Assign it to one or more <strong>categories</strong> — this determines which part of the catalog the guided selling flow will filter. For example, assigning it to the Hardware category means only products within Hardware (and its subcategories) will be included in the results. Set permissions to control which users, companies, or markets can see the guided selling flow.</p><p><strong>Step 2 — Product Attributes/Options.</strong> Add the attributes that will serve as filter criteria. You select from the same centrally managed attributes used by configurable products. For each attribute, choose which values to make available and set the display type (checkbox is common for guided selling, since users often want to select multiple acceptable options rather than a single value).</p><p><strong>Step 3 — Configuration Layout.</strong> Arrange the attributes on the guided selling screen using the drag-and-drop layout editor. Order them logically — typically from broadest criteria (product type, budget range) to most specific (technical specs). A layout preview lets you test the appearance before saving.</p><p><strong>Step 4 — Test.</strong> Preview the guided selling flow on the Layout tab, or exit Setup and access it through the catalog to see it from the end user's perspective. The guided selling entry appears in the catalog alongside regular products.</p>"
+    },
+    {
+      "title": "Guided Selling Access & User Experience",
+      "content": "<p>Guided selling is accessed <strong>via the catalog</strong>, just like a regular product. It appears as a special entry within the category it is assigned to. When the user clicks on it, the guided selling configuration screen opens — visually identical to a configurable product screen.</p><p>The user experience follows a simple pattern: <strong>select criteria → view results → choose product</strong>. The user makes selections across the available attributes (e.g. Processor: any Intel, Memory: at least 16 GB, Screen: 15 inch or 17 inch). Once they are satisfied with their filters, they submit. CPQ evaluates all products in the assigned categories and returns those that match the selected criteria.</p><p>The returned results list typically shows product names, descriptions, images, and prices. The user can then click through to view details, configure the product further (if it is a configurable product), and add it to the quote. Guided selling does not automatically add anything to the quote — it simply <strong>narrows the choices</strong> and lets the user decide.</p><p>Permissions work the same way as for products and categories. The guided selling flow's visibility can be restricted by <strong>User Types, Companies, Markets, Brands, and Custom Permission Groups</strong>. This means you can create different guided selling flows for different user groups — for example, one flow for internal sales reps and a simpler flow for partner channel users.</p>"
+    },
+    {
+      "title": "Design Patterns & Real-World Use Cases",
+      "content": "<p>Guided selling shines in specific business scenarios. Here are the most common patterns:</p><p><strong>Large catalog with technical products.</strong> When the catalog contains hundreds of products with complex specifications (industrial equipment, IT hardware, medical devices), guided selling prevents the user from being overwhelmed. Instead of scrolling through pages of products, they answer 4–6 targeted questions and see a shortlist.</p><p><strong>Non-expert sellers.</strong> Partner channels, resellers, or new sales reps who don't have deep product knowledge benefit enormously from guided selling. The questions are phrased in customer-need language (\"How many users will the system support?\") rather than technical-spec language (\"Select the processor model\").</p><p><strong>Cross-category selling.</strong> A single guided selling flow can span multiple categories. For example, a \"Complete Office Setup\" guided selling flow might filter across Hardware, Software, and Services categories simultaneously, helping the rep assemble a full solution in one step.</p><p><strong>Price-range filtering.</strong> Guided selling supports range-based criteria, not just exact matches. A user can specify a budget range (e.g. €500–€1000), and CPQ will return products whose base price falls within that range. This is useful for quote scenarios where the customer has a fixed budget.</p><p><strong>Combining with configurable products.</strong> The most powerful pattern is using guided selling to select the right configurable product, then having the user configure it in detail. Guided selling handles the \"which product?\" question; the configurator handles the \"how should it be configured?\" question. This two-step flow is intuitive for both experienced and novice users.</p>"
+    },
+    {
+      "title": "Guided Selling vs Other Product Selection Methods",
+      "content": "<p>SAP CPQ offers several ways for users to find and add products to a quote. Understanding when to use each is important for designing the optimal user experience.</p><p><strong>Catalog browsing</strong> — the user navigates categories and subcategories to find products. Best for experienced users who know the product hierarchy well and can navigate directly to what they need. No setup required beyond the catalog structure itself.</p><p><strong>Catalog search</strong> — the user types a keyword and filters by name, description, part number, type, or price. Best for users who know at least part of the product name or identifier. Relies on products having clear, searchable names and descriptions.</p><p><strong>Guided selling</strong> — the user answers questions and CPQ filters the results. Best for users who know what the customer needs but not which specific product satisfies those needs. Requires admin setup but provides the most intuitive experience for non-expert sellers.</p><p><strong>Quick add</strong> — the user types a product name directly in the quote and adds it. Best for repeat orders where the rep knows exactly which product to add. Fastest method but requires product knowledge.</p><p>In practice, most implementations offer <strong>all four methods</strong> simultaneously and let users choose their preferred path. Guided selling is positioned as the recommended starting point for new reps and complex catalogs, while experienced reps naturally migrate toward search and quick add.</p><p>For the exam, remember: guided selling is <strong>accessed via the catalog</strong>, uses the <strong>same attributes as configurable products</strong>, and its layout is <strong>identical to the standard configurator</strong>. It filters products within assigned categories and returns a results list — it does not add products to the quote automatically.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-guided-selling-q1",
+      "type": "multiple-choice",
+      "text": "What is the primary purpose of guided selling in SAP CPQ?",
+      "options": [
+        "To automatically configure a product based on customer data from CRM",
+        "To help users find the right product by answering filter questions instead of browsing the catalog manually",
+        "To replace the product catalog with a question-based interface",
+        "To generate quote documents based on pre-defined product selections"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Guided selling helps users <strong>find the right product</strong> by selecting criteria (filter questions) rather than browsing or searching the catalog manually. It narrows down the catalog to matching products based on the user's answers.</p>"
+    },
+    {
+      "id": "cpq-guided-selling-q2",
+      "type": "true-false",
+      "text": "Guided selling in SAP CPQ uses a completely separate set of attributes from those used by configurable products.",
+      "correctAnswer": false,
+      "explanation": "<p>Guided selling reuses the <strong>same centrally managed attributes and values</strong> used by configurable products. There is no separate data model — changes to attributes automatically flow into both product configurators and guided selling flows.</p>"
+    },
+    {
+      "id": "cpq-guided-selling-q3",
+      "type": "multiple-choice",
+      "text": "Where is guided selling accessed by end users in SAP CPQ?",
+      "options": [
+        "From a dedicated Guided Selling menu in the top navigation bar",
+        "Via the catalog, where it appears as a special entry within its assigned category",
+        "From the Quote Actions menu after creating a quote",
+        "Through the Setup menu under Develop → Guided Selling"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Guided selling is accessed <strong>via the catalog</strong>. It appears as a special entry within the category it is assigned to. Users click on it to open the guided selling configuration screen.</p>"
+    },
+    {
+      "id": "cpq-guided-selling-q4",
+      "type": "true-false",
+      "text": "The guided selling configuration screen has a different layout and user interface from the standard configurable product screen.",
+      "correctAnswer": false,
+      "explanation": "<p>The guided selling screen has an <strong>identical layout</strong> to the standard configurable product screen. It uses the same attribute selectors, display types, and drag-and-drop layout editor. The only difference is what happens after: guided selling returns a filtered product list instead of adding a configured product.</p>"
+    },
+    {
+      "id": "cpq-guided-selling-q5",
+      "type": "multiple-choice",
+      "text": "What determines which products are included in the guided selling results?",
+      "options": [
+        "All products in the entire CPQ tenant are always searched",
+        "Only products within the categories assigned to the guided selling flow are filtered",
+        "Only products that have been marked as 'guided selling enabled' in their product definition",
+        "Only configurable products are included — simple products are always excluded"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Guided selling filters products within the <strong>categories assigned</strong> to it during setup. If the flow is assigned to the Hardware category, only products within Hardware and its subcategories are included in the results.</p>"
+    },
+    {
+      "id": "cpq-guided-selling-q6",
+      "type": "true-false",
+      "text": "Guided selling automatically adds matching products to the quote without user intervention.",
+      "correctAnswer": false,
+      "explanation": "<p>Guided selling does <strong>not</strong> add products to the quote automatically. It returns a filtered list of matching products. The user then reviews the results, selects the desired product(s), and adds them to the quote through the normal flow.</p>"
+    },
+    {
+      "id": "cpq-guided-selling-q7",
+      "type": "multiple-choice",
+      "text": "Which display type is commonly recommended for guided selling attributes, since users often want to select multiple acceptable options?",
+      "options": [
+        "Dropdown (List Box)",
+        "Radio Button",
+        "Checkbox",
+        "Free Text"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Checkbox</strong> is commonly used for guided selling because it allows users to select multiple acceptable values simultaneously (e.g. both 15-inch and 17-inch screens). Dropdowns and radio buttons restrict the user to a single selection.</p>"
+    },
+    {
+      "id": "cpq-guided-selling-q8",
+      "type": "true-false",
+      "text": "A single guided selling flow can span multiple product categories to help assemble a cross-category solution.",
+      "correctAnswer": true,
+      "explanation": "<p>A guided selling flow can be assigned to <strong>multiple categories</strong>. This enables cross-category filtering — for example, a single flow that searches across Hardware, Software, and Services simultaneously to help the rep assemble a complete solution.</p>"
+    },
+    {
+      "id": "cpq-guided-selling-q9",
+      "type": "multiple-choice",
+      "text": "What is the correct sequence for setting up a guided selling flow in SAP CPQ?",
+      "options": [
+        "Layout → Attributes → Product Definition → Permissions",
+        "Product Definition (name & category) → Add Attributes → Configure Layout → Test",
+        "Create Quote → Add Guided Selling Tab → Assign Products → Save",
+        "Global Script → Guided Selling API → Attribute Mapping → Deploy"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The setup sequence is: <strong>Product Definition</strong> (name, category, permissions) → <strong>Add Attributes</strong> (select from central attributes, configure display types) → <strong>Configure Layout</strong> (arrange with drag-and-drop) → <strong>Test</strong> (preview on Layout tab or in catalog).</p>"
+    },
+    {
+      "id": "cpq-guided-selling-q10",
+      "type": "true-false",
+      "text": "Guided selling supports range-based criteria such as filtering products within a specific price range.",
+      "correctAnswer": true,
+      "explanation": "<p>Guided selling supports <strong>range-based filtering</strong>. Users can specify criteria like a budget range (e.g. €500–€1000), and CPQ will return products whose price falls within that range. This is useful when customers have fixed budget constraints.</p>"
+    },
+    {
+      "id": "cpq-guided-selling-q11",
+      "type": "multiple-choice",
+      "text": "Which product selection method in SAP CPQ is best suited for a new sales rep who knows the customer's requirements but not which specific product to sell?",
+      "options": [
+        "Catalog browsing by category",
+        "Quick add by product name",
+        "Guided selling",
+        "Catalog search by part number"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p><strong>Guided selling</strong> is ideal for reps who know the customer's needs but not which product satisfies them. It translates requirements into filter criteria and narrows the catalog to matching products — no product expertise required.</p>"
+    },
+    {
+      "id": "cpq-guided-selling-q12",
+      "type": "true-false",
+      "text": "Guided selling visibility can be restricted by User Types, Companies, Markets, Brands, and Custom Permission Groups — the same dimensions as product visibility.",
+      "correctAnswer": true,
+      "explanation": "<p>Guided selling uses the <strong>same permission model</strong> as products and categories. Visibility can be restricted by User Types, Companies, Markets, Brands, and Custom Permission Groups — allowing different guided selling flows for different user groups.</p>"
+    }
+  ]
+}

@@ -19,6 +19,14 @@
     "cc-search-solr",
     "cc-events",
     "cpq-overview",
-    "cpq-platform-basics"
+    "cpq-platform-basics",
+    "cpq-configurable-products",
+    "cpq-rules-engine",
+    "cpq-scripting",
+    "cpq-guided-selling",
+    "cpq-advanced-config",
+    "cpq-pricing",
+    "cpq-quote-management",
+    "cpq-approvals"
   ]
 }

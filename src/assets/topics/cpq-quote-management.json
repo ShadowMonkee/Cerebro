@@ -1,0 +1,189 @@
+{
+  "id": "cpq-quote-management",
+  "title": "Quote Lifecycle, Layout, Workflow & Versioning",
+  "description": "Understand the quote structure, custom fields, workflow engine, status transitions, revisions, and the full quote lifecycle.",
+  "icon": "📄",
+  "category": "cpq-phase-3",
+  "tags": ["quotes", "workflow", "statuses", "actions", "custom-fields", "quote-tables", "revisions", "lifecycle", "dictionary"],
+  "sections": [
+    {
+      "title": "Quote Layout & Structure",
+      "content": "<p>A quote in SAP CPQ is the central document that captures everything about a deal — products, pricing, customer information, terms, and approval status. The quote screen is organised into three main areas.</p><p><strong>Quote Tabs</strong> — displayed at the top of the page, tabs divide the quote into logical sections so that not all data is crammed onto a single screen. Three standard tabs exist by default: <strong>Quotation</strong> (the main working area), <strong>Involved Parties</strong> (customer and contact data), and <strong>Documents</strong> (generated output files). Admins can add <strong>Custom Quote Tabs</strong> to store additional data — for example, an \"SAP Data\" tab for ERP-related fields or a \"Technical Specs\" tab for engineering details.</p><p><strong>Quote Actions</strong> — buttons in the upper-right corner that move the quote through the workflow or perform specific tasks. Actions are divided into <strong>transitional actions</strong> (change the quote's status, e.g. Submit for Approval) and <strong>non-transitional actions</strong> (perform a task without changing status, e.g. View, Generate Documents, Attach Comment). The available actions depend on the current quote status and the user's permissions.</p><p><strong>Quote Body</strong> — the main content area containing the <strong>Quote Header</strong> (quote info, dates, references), <strong>Quote Items</strong> (the products with their configurations, quantities, and prices — each row is a line item with columns like List Price, Discount %, Discount Amount, Extended Amount), <strong>Totals</strong> (aggregated pricing), and <strong>Custom Fields</strong> (additional header-level data). Users can customise their own display by selecting which columns and sections are visible — but this layout is per-user, not global.</p>"
+    },
+    {
+      "title": "Custom Quote Tabs & Custom Fields",
+      "content": "<p><strong>Custom Quote Tabs</strong> are created under Setup → Quote → Custom Quote Tabs. Each tab has a name, rank (display order), and an optional <strong>Implementation File</strong> that links the tab to an existing CPQ page. If no implementation file is selected, the tab automatically displays the Quote Custom Fields assigned to it. Tab visibility is controlled by <strong>permissions</strong> (User Types, Companies, Markets, Brands, Permission Groups) and can be restricted to specific <strong>quote statuses</strong> — no selection means the tab is visible in all statuses.</p><p><strong>Quote Custom Fields (QCF)</strong> store extra information at the <strong>quote header level</strong>. Each QCF has a name, type (<strong>Free Form</strong>, <strong>Attribute</strong>, <strong>Date</strong>, or <strong>Long Text</strong>), is assigned to a tab, and has an order within that tab. The \"Save Quote on Change\" checkbox triggers rule and script re-evaluation when the field value changes. QCFs support <strong>calculation types</strong>: None (user-entered), Once (computed on quote creation), On Modify (recomputed when the quote changes), or Always (recomputed every time the quote loads). QCFs can also be flagged as <strong>Personally Identifiable Information</strong> for GDPR compliance, with an option to mark them as Sensitive Data so changes are not logged.</p><p><strong>QCF Permissions</strong> control field behaviour per user type per quote status. Each cell in the permission matrix can be set to: <strong>Editable</strong>, <strong>Read Only</strong>, <strong>Required</strong>, or <strong>Hidden</strong>. This enables scenarios like \"Editable in Preparing status for Sales Reps, Read Only in all other statuses.\"</p><p>Different <strong>labels per user type</strong> are also possible — the same field can display a different name to different user groups.</p>"
+    },
+    {
+      "title": "Quote Item Custom Fields & Dictionaries",
+      "content": "<p><strong>Quote Item Custom Fields (QICF)</strong> store extra information at the <strong>line item level</strong> — appearing as additional columns in the Quote Items table. Created under Setup → Quote → Fields, Calculations, Layout, each QICF has a name, type (Currency, Number, String, Date, Boolean), and an optional <strong>calculation formula</strong>. The formula can be set to run \"After Adding Products to Quote\" for automatic computation.</p><p>QICFs are <strong>non-editable by default</strong>. To make them editable, you must configure permissions per user type and per quote status in the QICF's editability settings. After creating a QICF, you must also <strong>add it to the layout</strong> — exit Setup, then configure column visibility per permission group. The QICF will not appear on the quote screen until both the layout and visibility steps are completed.</p><p>QICF labels initially display only the <strong>technical name</strong> in the UI. To show a user-friendly label, you use the <strong>Dictionary</strong> system. SAP CPQ's UI displays properties, names, and labels based on a <strong>system dictionary</strong> (read-only). You can extend it by creating a <strong>custom dictionary</strong> with key/value pairs that override system dictionary entries. Any key/value in a custom dictionary overrides the inherited system dictionary value. Custom fields are not in the system dictionary by default, so their display labels must be added to a custom dictionary.</p><p>Custom dictionaries are assigned to <strong>individual users</strong> (or users can assign one themselves). This is also the mechanism for <strong>translating</strong> the CPQ UI — create a dictionary per language and assign it to users based on their locale.</p>"
+    },
+    {
+      "title": "Quote Tables — Dynamic Data on Quotes",
+      "content": "<p><strong>Quote Tables</strong> display information on a quote tab in table format. They are used for data that is specific to a quote and doesn't fit into the standard line items or custom fields — for example, purchase history, cross-sell recommendations, multiple shipping addresses, or tender offerings.</p><p>Quote tables are created under Setup → Quote → Quote Tables. Each table has a <strong>Label</strong> (visible in the UI), a <strong>Name</strong> (used in scripts), an assigned <strong>Tab</strong>, a <strong>Rank</strong> (order within the tab), and <strong>permissions</strong> (visibility per company and status). Columns are defined with a label, name, type (Number, Decimal, String, Date, Money, Boolean, or Attribute), validation rules, and per-user-type permissions (Read Only, Editable, or Hidden).</p><p>Quote tables support <strong>actions</strong> at two levels: <strong>Table Actions</strong> (buttons above the table — standard ones are Add Row, Delete Row, Copy Row) and <strong>Row Actions</strong> (buttons on each row). Each action can have <strong>pre-action and post-action scripts</strong>, and entirely new <strong>custom actions</strong> can be created as scripts. Best practice: use <strong>global scripts</strong> for custom table actions so the code is centralised and easy to maintain.</p><p>The data in a quote table is usually <strong>loaded by a script from a custom table</strong>. A typical flow: a script queries a custom table based on the customer or product context, populates the quote table rows, and the user makes selections (e.g. checkboxes). Another script then acts on the selections — for example, adding cross-sell products to the quote. Quote table data can also be displayed in generated quote documents using dedicated tags.</p><p>Quote tables support <strong>translations</strong> for labels, column headers, action labels, and validation messages.</p>"
+    },
+    {
+      "title": "Workflow — Statuses, Actions & Permissions",
+      "content": "<p>The <strong>workflow engine</strong> is the most important process in a CPQ implementation. It defines the sequence of steps (statuses) a quote moves through and the actions available at each step.</p><p>A <strong>Status</strong> represents a stage in the quote lifecycle (e.g. Preparing, Draft, Submitted, Approved, Won, Lost). All quotes begin in a <strong>default status</strong> (typically \"Preparing\" or \"Open\") — there can be only one default. Statuses are created under Setup → Workflow/Approval → Statuses, each with a name and rank.</p><p><strong>Workflow Actions</strong> define what can happen at each status. They are configured in a <strong>matrix view</strong> where the left side represents start statuses and the top represents end statuses. Each cell contains the actions that can transition a quote between those statuses. Actions are configured separately for three views: <strong>My Quotes</strong> (user's own quotes — the most robust workflow), <strong>Waiting for Approval</strong> (quotes pending the user's approval), and <strong>Other Quotes</strong> (quotes visible by permission).</p><p>Each workflow action has: a <strong>Condition</strong> (a formula that must evaluate to true for the action to be available — indicated by a flag icon), a <strong>Notification</strong> (email trigger), and optional <strong>Pre-Action / Post-Action</strong> scripts. <strong>Workflow Permissions</strong> control which user types can execute which actions. <strong>Required Fields</strong> define which fields must be filled before an action can execute (e.g. Sold-To Party must be set before adding items).</p><p><strong>Item Actions</strong> define what can be done at the quote line item level (Add Item, Edit, Delete, Reconfigure) per status. Item action workflows can differ between My Quotes, Waiting for Approval, and Other Quotes. Extra conditions can restrict item actions — for example, preventing a specific user type from deleting items.</p>"
+    },
+    {
+      "title": "Quote Versioning, Creation & Lifecycle Tips",
+      "content": "<p><strong>Quote Revisions</strong> are different versions of the same quote. Only <strong>one revision can be active at a time</strong>, and the system retains the history of previous versions. Revisions are used when the customer wants to negotiate — the rep creates a new revision with adjusted prices or products without losing the original version. A previous revision can be reactivated at any time.</p><p>When changes are minor (price tweaks, adding a product), a <strong>revision</strong> is appropriate. When changes are extensive, it may be better to <strong>copy the quote</strong> — this creates an entirely new quote with a new number, resets to the initial status, and requires fresh approval.</p><p><strong>Quote creation</strong> can happen in several ways: by adding products from the catalog (which auto-creates a quote), by clicking the New Quote icon, or by configuring the application parameter \"Create Empty Quote First\". Every quote must be populated with <strong>customer details</strong> — selected from existing business partners or created on the fly (if the application parameter allows it). Best practice: customer master data should be maintained in <strong>ERP or CRM and interfaced to CPQ</strong> rather than manually managed in CPQ.</p><p><strong>Quote output</strong> can be generated in <strong>PDF, Word, or Excel</strong> format via the \"Generate Documents\" action. Output is always generated for the <strong>current active revision</strong>. After generation, the user can download, return to the quote, or send the document by email. By default, the quote remains editable after document generation — but the workflow can be configured to change the status (e.g. to \"Sent\") and disable editing after output is produced.</p><p><strong>Quote deletion</strong> is possible manually (from the quote list) or in bulk (by selecting user checkboxes and deleting all their quotes with optional filters). Deletion is permanent — there is no recycle bin or undo.</p>"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cpq-quote-management-q1",
+      "type": "multiple-choice",
+      "text": "What are the three standard quote tabs that exist by default in SAP CPQ?",
+      "options": [
+        "Products, Pricing, Documents",
+        "Quotation, Involved Parties, Documents",
+        "Header, Items, Totals",
+        "Configuration, Approval, Output"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>The three standard tabs are <strong>Quotation</strong> (main working area), <strong>Involved Parties</strong> (customer and contact data), and <strong>Documents</strong> (generated output files). Admins can add custom tabs for additional data.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q2",
+      "type": "true-false",
+      "text": "A transitional action in SAP CPQ moves a quote from one status to another, while a non-transitional action performs a task without changing the status.",
+      "correctAnswer": true,
+      "explanation": "<p><strong>Transitional actions</strong> change the quote's status (e.g. Submit for Approval moves from Draft to Pending Approval). <strong>Non-transitional actions</strong> perform tasks like viewing, generating documents, or attaching comments without affecting the status.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q3",
+      "type": "multiple-choice",
+      "text": "What are the possible types for a Quote Custom Field (QCF)?",
+      "options": [
+        "String, Number, Boolean, Currency",
+        "Free Form, Attribute, Date, Long Text",
+        "Dropdown, Checkbox, Radio Button, Text",
+        "Simple, Configurable, Container, Calculated"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>QCFs support four types: <strong>Free Form</strong> (open text input), <strong>Attribute</strong> (linked to a central attribute for dropdown selection), <strong>Date</strong> (date picker), and <strong>Long Text</strong> (multi-line text). The Attribute type reuses centrally managed attributes, consistent with CPQ's design philosophy.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q4",
+      "type": "true-false",
+      "text": "Quote Item Custom Fields (QICFs) are editable by default and must be explicitly set to read-only if needed.",
+      "correctAnswer": false,
+      "explanation": "<p>QICFs are <strong>non-editable by default</strong>. To make them editable, you must explicitly configure permissions per user type and per quote status. This prevents accidental modifications to calculated or system-managed fields.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q5",
+      "type": "multiple-choice",
+      "text": "How do you display a user-friendly label for a Quote Item Custom Field instead of its technical name?",
+      "options": [
+        "Edit the label directly on the QICF definition page",
+        "Add a key/value entry in a custom dictionary and assign it to the user",
+        "Rename the QICF in the Layout settings",
+        "Use a global script to override the label at runtime"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>QICF labels display the technical name by default. To show a user-friendly label, create a <strong>custom dictionary</strong> with a key/value pair for the field name, then assign the dictionary to the user. Custom dictionaries extend (and can override) the system dictionary.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q6",
+      "type": "true-false",
+      "text": "A custom dictionary in SAP CPQ can override values from the system dictionary, but the system dictionary itself cannot be modified.",
+      "correctAnswer": true,
+      "explanation": "<p>The <strong>system dictionary</strong> is read-only and defines default labels and properties. A <strong>custom dictionary</strong> extends it — any key/value pair in the custom dictionary overrides the corresponding system dictionary entry. This is also the mechanism for UI translations.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q7",
+      "type": "multiple-choice",
+      "text": "Quote table data is typically loaded into the table by which mechanism?",
+      "options": [
+        "Manual entry by the sales rep for every quote",
+        "Automatic import from the product catalog",
+        "A script that queries a custom table based on customer or product context",
+        "Direct database connection to ERP"
+      ],
+      "correctIndex": 2,
+      "explanation": "<p>Quote table data is usually <strong>loaded by a script from a custom table</strong>. The script queries relevant data based on the customer, product, or quote context, populates the quote table rows, and the user can then interact with the data (e.g. make selections via checkboxes).</p>"
+    },
+    {
+      "id": "cpq-quote-management-q8",
+      "type": "true-false",
+      "text": "SAP CPQ allows more than one default status for quotes in the workflow.",
+      "correctAnswer": false,
+      "explanation": "<p>There can be <strong>only one default status</strong>. All quotes begin in this status (typically \"Preparing\" or \"Open\"). Any status can be set as the default, but two statuses cannot both be marked as default simultaneously.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q9",
+      "type": "multiple-choice",
+      "text": "Workflow actions in SAP CPQ are configured separately for which three views?",
+      "options": [
+        "Quotes, Products, Customers",
+        "My Quotes, Waiting for Approval, Other Quotes",
+        "Draft, Active, Archived",
+        "Sales, Manager, Admin"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>Workflow actions are configured for three views: <strong>My Quotes</strong> (user's own quotes), <strong>Waiting for Approval</strong> (quotes the user needs to approve), and <strong>Other Quotes</strong> (quotes visible by permission). Each view can have different available actions.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q10",
+      "type": "true-false",
+      "text": "When a workflow action has a condition specified, a flag icon appears in the workflow matrix to indicate that the action is conditional.",
+      "correctAnswer": true,
+      "explanation": "<p>A <strong>flag icon</strong> in the workflow matrix indicates that a condition has been specified for that action. The condition is a formula that must evaluate to true (e.g. a status ID check or user type check) for the action to be available.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q11",
+      "type": "multiple-choice",
+      "text": "What is the difference between creating a new quote revision and copying a quote?",
+      "options": [
+        "Revisions create a new quote number; copies keep the same number",
+        "Revisions retain history and keep the same quote; copies create an entirely new quote with a new number and reset status",
+        "Copies retain approval status; revisions require fresh approval",
+        "There is no difference — they produce identical results"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p>A <strong>revision</strong> creates a new version of the same quote, retaining history — ideal for minor adjustments during negotiation. A <strong>copy</strong> creates an entirely new quote with a new number, resets to the initial status, and requires fresh approval — better for extensive changes.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q12",
+      "type": "true-false",
+      "text": "Quote output documents in SAP CPQ are always generated for the current active revision.",
+      "correctAnswer": true,
+      "explanation": "<p>Output is generated for the <strong>current active revision</strong> only. If a previous revision needs to be output, it must first be reactivated. Only one revision can be active at a time.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q13",
+      "type": "multiple-choice",
+      "text": "Which QCF calculation type recomputes the field value every time the quote is loaded?",
+      "options": [
+        "None",
+        "Once",
+        "On Modify",
+        "Always"
+      ],
+      "correctIndex": 3,
+      "explanation": "<p><strong>Always</strong> recomputes the field value every time the quote loads. <strong>On Modify</strong> recomputes when the quote changes. <strong>Once</strong> computes only at quote creation. <strong>None</strong> means the field is user-entered with no formula.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q14",
+      "type": "true-false",
+      "text": "By default, a quote remains editable after a document is generated via the 'Generate Documents' action.",
+      "correctAnswer": true,
+      "explanation": "<p>By default, the quote <strong>remains editable</strong> after document generation. However, the workflow can be configured to change the status after generation (e.g. to \"Sent\") and disable editing in that new status — this is a common implementation pattern.</p>"
+    },
+    {
+      "id": "cpq-quote-management-q15",
+      "type": "multiple-choice",
+      "text": "The 'Required Fields' feature in the workflow engine is used to:",
+      "options": [
+        "Define which products must be in the quote before it can be saved",
+        "Specify which fields must be filled before a specific workflow action can be executed",
+        "Mark custom fields as mandatory across all statuses",
+        "Require all quote tabs to be visited before the quote can be submitted"
+      ],
+      "correctIndex": 1,
+      "explanation": "<p><strong>Required Fields</strong> define which fields must be filled before a specific action can execute. For example, requiring the Sold-To Party field to be populated before the \"Add Item\" action can be performed. This is configured per action, not globally.</p>"
+    }
+  ]
+}
